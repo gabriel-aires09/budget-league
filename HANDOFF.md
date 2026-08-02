@@ -13,6 +13,7 @@ Project state for whoever continues the work. Update this file whenever the proj
 **Lighting — pulled forward from Milestone 13 on request: DONE.**
 **Milestone 06 — Arena, Goals and Scoring: DONE.**
 **Milestone 07 — Boost System and Boost Pads: DONE.**
+**Milestone 08 — Jumps, Flips and Air Control: DONE.**
 
 The game opens on a main menu (Play / Settings / Exit). Play starts a real match: an enclosed
 55 x 80 m arena with side walls, back walls, a ceiling and two coloured goals; a player car driven
@@ -20,8 +21,10 @@ with WASD/arrows on a Jolt rigid body; a ball; a score, a match clock and a kick
 a smooth third-person chase camera. A goal resets the field and counts down again, and the match
 ends at full time. The car draws a real low-poly model from the Cars-Park pack, cooked from FBX and
 painted in the team colour, and the whole scene is flat-shaded by one directional light. Shift
-boosts, drawing on a 0-100 meter refilled by 18 boost pads spread across the field. Esc or P
-pauses, with Resume / Settings / Return to main menu / Exit. No jumping, air control or opponent yet.
+boosts, drawing on a 0-100 meter refilled by 18 boost pads spread across the field. Space jumps,
+a second press flips in whatever direction is held, and the car can be pitched, yawed and rolled in
+the air, so aerial ball touches work. Esc or P pauses, with Resume / Settings / Return to main menu
+/ Exit. No opponent yet — the bot is Milestone 11.
 
 Verified on 2026-08-01 with temporary scripted-input harnesses, since there is no `xdotool`/`wtype`
 on this machine to press keys. Milestone 02 used a scripted controller (accelerate → sustained right
@@ -131,6 +134,20 @@ Milestone 07 boost, measured by a temporary harness (removed afterwards):
 | Car 5 m directly above a pad | pad not taken |
 | Nearest pad edge to the kickoff spot | 2.00 m, so kickoff never grabs one |
 
+Milestone 08 jumps and air control, measured by a temporary harness (removed afterwards):
+
+| Measurement | Result |
+|---|---|
+| Single jump | peaks 1.49 m above rest, 1.01 s airtime, lands upright |
+| Double jump | peaks 2.67 m, 1.67 s airtime, lands upright |
+| Forward / backward flip | 8.3 m/s speed change, 7.9 rad/s spin, upright again 2.02 s later |
+| Side flip | 8.3 m/s, 7.7 rad/s, upright again 0.89 s later |
+| Pitch, yaw and roll, each alone | 5.56 rad/s, 292 degrees per second |
+| Launched tumbling on all three axes | upright and drivable 3.16 s later, unaided |
+| Rolling 1.3 m above the floor | 5.43 rad/s — the righting assist stays out of the way |
+| Jump + second jump + boost, nose up | peaks at **10.09 m** |
+| Ball hung at 4.0 m (underside 2.75 m) | car climbs to 2.69 m and drives it up at 8.1 m/s |
+
 ## Layout
 
 ```
@@ -175,8 +192,9 @@ make run CONFIG=Debug
 ./Build/Release/ArcadeCarSoccer --smoke-test 60 --screenshot SmokeTest.png
 ```
 
-Controls so far: **WASD / arrows** drive and steer, **Shift** boosts (held), **R** resets the car,
-**Esc** or **P** pauses.
+Controls so far: **WASD / arrows** drive and steer on the ground and pitch/yaw in the air,
+**Space** jumps (again for a double jump, or a flip if a direction is held), **Shift** boosts
+(held), **Q/E** air roll, **R** resets the car, **Esc** or **P** pauses.
 In menus: **up/down** or **W/S** move, **Enter**/**Space** activate, **left/right** change a value,
 and the mouse works too.
 
@@ -239,6 +257,23 @@ is incremental.
 - **The ball uses `LinearCast` motion quality.** It is the fastest thing in the scene (38 m/s off a
   top-speed hit, capped at `maxSpeed` 55) and the one object that must never tunnel through a wall
   once the arena is closed in Milestone 06.
+- **`CarInput::jump` is held, not an edge, and `CarObject` finds the rising edge itself.**
+  `CarObject::Update` runs once per *fixed step* while `IsKeyPressed` stays true for a whole frame,
+  so at 120 Hz an edge-triggered field would fire twice in one frame and eat the double jump
+  instantly. Any new one-shot input must follow the same pattern.
+- **`jumpLockout` (0.15 s) exists because the ground probe still hits right after a jump.** Without
+  it the very next step sees `grounded`, hands the jumps back, and the car can jump forever.
+- **A flip is `up x heldDirection` for its spin axis.** That one expression gives a nose-down pitch
+  for a forward flip and a roll for a side flip, with no per-direction special casing.
+- **The righting assist is suppressed only when airborne *and* air input is present.** It cannot be
+  gated on input alone: W is throttle on the ground and pitch only in the air, so that would switch
+  the assist off every time the player drives forwards.
+- **`airControlRate` is a requested rate; the car settles at about 80% of it.** The body's
+  `angularDamping` (2.2) pulls the spin back every step, so 7.0 measures as 5.6 rad/s (300 deg/s,
+  about the Rocket League figure). Tune it by measuring, not by reading the number.
+- Air control drives the angular velocity towards the requested rate rather than applying torque,
+  matching how ground steering already works. With no input the target is zero and the response
+  drops to `airDamping`, so a flip still completes but the car settles before landing.
 - **Boost is applied before the grounded gate**, so it already works in the air. It is the one
   control that must keep working off the ground, and Milestone 08 builds aerials on top of it.
 - **Boost has its own speed cap** (`boostMaxSpeed` 46 m/s) above the throttle's `maxSpeed` (32),
@@ -272,6 +307,17 @@ is incremental.
   drift away from what is drawn — worth preserving when Milestone 13 adds trim and stands.
 - **The ceiling has collision but is never drawn.** Drawing it would put a slab between the chase
   camera and the field the moment the car climbs a wall.
+- **The arena walls are glass, and that needed a separate draw pass, not just an alpha.** The chase
+  camera regularly ends up outside the arena when the car is against a wall, and a solid wall then
+  hid the car completely. Lowering the alpha alone fixes nothing: `ArenaObject` draws first in
+  `Scene::objects`, so the wall stamps itself into the depth buffer and the car behind it is
+  rejected before it can ever blend through. `ArenaObject::DrawGlassWalls` therefore runs **after
+  every other object**, called explicitly at the end of `MatchScene::Draw`, with `rlDisableDepthMask`
+  so the panels test depth but never write it. A piece is glass purely because its colour has
+  alpha below 255, so `Draw` and `DrawGlassWalls` split the same `pieces` list with no extra flag.
+  Anything transparent added later has to join that late pass for the same reason.
+- The wall edges are drawn as solid lines so the boundary still reads once the panels are
+  see-through. The opaque base trim serves the same purpose at floor level.
 - **The kickoff freeze is simply not stepping physics.** Everything has just been re-centred with
   zero velocity, so skipping `StepPhysics` holds it there exactly, with no new "frozen" flags on the
   bodies and no risk of Jolt waking something. `Match::IsFrozen()` covers Kickoff and Finished;
@@ -406,8 +452,15 @@ the ball and floor were bare silhouettes. Milestone 13 still owns shadows, bloom
   the HUD lands in Milestone 10.
 - **The Release build prints GCC `-O3` warnings from inside Jolt.** Known third-party false
   positives, not project errors.
-- `CarInput` carries `throttle`, `steer`, `boost` and `reset`. Jump and air control fields get added
-  by the milestones that implement them, rather than sitting unused.
+- **Air roll is on Q/E, which CLAUDE.md section 8 does not list.** That section says WASD maps to
+  pitch, yaw and roll, but two axes of input cannot drive three axes of rotation independently, and
+  `CarController.h` in section 2.4 does specify separate pitch/yaw/roll fields. W/S is pitch and A/D
+  is yaw; roll needed somewhere, and two extra keys beat a modal air-roll modifier.
+- **The righting assist no longer fights aerials but still runs on a normal landing.** A car that
+  lands upside down with no input rights itself as before; a car being deliberately rotated is left
+  alone. Both are verified.
+- `CarInput` carries `throttle`, `steer`, `boost`, `jump`, `airPitch`, `airYaw`, `airRoll` and
+  `reset` — everything the bot in Milestone 11 needs.
 - **There is no boost flame or trail yet.** `CarObject::boosting` is set every step and the meter
   brightens while held, but the visual effect belongs to Milestone 13's `Effects.h/cpp`.
 - `.venv` does not exist yet; the Makefile falls back to `python3`, which is fine while the cooker
@@ -421,9 +474,6 @@ the ball and floor were bare silhouettes. Milestone 13 still owns shadows, bloom
   stability, so the fix is to **keep the arena floor smooth** — build ramps and wall transitions as
   slopes, never as steps. The Milestone 06 arena honours this (the floor is one flat slab and the
   walls meet it at a right angle); keep it true for boost pads and any Milestone 13 trim.
-- **The righting assist runs while airborne within `recoveryProbe` (1.3 m) of the ground.** That is
-  what makes bump landings clean now, but Milestone 08 must gate it off while the player is giving
-  air input, or it will fight deliberate aerial rotation.
 - **Some settings are stored but not consumed yet**, because the systems that read them do not exist:
   camera sensitivity (Milestone 09), bot enabled (Milestone 11), and
   the master/SFX volumes (Milestone 14 — the audio device is not even initialised). Fullscreen,
@@ -432,20 +482,20 @@ the ball and floor were bare silhouettes. Milestone 13 still owns shadows, bloom
 - **Settings live for the session only.** Nothing is written to disk; Milestone 12 introduces the
   config file, and that is the natural place to persist them.
 
-## Next steps — Milestone 08 (Jumps, Flips and Air Control)
+## Next steps — Milestone 09 (Camera Modes)
 
-1. Add `jump` to `CarInput` (edge triggered, unlike `boost` which is held) and jump/double-jump
-   state to `CarObject`: an impulse on the first press, a second jump or a directional flip on the
-   second, reset once the car lands.
-2. **Gate the righting assist off while the player is giving air input.** It currently runs whenever
-   the car is within `recoveryProbe` (1.3 m) of the ground, airborne or not, and it will fight
-   deliberate aerial rotation. See the note above.
-3. Air control replaces the `if (!grounded) return;` early-out in `CarObject::Update`. Boost is
-   already applied before that gate, so it keeps working; pitch/yaw/roll torques go after it.
-4. Keep every new rate in per-second units converted with the step, as `grip` and `tumbleDamping`
-   are — this has already caused one silent bug.
-5. Aerial ball touches are the goal: the ball sits at 1.25 m and a top-speed hit peaks around 7 m,
-   so the car needs to reach roughly that height under boost.
+1. Polish `ChaseCamera`: it currently only smooths position and target and clamps its own height.
+   Milestone 08 made the car fully aerial, so the camera now has to stay readable while the car is
+   10 m up and rotating on all three axes.
+   Note the camera passing through a wall is no longer *fatal* — the walls are glass, so the car
+   stays visible from outside — but pulling the camera in is still the better answer and belongs
+   here. Keep the glass either way; it also stops the far wall hiding play at the other end.
+2. Add the ball-cam toggle on **C**: keep the ball framed while still showing the car. The scene
+   already owns both objects, so `ChaseCamera::Update` just needs the ball position passed in.
+3. Wall occlusion is listed under 6.2 and is worth doing here rather than later: the arena is now
+   fully enclosed, so the camera can and will end up inside a wall.
+4. `GameSettings::cameraSensitivity` is stored but still unread — this is the milestone that should
+   consume it.
 
 The opponent car (Milestone 11) needs no new asset work: give the second `CarObject` a different
 `modelName` and the orange `teamColor` before `Initialize()` and it cooks, fits and paints itself.

@@ -78,6 +78,27 @@ public:
     float boostMaxSpeed = 46.0f;   // boost drives past the normal top speed
     bool boosting = false;         // for the HUD, and the flame in Milestone 13
 
+    // --- Jump, flip and air control
+    float jumpImpulse = 1000.0f;       // N s along the car's own up axis
+    float secondJumpImpulse = 900.0f;
+    float flipImpulse = 1500.0f;       // horizontal, towards whatever is held
+    float flipSpin = 9.0f;             // rad/s of the flip rotation
+    // Grounded is ignored for this long after a jump, otherwise the ground probe
+    // still hits on the next step and instantly hands the jumps back.
+    float jumpLockout = 0.15f;
+    // Requested rate at full deflection. The car settles at roughly 80% of it,
+    // because the body's angularDamping keeps pulling the spin back down every
+    // step: 7.0 measures as about 5.6 rad/s, or 300 degrees per second. Tune
+    // this by measuring, not by reading the number.
+    float airControlRate = 7.0f;
+    float airControlResponse = 9.0f;   // how fast it reaches that rate, per second
+    float airDamping = 0.8f;           // spin bleed with no air input, per second
+
+    bool jumpUsed = false;
+    bool doubleJumpUsed = false;
+    bool jumpHeldPrevious = false;
+    float jumpLockoutRemaining = 0.0f;
+
     // --- Stability
     float linearDamping = 0.1f;
     float angularDamping = 2.2f;

@@ -122,7 +122,15 @@ void CarObject::Update(float deltaTime)
     // Self-righting torque, so a bad landing or a hard bump never leaves the car stuck.
     // The axis is normalised on purpose: its raw length is sin(tilt), which vanishes
     // exactly when the car is upside down and would leave it stranded on its roof.
-    if (nearGround && uprightness < 0.999f)
+    //
+    // It is suppressed while the player is rotating the car in the air: the assist
+    // reaches 1.3 m above the ground, so without this it would quietly fight every
+    // deliberate aerial. Ground input must not suppress it, hence the grounded test
+    // — W is throttle on the ground and pitch only in the air.
+    bool aerialInput = !grounded && (fabsf(input.airPitch) + fabsf(input.airYaw) +
+                                     fabsf(input.airRoll)) > 0.01f;
+
+    if (nearGround && !aerialInput && uprightness < 0.999f)
     {
         JPH::Vec3 uprightAxis = up.Cross(worldUp);
         if (uprightAxis.LengthSq() < 1.0e-4f)
@@ -144,8 +152,61 @@ void CarObject::Update(float deltaTime)
             bodies.AddForce(bodyID, forward * boostForce);
     }
 
+    // Jump and flip. The rising edge is found here rather than in the controller
+    // so it survives running several fixed steps inside one rendered frame.
+    if (jumpLockoutRemaining > 0.0f)
+        jumpLockoutRemaining = fmaxf(jumpLockoutRemaining - deltaTime, 0.0f);
+    else if (grounded)
+    {
+        jumpUsed = false;
+        doubleJumpUsed = false;
+    }
+
+    bool jumpEdge = input.jump && !jumpHeldPrevious;
+    jumpHeldPrevious = input.jump;
+
+    if (jumpEdge && !jumpUsed && grounded)
+    {
+        // Along the car's own up, so jumping off a wall pushes away from it.
+        bodies.AddImpulse(bodyID, up * jumpImpulse);
+        jumpUsed = true;
+        jumpLockoutRemaining = jumpLockout;
+    }
+    else if (jumpEdge && jumpUsed && !doubleJumpUsed)
+    {
+        // A direction held turns the second jump into a flip that way; nothing
+        // held is a plain second jump.
+        JPH::Vec3 flipDirection = forward * input.throttle + right * input.steer;
+        if (flipDirection.LengthSq() > 0.01f)
+        {
+            flipDirection = flipDirection.Normalized();
+            bodies.AddImpulse(bodyID, flipDirection * flipImpulse);
+            // up x direction is the axis that rolls the car over that way: it
+            // gives a nose-down pitch for a forward flip and a roll for a side one.
+            bodies.SetAngularVelocity(bodyID, up.Cross(flipDirection).Normalized() * flipSpin);
+        }
+        else
+        {
+            bodies.AddImpulse(bodyID, up * secondJumpImpulse);
+        }
+        doubleJumpUsed = true;
+    }
+
     if (!grounded)
-        return; // air control arrives in Milestone 08
+    {
+        // Air control: drive the angular velocity towards the requested rate.
+        // With no input the requested rate is zero and the response drops to
+        // airDamping, so a flip still completes but the car settles for landing.
+        JPH::Vec3 angularVelocity = bodies.GetAngularVelocity(bodyID);
+        JPH::Vec3 desired = right * (input.airPitch * airControlRate) +
+                            up * (-input.airYaw * airControlRate) +
+                            forward * (input.airRoll * airControlRate);
+
+        float response = aerialInput ? airControlResponse : airDamping;
+        float blend = 1.0f - expf(-response * deltaTime);
+        bodies.SetAngularVelocity(bodyID, angularVelocity + (desired - angularVelocity) * blend);
+        return;
+    }
 
     JPH::Vec3 angularVelocity = bodies.GetAngularVelocity(bodyID);
     float yawSpin = angularVelocity.Dot(up);

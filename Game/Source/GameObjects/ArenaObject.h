@@ -20,6 +20,11 @@ public:
     virtual void Draw() override;
     virtual BoundingBox GetWorldBounds() const override;
 
+    // The glass walls, which MUST be drawn after every other object in the scene.
+    // They are see-through so the camera can sit outside the arena and still show
+    // the car, and that only works if nothing writes depth over the car first.
+    void DrawGlassWalls();
+
     float width = 55.0f;  // along X, sideline to sideline
     float length = 80.0f; // along Z, goal line to goal line
     float wallHeight = 15.0f;
@@ -33,6 +38,8 @@ public:
 
     // One box of the arena. Physics and rendering both read this list, so the
     // collision can never drift away from what is on screen.
+    // A colour with alpha below 255 marks the piece as glass: it is skipped by
+    // Draw and picked up by DrawGlassWalls instead.
     struct Piece
     {
         Vector3 center;

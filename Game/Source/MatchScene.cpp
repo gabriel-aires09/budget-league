@@ -179,6 +179,8 @@ void MatchScene::Draw()
     BeginMode3D(camera);
     for (GameObject *object : objects)
         object->Draw();
+    // Last, and only after everything else: see the note on DrawGlassWalls.
+    arena.DrawGlassWalls();
     EndMode3D();
 
     DrawMatchStatus();
@@ -190,7 +192,7 @@ void MatchScene::Draw()
     // flag would read stale for the first three seconds of every match.
     if (!match.IsFrozen())
         uistyle::DrawTextAt(playerCar.grounded ? "GROUNDED" : "AIRBORNE", 20.0f, 52.0f, 18.0f, uistyle::TextDim);
-    uistyle::DrawTextAt("WASD / arrows drive - Shift boosts - R resets car - Esc pauses",
+    uistyle::DrawTextAt("WASD drive / air pitch+yaw - Space jump - Shift boost - Q/E air roll - R reset - Esc pause",
                         20.0f, GetScreenHeight() - 32.0f, 18.0f, uistyle::TextDim);
 
     if (!paused)

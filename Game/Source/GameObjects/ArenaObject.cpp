@@ -4,13 +4,17 @@
 #include "Scene.h"
 
 #include <raymath.h>
+#include <rlgl.h>
 
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/StaticCompoundShape.h>
 
 static const Color FLOOR_COLOR = { 42, 50, 68, 255 };
-static const Color WALL_COLOR = { 32, 39, 56, 255 };
+// Glass, not masonry: the chase camera regularly ends up outside the arena, and
+// a solid wall then hides the car completely. The alpha is what puts these in
+// the late, depth-write-free pass (see DrawGlassWalls).
+static const Color WALL_COLOR = { 96, 132, 190, 52 };
 static const Color TRIM_COLOR = { 52, 64, 90, 255 };
 
 ArenaObject::~ArenaObject()
@@ -97,8 +101,8 @@ void ArenaObject::Draw()
 {
     for (const Piece &piece : pieces)
     {
-        if (!piece.visible)
-            continue;
+        if (!piece.visible || piece.color.a < 255)
+            continue; // glass is drawn last, by DrawGlassWalls
 
         DrawModelEx(boxModel, piece.center, Vector3{ 0.0f, 1.0f, 0.0f }, 0.0f,
                     Vector3Scale(piece.halfExtents, 2.0f), piece.color);
@@ -119,6 +123,44 @@ void ArenaObject::Draw()
     DrawCubeWires(Vector3{ 0.0f, 0.02f, 0.0f }, width, 0.04f, length, Color{ 90, 190, 255, 120 });
     DrawLine3D(Vector3{ -halfWidth, 0.03f, 0.0f }, Vector3{ halfWidth, 0.03f, 0.0f },
                Color{ 90, 190, 255, 190 });
+}
+
+void ArenaObject::DrawGlassWalls()
+{
+    // Depth writing off, depth testing still on. Without this the walls would
+    // stamp themselves into the depth buffer and every object further away —
+    // which is exactly the car, whenever the camera slips outside the arena —
+    // would be rejected before it ever got the chance to blend through.
+    rlDisableDepthMask();
+
+    for (const Piece &piece : pieces)
+    {
+        if (!piece.visible || piece.color.a >= 255)
+            continue;
+
+        DrawModelEx(boxModel, piece.center, Vector3{ 0.0f, 1.0f, 0.0f }, 0.0f,
+                    Vector3Scale(piece.halfExtents, 2.0f), piece.color);
+    }
+
+    rlEnableDepthMask();
+
+    // Edges kept solid, so the boundary still reads even though the panels are
+    // nearly see-through.
+    const float halfWidth = width * 0.5f;
+    const float halfLength = length * 0.5f;
+    const Color edge = { 110, 160, 220, 150 };
+    for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
+    {
+        DrawLine3D(Vector3{ sideX * halfWidth, wallHeight, -halfLength },
+                   Vector3{ sideX * halfWidth, wallHeight, halfLength }, edge);
+        for (float sideZ = -1.0f; sideZ <= 1.0f; sideZ += 2.0f)
+        {
+            DrawLine3D(Vector3{ sideX * halfWidth, 0.0f, sideZ * halfLength },
+                       Vector3{ sideX * halfWidth, wallHeight, sideZ * halfLength }, edge);
+            DrawLine3D(Vector3{ -halfWidth, wallHeight, sideZ * halfLength },
+                       Vector3{ halfWidth, wallHeight, sideZ * halfLength }, edge);
+        }
+    }
 }
 
 BoundingBox ArenaObject::GetWorldBounds() const

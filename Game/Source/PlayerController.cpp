@@ -17,6 +17,18 @@ CarInput PlayerController::Poll()
         input.steer -= 1.0f;
 
     input.boost = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+    input.jump = IsKeyDown(KEY_SPACE);
+
+    // Airborne, the same WASD keys become pitch and yaw, with roll on Q/E.
+    // Pitch is deliberately inverted against the throttle: W drives forwards on
+    // the ground and puts the nose down in the air, as in Rocket League.
+    input.airPitch = -input.throttle;
+    input.airYaw = input.steer;
+    if (IsKeyDown(KEY_E))
+        input.airRoll += 1.0f;
+    if (IsKeyDown(KEY_Q))
+        input.airRoll -= 1.0f;
+
     input.reset = IsKeyPressed(KEY_R);
     return input;
 }
