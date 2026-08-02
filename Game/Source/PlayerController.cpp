@@ -16,6 +16,7 @@ CarInput PlayerController::Poll()
     if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT))
         input.steer -= 1.0f;
 
+    input.boost = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
     input.reset = IsKeyPressed(KEY_R);
     return input;
 }

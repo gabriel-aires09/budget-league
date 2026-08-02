@@ -16,6 +16,7 @@ namespace uistyle
     const Color TextDim = { 138, 154, 182, 255 };
     const Color TeamBlue = { 60, 140, 255, 255 };
     const Color TeamOrange = { 255, 142, 48, 255 };
+    const Color Boost = { 255, 205, 80, 255 }; // boost meter and ready boost pads
     const Color Warning = { 255, 96, 96, 255 };
 
     // The UI is laid out for a 720p window and scaled from there.

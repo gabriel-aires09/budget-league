@@ -1,5 +1,6 @@
 #include "App.h"
 
+#include "Lighting.h"
 #include "MainMenuScene.h"
 #include "MatchScene.h"
 #include "UserInterface.h"
@@ -42,6 +43,8 @@ bool App::Initialize(int argc, char **argv)
     JPH::RegisterDefaultAllocator();
     JPH::Factory::sInstance = new JPH::Factory();
     JPH::RegisterTypes();
+
+    lighting::Load();
 
 #ifdef GAME_DEV_TOOLS
     ImGui::CreateContext();
@@ -112,6 +115,9 @@ void App::Shutdown()
 #ifdef GAME_DEV_TOOLS
     ImGui::DestroyContext();
 #endif
+
+    // After the scenes, so every model has already detached from the shader.
+    lighting::Unload();
 
     JPH::UnregisterTypes();
     delete JPH::Factory::sInstance;

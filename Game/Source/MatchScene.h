@@ -3,15 +3,21 @@
 
 #include "Scene.h"
 #include "ChaseCamera.h"
+#include "Match.h"
 #include "PlayerController.h"
 #include "SettingsMenu.h"
 #include "UserInterface.h"
 #include "GameObjects/ArenaObject.h"
 #include "GameObjects/BallObject.h"
+#include "GameObjects/BoostPadObject.h"
 #include "GameObjects/CarObject.h"
+#include "GameObjects/GoalObject.h"
+
+#include <vector>
 
 // The gameplay scene. Milestone 02: arena floor, player car and chase camera.
-// Milestone 03: pause menu. Milestone 05: the ball.
+// Milestone 03: pause menu. Milestone 05: the ball. Milestone 06: the enclosed
+// arena, goals, score and clock. The full HUD arrives in Milestone 10.
 class MatchScene final : public Scene
 {
 public:
@@ -20,9 +26,19 @@ public:
     virtual void Draw() override;
     virtual void Shutdown() override;
 
+    void BuildBoostPads();
+    void DrawMatchStatus();
+    void DrawBoostMeter();
+
     ArenaObject arena;
     BallObject ball;
+    GoalObject blueGoal;
+    GoalObject orangeGoal;
     CarObject playerCar;
+    // Filled completely before any pointer is taken into Scene::objects, because
+    // a later push_back would reallocate and leave those pointers dangling.
+    std::vector<BoostPadObject> boostPads;
+    Match match;
     PlayerController playerController;
     ChaseCamera chaseCamera;
 

@@ -1,5 +1,7 @@
 #include "StaticModelAsset.h"
 
+#include "Lighting.h"
+
 #include <raymath.h>
 
 #include <cstring>
@@ -152,6 +154,8 @@ bool StaticModelAsset::Load(const std::string &name)
         model.materials[i].maps[MATERIAL_MAP_DIFFUSE].color = readMaterials[i].baked;
     }
 
+    lighting::Apply(model);
+
     materials = readMaterials;
     loaded = true;
     TraceLog(LOG_INFO, "MODEL: loaded %s (%d meshes, %d materials)",
@@ -162,7 +166,10 @@ bool StaticModelAsset::Load(const std::string &name)
 void StaticModelAsset::Unload()
 {
     if (loaded)
+    {
+        lighting::Detach(model);
         UnloadModel(model);
+    }
 
     model = {};
     bounds = {};

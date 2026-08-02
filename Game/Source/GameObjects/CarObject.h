@@ -65,6 +65,19 @@ public:
     float highSpeedSteerScale = 0.45f; // steering authority left at top speed
     float grip = 12.0f;                // sideways speed bled off, per second
 
+    // --- Boost
+    // Held, and it works in the air as well as on the ground, so it stays useful
+    // once Milestone 08 adds aerials.
+    float boostCapacity = 100.0f;
+    float boostAmount = 100.0f;    // 0 .. boostCapacity
+    float boostDrainRate = 33.0f;  // per second, so a full tank lasts about 3 s
+    // On top of the engine force. At 9000 the push from cruising to top speed
+    // took 0.36 s, which read as a teleport; at 4000 the car never reached the
+    // cap before running out of field.
+    float boostForce = 6000.0f;
+    float boostMaxSpeed = 46.0f;   // boost drives past the normal top speed
+    bool boosting = false;         // for the HUD, and the flame in Milestone 13
+
     // --- Stability
     float linearDamping = 0.1f;
     float angularDamping = 2.2f;

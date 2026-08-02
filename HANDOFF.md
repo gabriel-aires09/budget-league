@@ -10,13 +10,18 @@ Project state for whoever continues the work. Update this file whenever the proj
 **Milestone 04 — Car Handling and Feel: DONE.**
 **Asset pipeline — FBX cooking + car models (CLAUDE.md 4.1): DONE.**
 **Milestone 05 — Ball and Car-Ball Interaction: DONE.**
+**Lighting — pulled forward from Milestone 13 on request: DONE.**
+**Milestone 06 — Arena, Goals and Scoring: DONE.**
+**Milestone 07 — Boost System and Boost Pads: DONE.**
 
-The game opens on a main menu (Play / Settings / Exit). Play starts the match scene: an arena
-floor, a player car driven with WASD/arrows on a Jolt rigid body, a ball to hit around, and a
-smooth third-person chase camera. The car draws a real low-poly model from the Cars-Park pack,
-cooked from FBX and painted in the team colour. Esc or P pauses, with Resume / Settings / Return
-to main menu / Exit. The settings panel is one widget reused by both menus. No walls, goals,
-scoring, jumping or boost yet.
+The game opens on a main menu (Play / Settings / Exit). Play starts a real match: an enclosed
+55 x 80 m arena with side walls, back walls, a ceiling and two coloured goals; a player car driven
+with WASD/arrows on a Jolt rigid body; a ball; a score, a match clock and a kickoff countdown; and
+a smooth third-person chase camera. A goal resets the field and counts down again, and the match
+ends at full time. The car draws a real low-poly model from the Cars-Park pack, cooked from FBX and
+painted in the team colour, and the whole scene is flat-shaded by one directional light. Shift
+boosts, drawing on a 0-100 meter refilled by 18 boost pads spread across the field. Esc or P
+pauses, with Resume / Settings / Return to main menu / Exit. No jumping, air control or opponent yet.
 
 Verified on 2026-08-01 with temporary scripted-input harnesses, since there is no `xdotool`/`wtype`
 on this machine to press keys. Milestone 02 used a scripted controller (accelerate → sustained right
@@ -80,6 +85,52 @@ numbers (removed afterwards):
 | Hit at 26.5 m/s | ball leaves at 31.1 m/s (1.17x), 25 deg launch, travels 60 m |
 | Hit at 32.0 m/s (top speed) | ball leaves at 38.0 m/s (1.19x), 24 deg launch, 1.8 s airborne, travels 54 m |
 
+Lighting checks:
+
+| Check | Result |
+|---|---|
+| Shader cooks and ships | `assets/Shaders/Lit.vs` + `Lit.fs` in all three configs |
+| Compiles on load | yes, no GLSL warnings |
+| Flat shading | cars, ball and floor all render one tone per triangle |
+| Missing `assets/Shaders` | logs `LIGHTING: lit shader unavailable, drawing unlit`, renders unlit, exit 0 |
+| Model unload with a shared shader | no double free; all three configs exit 0, Debug included |
+
+Milestone 06, measured by a temporary harness (removed afterwards):
+
+| Check | Result |
+|---|---|
+| Ball fired at 50 m/s into each side wall | contained, max abs(x) 26.4 against a wall at 27.5 |
+| Ball fired at 50 m/s into each back wall, off centre | contained, max abs(z) 38.9 against a line at 40.0 |
+| Ball fired straight up at 50 m/s | peaks at y 14.0 under a 15.0 ceiling, comes back down |
+| Ball touching the line from in front | no goal |
+| Ball half across | no goal |
+| Ball **1 mm** short of fully across | no goal |
+| Ball exactly fully across | GOAL |
+| Ball past the line but outside the mouth (x = 20) | no goal |
+| Kickoff | releases after exactly 3.00 s into Playing |
+| Clock | runs down 1.00 s per second of play, stops at 0 into Finished |
+| Goal sequence | score 0 → 1, celebration 2.50 s, then reset |
+| Reset accuracy | ball back to (0, 1.25, 0), car to (0, 0.36, 24), countdown re-armed at 3.00 s |
+
+Milestone 07 boost, measured by a temporary harness (removed afterwards):
+
+| Measurement | Result |
+|---|---|
+| Full tank held down | empties in 3.03 s at 33 per second |
+| `boosting` flag once empty | clears on the next step |
+| 0 to 100 km/h, throttle only | 1.63 s |
+| 0 to 100 km/h, throttle + boost | 0.56 s |
+| Top speed, throttle only | 32.1 m/s (116 km/h) |
+| Top speed with boost | 46.2 m/s (166 km/h) |
+| Cruising 31.6 m/s, then boost | 45.7 m/s in 0.62 s, costs 8 boost |
+| Pads laid out | 18 (4 full-refill, 14 small) |
+| Small pad driven over | boost 20 → 32, pad dark, 4.0 s cooldown |
+| Full pad driven over | boost 20 → 100, pad dark, 10.0 s cooldown |
+| Pad on cooldown | gives nothing |
+| Pad after its cooldown | ready again at exactly 4.0 s / 10.0 s |
+| Car 5 m directly above a pad | pad not taken |
+| Nearest pad edge to the kickoff spot | 2.00 m, so kickoff never grabs one |
+
 ## Layout
 
 ```
@@ -87,24 +138,29 @@ Game/Source/
   Main.cpp, App.h/cpp          entry point, window, settings, scene switching, smoke test
   Scene.h/cpp                  camera + GameObjects + Jolt PhysicsSystem, fixed step loop
   MainMenuScene.h/cpp          title, Play / Settings / Exit, credits and build string
-  MatchScene.h/cpp             the gameplay scene, plus the pause overlay
+  MatchScene.h/cpp             the gameplay scene, pause overlay, score/clock readout
+  Match.h/cpp                  score, clock, kickoff/goal/full time state machine
   GameSettings.h               the settings struct App owns
   MenuAction.h                 what a scene asks App to do next
   UserInterface.h/cpp          namespace uistyle: colors, text helpers, MenuList widget
   SettingsMenu.h/cpp           settings panel reused by both menus
   GameObject.h/cpp             base object, body transform helpers
   StaticModelAsset.h/cpp       .evmodel loader + assets::Path, team repaint
+  Lighting.h/cpp               namespace lighting: the one lit shader, Apply/Detach
   GameObjects/CarObject.h/cpp  arcade car (single box body + cooked car model)
   GameObjects/BallObject.h/cpp the ball (single dynamic sphere)
-  GameObjects/ArenaObject.h/cpp floor only for now
+  GameObjects/GoalObject.h/cpp net geometry + the fully-across-the-line test
+  GameObjects/BoostPadObject.h/cpp refill pad, no physics body, cooldown + glow
+  GameObjects/ArenaObject.h/cpp floor, walls, ceiling, back walls with goal openings
   CarController.h              CarInput + abstract controller
   PlayerController.h/cpp       keyboard input
   ChaseCamera.h/cpp            third person follow camera
   PhysicsLayers.h/cpp          namespace physics: layers and Jolt filters
 Game/ThirdParty/   raylib, Jolt, glm, imgui     (cloned, git-ignored)
 Game/Assets/       Cars-Park/ (OBJ, FBX, Blends, License.txt, Preview.png)
+                   Shaders/ (Lit.vs, Lit.fs)
 Tools/             AssetCooker.py, FbxReader.py, requirements.txt
-Build/<Config>/    ArcadeCarSoccer + assets/Models/*.evmodel
+Build/<Config>/    ArcadeCarSoccer + assets/Models/*.evmodel + assets/Shaders/*
 ```
 
 ## How to build and run
@@ -119,7 +175,8 @@ make run CONFIG=Debug
 ./Build/Release/ArcadeCarSoccer --smoke-test 60 --screenshot SmokeTest.png
 ```
 
-Controls so far: **WASD / arrows** drive and steer, **R** resets the car, **Esc** or **P** pauses.
+Controls so far: **WASD / arrows** drive and steer, **Shift** boosts (held), **R** resets the car,
+**Esc** or **P** pauses.
 In menus: **up/down** or **W/S** move, **Enter**/**Space** activate, **left/right** change a value,
 and the mouse works too.
 
@@ -182,6 +239,46 @@ is incremental.
 - **The ball uses `LinearCast` motion quality.** It is the fastest thing in the scene (38 m/s off a
   top-speed hit, capped at `maxSpeed` 55) and the one object that must never tunnel through a wall
   once the arena is closed in Milestone 06.
+- **Boost is applied before the grounded gate**, so it already works in the air. It is the one
+  control that must keep working off the ground, and Milestone 08 builds aerials on top of it.
+- **Boost has its own speed cap** (`boostMaxSpeed` 46 m/s) above the throttle's `maxSpeed` (32),
+  because the throttle stops adding force at its own cap. `boostForce` was tuned on the metric that
+  matters in play — how long the push from cruising to supersonic takes. 9000 N did it in 0.36 s,
+  which read as a teleport; 4000 N never reached the cap before running out of field; 6000 N gives
+  0.62 s. Do not tune this on the 0-100 figure alone.
+- **Boost pads have no physics body at all.** A pad has to be flush with the floor, because the car
+  is a box with no wheels and would stop dead against any raised lip, so a collider would be either
+  useless or harmful. Pickup is a distance check in the XZ plane plus a height limit, the same
+  analytic approach `GoalObject` uses. `physics::Trigger` is therefore *still* unused — it may never
+  be needed.
+- **A pad is taken even when the car is already full**, as in Rocket League. Wasting a pad is part of
+  managing boost.
+- `MatchScene::boostPads` is a vector that must be **filled completely before any pointer is taken
+  into `Scene::objects`** — a later `push_back` would reallocate and leave those pointers dangling.
+  This is the one place the scenes-own-objects-by-value rule needs care.
+- **Goal detection is an analytic test, not a Jolt sensor.** `GoalObject::IsBallFullyInside` compares
+  the ball's centre against the goal line plus its radius. "Fully across the line" is exactly a
+  statement about centre and radius, so this is one comparison and it is exact — verified to be
+  correct to the millimetre. A sensor body would have had to be inset by a whole ball diameter to
+  mean the same thing, would need a `ContactListener`, and would still depend on when Jolt happened
+  to generate the contact. This is why `physics::Trigger` is still unused; boost pads in Milestone
+  07 can most likely do the same thing with a distance check.
+- **Z is the goal-to-goal axis, X is sideline to sideline.** The field was 80 x 55 with the long axis
+  across the pitch, which would have put the goals on the short side; the numbers are now swapped
+  (55 wide, 80 long, a 0.69 ratio close to a real football pitch). 80 m at 32 m/s is a 2.5 s run
+  from goal to goal. Blue defends +Z, orange defends -Z, and the player kicks off in front of blue.
+- **The arena and each goal are one Jolt compound body each**, built from a `Piece` list that
+  physics and rendering both read. That list is the single source of truth, so the collision cannot
+  drift away from what is drawn — worth preserving when Milestone 13 adds trim and stands.
+- **The ceiling has collision but is never drawn.** Drawing it would put a slab between the chase
+  camera and the field the moment the car climbs a wall.
+- **The kickoff freeze is simply not stepping physics.** Everything has just been re-centred with
+  zero velocity, so skipping `StepPhysics` holds it there exactly, with no new "frozen" flags on the
+  bodies and no risk of Jolt waking something. `Match::IsFrozen()` covers Kickoff and Finished;
+  Celebration deliberately keeps simulating so the ball is seen going into the net.
+- Car and ball kickoff positions come from their own `spawnPosition` fields, so `Match::ResetField`
+  does not duplicate them. The car's spawn Y is 0.36 (its box half-height plus a hair) so it does
+  not visibly drop when the countdown ends.
 - **Physics runs at a fixed 120 Hz** with an accumulator (`Scene::StepPhysics`, 0.25 s clamp).
   `GameObject::Update` is called once per *fixed step*, right before the simulation runs — this
   matters because Jolt forces only persist for one step, so applying them per frame would be wrong.
@@ -234,6 +331,43 @@ is incremental.
 - **The cooked model is optional.** If `assets/Models` is missing, `CarObject` falls back to the old
   box; the game still runs from an uncooked build instead of crashing.
 
+### Lighting
+Pulled forward from Milestone 13 because without it every material rendered as one flat colour and
+the ball and floor were bare silhouettes. Milestone 13 still owns shadows, bloom and effects.
+
+- **The low-poly look needs light, not textures.** The Cars-Park pack contains **no textures at all**
+  — every `.mtl` is flat `Kd` values and the only image in `Game/Assets/` is a preview thumbnail.
+  Nothing was missing from the cooker; what was missing was a shader. raylib's default shader is
+  unlit (`texelColor*colDiffuse*fragColor`), so it never touches a normal and a sphere renders as a
+  flat disc.
+- **The normal is derived, not interpolated.** `Lit.fs` computes
+  `cross(dFdx(fragPosition), dFdy(fragPosition))`, which gives the true face normal, constant across
+  each triangle. This is why one shader flat-shades everything: the cooked cars carry per-face
+  normals and would have shaded correctly from `vertexNormal`, but raylib's `GenMeshSphere` and
+  `GenMeshCylinder` carry **smooth** normals, and reading those would have left the ball looking
+  like a beach ball next to hard-edged cars. It also means anything added later (boost pads, arena
+  trim, light rigs) is flat shaded for free with no per-mesh normal work.
+- **`lighting::Detach` must be called before `UnloadModel` on any model that went through `Apply`.**
+  `UnloadModel` → `UnloadMaterial` → `UnloadShader`, which would delete the one shared shader
+  program and leave every other model drawing with a dead one. `Detach` hands the materials back
+  raylib's default first. This is the single sharpest edge in the lighting code — a new lit model
+  that forgets it will work fine until the scene is torn down.
+- **The arena floor is a `Model`, not `DrawCube`.** `DrawCube` goes through the rlgl immediate batch,
+  which pre-transforms vertices by `RLGL.State.transform` *and* uploads that same matrix as
+  `matModel` — so a shader that computes `matModel*vertexPosition` would double-transform it. Going
+  through `DrawModel` keeps one predictable path. The grid, centre circle and field outline stay
+  unlit lines; do not wrap lines in the lit shader, their derivatives are degenerate (the shader
+  falls back to an up normal, but it is meaningless).
+- **Detecting a missing shader needs two checks, not one.** `IsShaderValid` only tests
+  `id > 0 && locs != NULL`, and raylib answers a *missing file* with its **default** shader, whose
+  id is perfectly valid — so the check silently passed and no warning was logged. `Load` now also
+  compares against `rlGetShaderIdDefault()`. Worth remembering for `TextureAsset`.
+- **The sun is mostly overhead** (`0.30, 0.90, 0.32`). The first version lit from behind the scene
+  and every camera-facing surface fell into fill light; because the chase camera swings all the way
+  around the car, only a high sun keeps whichever side faces the player readable.
+- Light colours are constants in `Lighting.cpp` and set into the program once at load, since the
+  light never moves. Milestone 12 can bind them to the ImGui panel.
+
 ### Menus
 - **`App` owns the single `GameSettings`** and hands each scene a pointer, which is what makes the
   settings shared between the main menu and the pause menu. The `SettingsMenu` *widget* is per scene
@@ -256,22 +390,26 @@ is incremental.
 
 - **Assets folder name.** CLAUDE.md says `Game/Assets/Cars-pack/`; on disk it is
   `Game/Assets/Cars-Park/`.
-- **Nothing is lit yet.** The car models render with raylib's default unlit shader, so each material
-  is one flat colour — consistent with the rest of the scene, which is also unlit, but the cars read
-  as silhouettes rather than shapes. The cooked meshes already carry per-face normals, so Milestone
-  13's lighting shader has what it needs. Do **not** bake shading into vertex colours in the
-  meantime; a real light would then double-darken the model.
+- **There are still no shadows.** Everything is lit by one directional light plus a hemisphere fill,
+  with no occlusion, so nothing casts onto anything else and the cars do not sit into the floor as
+  firmly as they could. Milestone 13 owns that, along with bloom. Do **not** bake shading into
+  vertex colours as a substitute — the lit shader would then double-darken the model.
 - **The OBJ+MTL copies in `Game/Assets/Cars-Park/OBJ/` are now unused by the build.** They are worth
   keeping as the reference the FBX reader is validated against
   (`Tools/FbxReader.py` output matched them exactly), but nothing loads them at runtime.
-- **There are no walls yet** (Milestone 06), so driving off the floor edge makes the car fall
-  forever, and a hard hit can put the ball off the field. `R` now re-centres **both** the car and
-  the ball for exactly that reason — drop the ball half of it once the arena is closed if it stops
-  being useful.
+- **`R` resets the car only.** It briefly also re-centred the ball while the field had no walls;
+  now that the arena is closed the ball cannot be lost, so that was dropped again.
+- **`GameSettings::matchDurationMinutes` is now read** (at `MatchScene::Initialize`), so changing it
+  mid-match has no effect until the next match. That is the intended behaviour, not a bug.
+- **Full time just stops.** The match freezes and shows FULL TIME with the result; there is no
+  post-match screen or rematch flow. Esc still opens the pause menu to leave. Worth revisiting when
+  the HUD lands in Milestone 10.
 - **The Release build prints GCC `-O3` warnings from inside Jolt.** Known third-party false
   positives, not project errors.
-- `CarInput` currently only carries `throttle`, `steer` and `reset`. Jump, boost and air control
-  fields get added by the milestones that implement them, rather than sitting unused.
+- `CarInput` carries `throttle`, `steer`, `boost` and `reset`. Jump and air control fields get added
+  by the milestones that implement them, rather than sitting unused.
+- **There is no boost flame or trail yet.** `CarObject::boosting` is set every step and the meter
+  brightens while held, but the visual effect belongs to Milestone 13's `Effects.h/cpp`.
 - `.venv` does not exist yet; the Makefile falls back to `python3`, which is fine while the cooker
   has no dependencies. Create it before the cooker starts using Pillow/numpy:
   `python3 -m venv .venv && .venv/bin/pip install -r Tools/requirements.txt`.
@@ -281,36 +419,33 @@ is incremental.
   centimetres stops it dead: the contact normal barely tilts up, so lift never beats the car's
   weight. Rounding the box enough to climb would make the underside nearly cylindrical and wreck
   stability, so the fix is to **keep the arena floor smooth** — build ramps and wall transitions as
-  slopes, never as steps. Worth remembering when Milestone 06 builds the arena.
+  slopes, never as steps. The Milestone 06 arena honours this (the floor is one flat slab and the
+  walls meet it at a right angle); keep it true for boost pads and any Milestone 13 trim.
 - **The righting assist runs while airborne within `recoveryProbe` (1.3 m) of the ground.** That is
   what makes bump landings clean now, but Milestone 08 must gate it off while the player is giving
   air input, or it will fight deliberate aerial rotation.
 - **Some settings are stored but not consumed yet**, because the systems that read them do not exist:
-  camera sensitivity (Milestone 09), match duration (Milestone 06), bot enabled (Milestone 11), and
+  camera sensitivity (Milestone 09), bot enabled (Milestone 11), and
   the master/SFX volumes (Milestone 14 — the audio device is not even initialised). Fullscreen,
   resolution and the post-processing flag are the only ones with an effect today, and post-processing
   is just a stored flag until Milestone 13.
 - **Settings live for the session only.** Nothing is written to disk; Milestone 12 introduces the
   config file, and that is the natural place to persist them.
 
-## Next steps — Milestone 06 (Arena, Goals and Scoring)
+## Next steps — Milestone 08 (Jumps, Flips and Air Control)
 
-1. Extend `ArenaObject` with side walls, back walls and a ceiling, all static boxes on the
-   `physics::Arena` layer. **Keep every surface smooth** — see the "box has no wheels" note above:
-   build transitions as slopes, never steps, or the car will stop dead against them.
-2. Size the ceiling against the ball's arc: a top-speed hit peaks around 7 m, so a ceiling below
-   ~12 m will change how the game plays. The ball already uses `LinearCast`, so thin walls are safe.
-3. Add `GameObjects/GoalObject.h/cpp` with a **sensor** body (`physics::Trigger` layer,
-   `BodyCreationSettings::mIsSensor`). Goal detection must only fire when the ball is **fully**
-   across the line, so either inset the sensor by the ball radius (1.25 m) or test the ball's
-   centre against the goal plane rather than relying on first overlap.
-4. Add `Match.h/cpp` for score, the match timer (`GameSettings::matchDurationMinutes` is already
-   stored but unread) and the kickoff countdown, then reset with `CarObject::ResetTo` and
-   `BallObject::ResetTo`, which both already zero the velocities.
-5. Once the arena is closed, reconsider whether `R` should still re-centre the ball.
-
-Note the layer filters in `PhysicsLayers.cpp` already allow Ball vs Car, Ball vs Arena and Ball vs
-Ball, and a `Trigger` layer exists, so no collision-filter work should be needed.
+1. Add `jump` to `CarInput` (edge triggered, unlike `boost` which is held) and jump/double-jump
+   state to `CarObject`: an impulse on the first press, a second jump or a directional flip on the
+   second, reset once the car lands.
+2. **Gate the righting assist off while the player is giving air input.** It currently runs whenever
+   the car is within `recoveryProbe` (1.3 m) of the ground, airborne or not, and it will fight
+   deliberate aerial rotation. See the note above.
+3. Air control replaces the `if (!grounded) return;` early-out in `CarObject::Update`. Boost is
+   already applied before that gate, so it keeps working; pitch/yaw/roll torques go after it.
+4. Keep every new rate in per-second units converted with the step, as `grip` and `tumbleDamping`
+   are — this has already caused one silent bug.
+5. Aerial ball touches are the goal: the ball sits at 1.25 m and a top-speed hit peaks around 7 m,
+   so the car needs to reach roughly that height under boost.
 
 The opponent car (Milestone 11) needs no new asset work: give the second `CarObject` a different
 `modelName` and the orange `teamColor` before `Initialize()` and it cooks, fits and paints itself.

@@ -1,5 +1,6 @@
 #include "CarObject.h"
 
+#include "Lighting.h"
 #include "Scene.h"
 
 #include <raymath.h>
@@ -18,7 +19,10 @@ CarObject::~CarObject()
 {
     carModel.Unload();
     if (colliderModelLoaded)
+    {
+        lighting::Detach(colliderModel);
         UnloadModel(colliderModel);
+    }
 }
 
 void CarObject::Initialize(Scene &owner)
@@ -56,6 +60,7 @@ void CarObject::Initialize(Scene &owner)
     {
         colliderModel = LoadModelFromMesh(GenMeshCube(halfExtents.x * 2.0f, halfExtents.y * 2.0f,
                                                       halfExtents.z * 2.0f));
+        lighting::Apply(colliderModel);
         colliderModelLoaded = true;
     }
 }
@@ -127,6 +132,16 @@ void CarObject::Update(float deltaTime)
         // Squared so the assist is barely there when nearly level and full past 45 degrees.
         float strength = fminf(tilt / (PI * 0.25f), 1.0f);
         bodies.AddTorque(bodyID, uprightAxis.Normalized() * (uprightTorque * strength * strength));
+    }
+
+    // Boost is applied before the grounded gate on purpose: it is the one control
+    // that has to keep working in the air, which is what Milestone 08 builds on.
+    boosting = input.boost && boostAmount > 0.0f;
+    if (boosting)
+    {
+        boostAmount = fmaxf(boostAmount - boostDrainRate * deltaTime, 0.0f);
+        if (velocity.Dot(forward) < boostMaxSpeed)
+            bodies.AddForce(bodyID, forward * boostForce);
     }
 
     if (!grounded)

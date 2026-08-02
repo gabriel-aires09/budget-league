@@ -166,9 +166,21 @@ def main():
             print("[cook] FAILED %s: %s" % (source.name, error))
             failed += 1
 
+    # Shaders are plain GLSL and the engine hands them straight to raylib, so
+    # they are copied rather than converted.
+    shadersOut = args.output / "Shaders"
+    for source in sorted(args.assets.glob("Shaders/*.vs")) + sorted(args.assets.glob("Shaders/*.fs")):
+        target = shadersOut / source.name
+        if not args.force and target.exists() and target.stat().st_mtime >= source.stat().st_mtime:
+            continue
+        shadersOut.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+        print("[cook] %s" % target.name)
+        cooked += 1
+
     if failed:
         return 1
-    print("[cook] %s -> %s" % ("%d model(s) cooked" % cooked if cooked else "up to date", args.output))
+    print("[cook] %s -> %s" % ("%d asset(s) cooked" % cooked if cooked else "up to date", args.output))
     return 0
 
 

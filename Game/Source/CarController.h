@@ -7,6 +7,7 @@ struct CarInput
 {
     float throttle = 0.0f; // -1 reverse .. 1 forward
     float steer = 0.0f;    // -1 left .. 1 right
+    bool boost = false;    // held, not tapped
     bool reset = false;
 };
 

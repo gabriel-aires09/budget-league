@@ -1,5 +1,6 @@
 #include "BallObject.h"
 
+#include "Lighting.h"
 #include "Scene.h"
 
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
@@ -9,7 +10,10 @@
 BallObject::~BallObject()
 {
     if (modelLoaded)
+    {
+        lighting::Detach(ballModel);
         UnloadModel(ballModel);
+    }
 }
 
 void BallObject::Initialize(Scene &owner)
@@ -34,6 +38,7 @@ void BallObject::Initialize(Scene &owner)
 
     // Low ring/slice counts on purpose: the facets are the look (CLAUDE.md 4.2).
     ballModel = LoadModelFromMesh(GenMeshSphere(radius, 6, 10));
+    lighting::Apply(ballModel);
     modelLoaded = true;
 }
 
@@ -70,8 +75,6 @@ void BallObject::Draw()
     ballModel.transform = GetBodyRotation();
 
     DrawModel(ballModel, position, 1.0f, ballColor);
-    // The wireframe is what makes the spin readable on a flat shaded sphere.
-    DrawModelWires(ballModel, position, 1.0f, Color{ 70, 110, 160, 140 });
 }
 
 BoundingBox BallObject::GetWorldBounds() const
