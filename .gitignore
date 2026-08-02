@@ -1,0 +1,17 @@
+# Build output
+Build/Debug/
+Build/Development/
+Build/Release/
+Build/Intermediate/
+
+# External libraries (cloned, see HANDOFF.md)
+Game/ThirdParty/
+
+# Python tools
+.venv/
+__pycache__/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
