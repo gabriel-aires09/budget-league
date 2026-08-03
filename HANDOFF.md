@@ -10,10 +10,15 @@ Project state for whoever continues the work. Update this file whenever the proj
 **Milestone 04 — Car Handling and Feel: DONE.**
 **Asset pipeline — FBX cooking + car models (CLAUDE.md 4.1): DONE.**
 **Milestone 05 — Ball and Car-Ball Interaction: DONE.**
-**Lighting — pulled forward from Milestone 13 on request: DONE.**
+**Lighting — pulled forward from Milestone 14 on request: DONE.**
 **Milestone 06 — Arena, Goals and Scoring: DONE.**
 **Milestone 07 — Boost System and Boost Pads: DONE.**
-**Milestone 08 — Jumps, Flips and Air Control: DONE.**
+**Milestone 09 — Jumps, Flips and Air Control: DONE.**
+**Arena ramps + wall and ceiling driving (PROMPTS.md): DONE.**
+**Milestone 08 — Car Selection: NOT STARTED.** It was inserted into CLAUDE.md after the milestones
+above were built, which is why it is out of order here. Everything from the old Milestone 08 onwards
+shifted up by one; this document uses the new numbering throughout. A second new milestone,
+**Milestone 16 — UI Polish (raygui)**, was added at the end of the list.
 
 The game opens on a main menu (Play / Settings / Exit). Play starts a real match: an enclosed
 55 x 80 m arena with side walls, back walls, a ceiling and two coloured goals; a player car driven
@@ -24,7 +29,13 @@ painted in the team colour, and the whole scene is flat-shaded by one directiona
 boosts, drawing on a 0-100 meter refilled by 18 boost pads spread across the field. Space jumps,
 a second press flips in whatever direction is held, and the car can be pitched, yawed and rolled in
 the air, so aerial ball touches work. Esc or P pauses, with Resume / Settings / Return to main menu
-/ Exit. No opponent yet — the bot is Milestone 11.
+/ Exit. No opponent yet — the bot is Milestone 12.
+
+Every edge of the arena is now ramped rather than square, as in Rocket League: a 5 m quarter-circle
+carries the floor up into the walls, and a 3.5 m one carries the walls into the ceiling. Driving into
+the side of the pitch now carries the car up the wall and, with boost, across the roof: `CarObject`
+measures the surface under the car rather than the world, so the same throttle, steering and grip
+work upside down.
 
 Verified on 2026-08-01 with temporary scripted-input harnesses, since there is no `xdotool`/`wtype`
 on this machine to press keys. Milestone 02 used a scripted controller (accelerate → sustained right
@@ -134,7 +145,7 @@ Milestone 07 boost, measured by a temporary harness (removed afterwards):
 | Car 5 m directly above a pad | pad not taken |
 | Nearest pad edge to the kickoff spot | 2.00 m, so kickoff never grabs one |
 
-Milestone 08 jumps and air control, measured by a temporary harness (removed afterwards):
+Milestone 09 jumps and air control, measured by a temporary harness (removed afterwards):
 
 | Measurement | Result |
 |---|---|
@@ -147,6 +158,46 @@ Milestone 08 jumps and air control, measured by a temporary harness (removed aft
 | Rolling 1.3 m above the floor | 5.43 rad/s — the righting assist stays out of the way |
 | Jump + second jump + boost, nose up | peaks at **10.09 m** |
 | Ball hung at 4.0 m (underside 2.75 m) | car climbs to 2.69 m and drives it up at 8.1 m/s |
+
+Arena ramps, measured by a temporary probe that raycast the built collision shape and stepped
+physics directly (removed afterwards):
+
+| Check | Result |
+|---|---|
+| Floor ramp profile vs an ideal quarter circle | within 0.03 m through the drivable part, 0.08 m at the steepest facet |
+| Lips anywhere in the ramp | none — the profile is monotonic, biggest backward step 0.000 m |
+| Rise per 0.25 m across the ramp | 0.025 → 0.29 m, no discontinuity between facets |
+| Vertical wall | exactly x = 27.5 from y = 5.0 to y = 11.5 |
+| Ceiling fillet | leaves the ceiling at x = 24.0, meets the wall at y = 11.5, matches R = 3.5 |
+| Goal mouth | floor stays flat to the goal line, no ramp across it |
+| Boost pads overhanging a ramp | 0 of 18 |
+| Standing start, full boost into the wall | climbs to 14.1 m, reaches the wall face, then tumbles |
+| 32 m/s into the ramp | launches off it at 3.8 m, stays upright (uprightness 0.77) |
+| Ball at 50 m/s into a ramp, five angles | contained; max abs(x) 26.4, abs(z) 38.8, peak y 13.8 under the 15 m ceiling |
+| Ramp reads as joining the wall | yes, after the seam line and mullions were added — checked on a screenshot |
+| Ramp drawn as one surface, no alpha banding | yes; forcing the ramps opaque shows full coverage, correct facing, goal mouth left clear |
+| Debug teardown with 10 ramp models | 10 VAOs unloaded, lit shader unloaded exactly once, no errors |
+
+Surface-relative driving, measured by a temporary harness that ran the same routines against the
+original `CarObject` and the new one (removed afterwards). The left column is the point: everything
+on flat ground had to stay exactly as Milestones 04 and 09 left it.
+
+| Measurement | Before | After |
+|---|---|---|
+| 0 to 100 km/h | 2.13 s | 2.13 s |
+| Top speed | 32.1 m/s | 32.1 m/s |
+| Jump held 4 s (infinite-jump check) | peak 1.85 m | peak 1.85 m |
+| Tap, tap (double jump) | peak 4.08 m | peak 4.08 m |
+| Recovery from upside down | 0.80 s | 0.93 s |
+| Wall climb, 20 m/s, no boost | 1.97 m, never on the wall, airborne 37% | **13.15 m, on the wall 47% of 3 s, airborne 0%** |
+| Wall climb, 32 m/s, no boost | 3.36 m, never on the wall, airborne 55% | **10.88 m, on the wall 48% of 3 s, airborne 0%** |
+| Driving on the ceiling | falls off immediately (0% of 3 s) | **holds 92% of 3 s** |
+| Boosted run up a wall and across the roof | — | wall at 2.16 s, ceiling at 3.03 s, grounded 92% of the run |
+
+The 0-100 figure differs from the 1.63 s recorded for Milestones 04 and 07 because this harness
+starts and measures differently, **not** because anything regressed — the original code measures
+2.13 s on this harness too. Compare within a column, not across harnesses.
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank |
 
 ## Layout
 
@@ -168,7 +219,7 @@ Game/Source/
   GameObjects/BallObject.h/cpp the ball (single dynamic sphere)
   GameObjects/GoalObject.h/cpp net geometry + the fully-across-the-line test
   GameObjects/BoostPadObject.h/cpp refill pad, no physics body, cooldown + glow
-  GameObjects/ArenaObject.h/cpp floor, walls, ceiling, back walls with goal openings
+  GameObjects/ArenaObject.h/cpp floor, walls, ceiling, back walls with goal openings, edge ramps
   CarController.h              CarInput + abstract controller
   PlayerController.h/cpp       keyboard input
   ChaseCamera.h/cpp            third person follow camera
@@ -214,7 +265,7 @@ is incremental.
   `JOLT_DEFINES` and `SIMD_FLAGS` in the `Makefile`. Mismatching them causes silent ABI breakage.
 - Third-party include paths use **`-isystem`**, so `-Wall -Wextra` only reports game code.
 - Mode defines: `GAME_DEBUG` / `GAME_DEVELOPMENT` / `GAME_RELEASE`, plus `GAME_DEV_TOOLS` in Debug
-  and Development only — gate all ImGui tuning UI behind it (Milestone 12).
+  and Development only — gate all ImGui tuning UI behind it (Milestone 13).
 
 ### Gameplay and physics
 - **The car is a single dynamic box** with a downward ground-probe ray and custom arcade forces, not
@@ -257,6 +308,36 @@ is incremental.
 - **The ball uses `LinearCast` motion quality.** It is the fastest thing in the scene (38 m/s off a
   top-speed hit, capped at `maxSpeed` 55) and the one object that must never tunnel through a wall
   once the arena is closed in Milestone 06.
+- **Driving is measured against the surface the car is on, not against the world.** This is what
+  lets the same code drive the floor, a wall and the ceiling. Three things changed together and none
+  of them works alone: the drive probe casts along the car's **own** down rather than straight down;
+  the surface normal is read back from that hit (`Body::GetWorldSpaceSurfaceNormal`) and becomes what
+  `uprightness`, `driveUprightMin` and the righting assist all measure against; and a stick force
+  holds the car on. On level ground with an upright car the probe is the same ray it always was, so
+  none of this touches flat-ground handling — verified identical, see the table above.
+- **The recovery probe deliberately stayed world-down.** It exists for a car on its roof, and such a
+  car has its own down pointing at the sky, so a local ray would never find the floor to right it
+  onto. The rule is: `alignTo` is the surface normal when grounded, world up otherwise.
+- **The stick force must be scaled by surface tilt; a constant one destroys the car.** Measured:
+  a constant 10 m/s² took 0-100 from 2.13 s to 3.41 s, 25 m/s² dropped top speed from 32 m/s to
+  **5 m/s**, and 50 m/s² pinned the car so hard it could not move at all (0.2 m/s). Extra downforce
+  on the floor is simply extra friction. Scaling by `(1 - normal·worldUp) * 0.5` makes it exactly
+  zero on level ground, half on a wall and full on the ceiling, which is also the order in which it
+  is actually needed — gravity presses the car into the floor, does nothing on a wall, and pulls it
+  off the ceiling. `surfaceStick` (22 m/s²) therefore has to beat gravity, since the full value
+  applies exactly where it is inverted.
+- **The real reason a car bounced off the ramp was the probe, not the stick force.** A 3.2 m box
+  bridges a concave curve: on the 5 m ramp its middle rides 0.26 m higher than its ends, which ate
+  most of a 0.7 m probe and dropped the car exactly where it was trying to climb. `groundStickyProbe`
+  (0.75, against `groundProbe` 0.35) extends the reach *only once already grounded*, so it can never
+  make an airborne car grounded. That one change took a 20 m/s no-boost approach from 1.97 m and
+  bouncing to 13.15 m and glued. 1.10 measured no better than 0.75, so 0.75 is the value.
+- **The sticky probe is suppressed during `jumpLockout`, and has to be.** A jump clears only 0.72 m
+  in those 0.15 s, so a 0.75 m reach would still find the floor as the lockout expired, hand the
+  jumps straight back and let the car jump forever — the exact bug `jumpLockout` exists to stop.
+  With the short probe used during the lockout the car is already 0.72 m up when it expires, past
+  the 0.35 m the short probe can see, so grounded stays false. Verified: jump held for 4 s peaks at
+  1.85 m, identical to before.
 - **`CarInput::jump` is held, not an edge, and `CarObject` finds the rising edge itself.**
   `CarObject::Update` runs once per *fixed step* while `IsKeyPressed` stays true for a whole frame,
   so at 120 Hz an edge-triggered field would fire twice in one frame and eat the double jump
@@ -275,7 +356,7 @@ is incremental.
   matching how ground steering already works. With no input the target is zero and the response
   drops to `airDamping`, so a flip still completes but the car settles before landing.
 - **Boost is applied before the grounded gate**, so it already works in the air. It is the one
-  control that must keep working off the ground, and Milestone 08 builds aerials on top of it.
+  control that must keep working off the ground, and Milestone 09 builds aerials on top of it.
 - **Boost has its own speed cap** (`boostMaxSpeed` 46 m/s) above the throttle's `maxSpeed` (32),
   because the throttle stops adding force at its own cap. `boostForce` was tuned on the metric that
   matters in play — how long the push from cruising to supersonic takes. 9000 N did it in 0.36 s,
@@ -304,9 +385,70 @@ is incremental.
   from goal to goal. Blue defends +Z, orange defends -Z, and the player kicks off in front of blue.
 - **The arena and each goal are one Jolt compound body each**, built from a `Piece` list that
   physics and rendering both read. That list is the single source of truth, so the collision cannot
-  drift away from what is drawn — worth preserving when Milestone 13 adds trim and stands.
+  drift away from what is drawn — worth preserving when Milestone 14 adds trim and stands.
 - **The ceiling has collision but is never drawn.** Drawing it would put a slab between the chase
   camera and the field the moment the car climbs a wall.
+- **Every arena edge is a quarter-circle ramp, built from tilted boxes** (`ArenaObject::AddFillet`).
+  `Piece` gained a `rotation`; it defaults to identity, which is why the floor, walls and ceiling are
+  still written as plain four-field initializers. The rotation is derived from the surface basis
+  (tangent, normal, run axis) as a matrix and converted once — do not try to express these as a
+  single world-axis angle. It works for the floor ramps but breaks for the ceiling ones, where the
+  box's local up has to end up pointing *downwards*.
+- **Each ramp facet sits on the chord between two angles, not on the tangent.** A chord is a secant,
+  so extending a facet to overlap its neighbour buries the extension inside the solid; extending a
+  tangent plane would push it out into the driving surface and create exactly the lip that stops a
+  wheel-less box car. The 0.02 m overlap in `AddFillet` depends on this.
+- **8 facets per quarter turn.** The error against a true circle is the sagitta,
+  `R(1 - cos(Δθ/2))`: 2.4 cm at the floor's 5 m radius, 1.7 cm at the ceiling's 3.5 m. At 6 facets it
+  is 4.3 cm, which is into the range that a box car notices. Raising the radius or the segment count
+  is safe; lowering either is not.
+- **The floor ramp radius is 5 m and the ceiling's is 3.5 m**, so the flat playing surface is 45 x 70
+  inside an arena that is still 55 x 80, and the wall is truly vertical only between y = 5 and
+  y = 11.5. `FlatHalfWidth()` / `FlatHalfLength()` report that flat area; anything that has to lie on
+  the floor must be placed against them, not against `width` / `length`.
+- **The back-wall ramps stop either side of the goal mouth.** A ramp across the mouth would wall the
+  goal off. This leaves the floor flat right up to the goal line, which is also how Rocket League
+  reads, and it keeps `GoalObject`'s analytic line test untouched.
+- **Every ramp is glass, like the walls**, so the whole edge of the arena is one continuous
+  see-through surface. The floor ramps are held at alpha 90 against the walls' 52 because they are
+  driven on and the slope still has to read. Colour alpha alone decides which pass a piece lands in,
+  so switching them cost one constant. They started opaque; that was changed on request.
+- **A ramp's collision is boxes but what is drawn is a single strip mesh** (`ArenaObject::RampMesh`).
+  Drawing the boxes made a transparent ramp read as stacked bands: 8 overlapping boxes compound
+  their alpha at every overlap, and each box blends its near face *and* its far face. A strip has
+  neither problem. The boxes are still built and still own the collision — they are just pushed with
+  `visible = false`, which is the mechanism the undrawn ceiling slab already used.
+- **The strip and the boxes cannot drift apart, because both come from `ArcPoint` in the same call.**
+  The strip's vertices are the arc points where consecutive chords meet, which are exactly the ends
+  of the box top faces. This is the one place in the arena where collision and rendering are not
+  literally the same data, so keep them derived from the same arc — do not hand-tune one.
+- **The strip winding is taken from `up x inward`, not from the `runAxis` argument.** The two side
+  walls are passed the same `runAxis` but mirror each other, so half the ramps would have been wound
+  backwards and culled away when seen from inside the arena. `runAxis` is still what positions a run
+  along its length; it just cannot decide the facing. Verified by temporarily forcing the ramps
+  opaque, which shows every one of them at full coverage from the default camera.
+- **`lighting::Detach` runs on all 10 ramp models before `UnloadModel`.** Same trap as everywhere
+  else: any one of them would otherwise destroy the shared lit shader. Debug teardown was checked —
+  10 VAOs unloaded, shader program unloaded exactly once, no errors.
+- **`LoadModelFromMesh` does not upload**, so `UploadMesh` has to be called first or the ramp draws
+  nothing. `MemAlloc` for the vertex array is correct here: `UnloadModel` frees it with `RL_FREE`.
+- **The seam line and mullions are what make the edge of the arena readable at all.** They were added
+  when the ramps were still solid and the ramp appeared to end in mid air against an invisible glass
+  wall; now that the ramps are glass too they matter more, not less, because nothing else tells the
+  player where the ramp starts and where it becomes wall. `DrawGlassWalls` draws a
+  bright line along the top of every ramp (`y = floorRampRadius`) plus faint vertical mullions every
+  5 m up the flat part of each wall, matching the field grid spacing. Pushing the walls' alpha up
+  would read too, but at the cost of the see-through the chase camera depends on — lines cost
+  nothing and keep both. The back-wall seam is split around the goal mouth, which works out
+  because `goalHeight` and `floorRampRadius` are both 5.0, so no mullion ever crosses the opening.
+- **The two trim strips along the base of the side walls were removed.** The floor ramp now occupies
+  that space and they were left buried inside it.
+- **The field markings are drawn to the flat area, not to the field bounds.** Past the ramp toe they
+  would be inside solid geometry. The pitch outline therefore traces the bottom of the ramps, which
+  is the edge a player actually reads as the boundary.
+- **Three boost pads moved inward** (the four corner pads to x 19 / z 31, the two halfway pads to
+  x 20) so no pad hangs over a ramp. A pad is a flat disc with no body, so one overhanging would
+  clip into the slope and look broken.
 - **The arena walls are glass, and that needed a separate draw pass, not just an alpha.** The chase
   camera regularly ends up outside the arena when the car is against a wall, and a solid wall then
   hid the car completely. Lowering the alpha alone fixes nothing: `ArenaObject` draws first in
@@ -378,8 +520,8 @@ is incremental.
   box; the game still runs from an uncooked build instead of crashing.
 
 ### Lighting
-Pulled forward from Milestone 13 because without it every material rendered as one flat colour and
-the ball and floor were bare silhouettes. Milestone 13 still owns shadows, bloom and effects.
+Pulled forward from Milestone 14 because without it every material rendered as one flat colour and
+the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom and effects.
 
 - **The low-poly look needs light, not textures.** The Cars-Park pack contains **no textures at all**
   — every `.mtl` is flat `Kd` values and the only image in `Game/Assets/` is a preview thumbnail.
@@ -412,7 +554,7 @@ the ball and floor were bare silhouettes. Milestone 13 still owns shadows, bloom
   and every camera-facing surface fell into fill light; because the chase camera swings all the way
   around the car, only a high sun keeps whichever side faces the player readable.
 - Light colours are constants in `Lighting.cpp` and set into the program once at load, since the
-  light never moves. Milestone 12 can bind them to the ImGui panel.
+  light never moves. Milestone 13 can bind them to the ImGui panel.
 
 ### Menus
 - **`App` owns the single `GameSettings`** and hands each scene a pointer, which is what makes the
@@ -438,7 +580,7 @@ the ball and floor were bare silhouettes. Milestone 13 still owns shadows, bloom
   `Game/Assets/Cars-Park/`.
 - **There are still no shadows.** Everything is lit by one directional light plus a hemisphere fill,
   with no occlusion, so nothing casts onto anything else and the cars do not sit into the floor as
-  firmly as they could. Milestone 13 owns that, along with bloom. Do **not** bake shading into
+  firmly as they could. Milestone 14 owns that, along with bloom. Do **not** bake shading into
   vertex colours as a substitute — the lit shader would then double-darken the model.
 - **The OBJ+MTL copies in `Game/Assets/Cars-Park/OBJ/` are now unused by the build.** They are worth
   keeping as the reference the FBX reader is validated against
@@ -449,7 +591,7 @@ the ball and floor were bare silhouettes. Milestone 13 still owns shadows, bloom
   mid-match has no effect until the next match. That is the intended behaviour, not a bug.
 - **Full time just stops.** The match freezes and shows FULL TIME with the result; there is no
   post-match screen or rematch flow. Esc still opens the pause menu to leave. Worth revisiting when
-  the HUD lands in Milestone 10.
+  the HUD lands in Milestone 11.
 - **The Release build prints GCC `-O3` warnings from inside Jolt.** Known third-party false
   positives, not project errors.
 - **Air roll is on Q/E, which CLAUDE.md section 8 does not list.** That section says WASD maps to
@@ -460,32 +602,37 @@ the ball and floor were bare silhouettes. Milestone 13 still owns shadows, bloom
   lands upside down with no input rights itself as before; a car being deliberately rotated is left
   alone. Both are verified.
 - `CarInput` carries `throttle`, `steer`, `boost`, `jump`, `airPitch`, `airYaw`, `airRoll` and
-  `reset` — everything the bot in Milestone 11 needs.
+  `reset` — everything the bot in Milestone 12 needs.
 - **There is no boost flame or trail yet.** `CarObject::boosting` is set every step and the meter
-  brightens while held, but the visual effect belongs to Milestone 13's `Effects.h/cpp`.
+  brightens while held, but the visual effect belongs to Milestone 14's `Effects.h/cpp`.
 - `.venv` does not exist yet; the Makefile falls back to `python3`, which is fine while the cooker
   has no dependencies. Create it before the cooker starts using Pillow/numpy:
   `python3 -m venv .venv && .venv/bin/pip install -r Tools/requirements.txt`.
-- The chase camera has no wall-occlusion handling yet (Milestone 09 / 6.2); it only clamps its own
+- The chase camera has no wall-occlusion handling yet (Milestone 10 / 6.2); it only clamps its own
   height above the floor.
+- **The vertical corners, where two walls meet, are not filleted.** The four floor ramps simply
+  overlap there, so the corner is solid and drivable-into but visibly faceted rather than the smooth
+  corner patch Rocket League has. Rocket League also has 45-degree diagonal corner walls, which this
+  arena does not; both are arena-shape work rather than ramp work.
 - **A box has no wheels, so the car cannot climb steps.** A vertical lip taller than a few
   centimetres stops it dead: the contact normal barely tilts up, so lift never beats the car's
   weight. Rounding the box enough to climb would make the underside nearly cylindrical and wreck
   stability, so the fix is to **keep the arena floor smooth** — build ramps and wall transitions as
-  slopes, never as steps. The Milestone 06 arena honours this (the floor is one flat slab and the
-  walls meet it at a right angle); keep it true for boost pads and any Milestone 13 trim.
+  slopes, never as steps. The wall transitions are now exactly that (see the ramp notes above, and
+  the measured "biggest backward step 0.000 m"); keep it true for boost pads and any Milestone 14
+  trim.
 - **Some settings are stored but not consumed yet**, because the systems that read them do not exist:
-  camera sensitivity (Milestone 09), bot enabled (Milestone 11), and
-  the master/SFX volumes (Milestone 14 — the audio device is not even initialised). Fullscreen,
+  camera sensitivity (Milestone 10), bot enabled (Milestone 12), and
+  the master/SFX volumes (Milestone 15 — the audio device is not even initialised). Fullscreen,
   resolution and the post-processing flag are the only ones with an effect today, and post-processing
-  is just a stored flag until Milestone 13.
-- **Settings live for the session only.** Nothing is written to disk; Milestone 12 introduces the
+  is just a stored flag until Milestone 14.
+- **Settings live for the session only.** Nothing is written to disk; Milestone 13 introduces the
   config file, and that is the natural place to persist them.
 
-## Next steps — Milestone 09 (Camera Modes)
+## Next steps — Milestone 10 (Camera Modes)
 
 1. Polish `ChaseCamera`: it currently only smooths position and target and clamps its own height.
-   Milestone 08 made the car fully aerial, so the camera now has to stay readable while the car is
+   Milestone 09 made the car fully aerial, so the camera now has to stay readable while the car is
    10 m up and rotating on all three axes.
    Note the camera passing through a wall is no longer *fatal* — the walls are glass, so the car
    stays visible from outside — but pulling the camera in is still the better answer and belongs
@@ -496,8 +643,12 @@ the ball and floor were bare silhouettes. Milestone 13 still owns shadows, bloom
    fully enclosed, so the camera can and will end up inside a wall.
 4. `GameSettings::cameraSensitivity` is stored but still unread — this is the milestone that should
    consume it.
+5. The floor ramps are opaque and 5 m tall at the wall, so a camera sitting low outside the arena can
+   now be blocked by one where the glass wall alone used to let the car through. Pulling the camera
+   in (point 3) covers this; if it does not, the ramps can join the glass pass, but they are a
+   driving surface and should stay solid if at all possible.
 
-The opponent car (Milestone 11) needs no new asset work: give the second `CarObject` a different
+The opponent car (Milestone 12) needs no new asset work: give the second `CarObject` a different
 `modelName` and the orange `teamColor` before `Initialize()` and it cooks, fits and paints itself.
 
 ### Verifying without a keyboard

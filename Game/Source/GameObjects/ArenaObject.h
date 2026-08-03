@@ -6,11 +6,13 @@
 #include <vector>
 
 // Static arena: floor, side walls, ceiling and the two back walls, each with a
-// goal-sized opening cut into it. All of it is one Jolt compound body.
+// goal-sized opening cut into it, plus the curved ramps that join the floor to
+// the walls and the walls to the ceiling. All of it is one Jolt compound body.
 //
 // Z is the goal-to-goal axis, X is sideline to sideline. Keep every surface flat
 // and smooth: the car is a box with no wheels, so any vertical lip taller than a
-// few centimetres stops it dead.
+// few centimetres stops it dead. That is exactly why the wall edges are ramped
+// rather than square — see AddFillet.
 class ArenaObject final : public GameObject
 {
 public:
@@ -31,6 +33,17 @@ public:
     float wallThickness = 2.0f;
     float floorThickness = 2.0f;
 
+    // Radius of the quarter-circle ramp at each edge of the arena, approximated
+    // by rampSegments tilted boxes. The floor one is the one the car drives up,
+    // so it is the larger of the two; both eat into the flat playing surface,
+    // which is what FlatHalfWidth/FlatHalfLength report.
+    float floorRampRadius = 5.0f;
+    float ceilingRampRadius = 3.5f;
+    int rampSegments = 8;
+
+    float FlatHalfWidth() const { return width * 0.5f - floorRampRadius; }
+    float FlatHalfLength() const { return length * 0.5f - floorRampRadius; }
+
     // The opening in each back wall. GoalObject must be built from the same
     // numbers, so MatchScene copies them across rather than repeating them.
     float goalWidth = 14.0f;
@@ -46,11 +59,38 @@ public:
         Vector3 halfExtents;
         Color color;
         bool visible;
+        // Identity for everything flat, which is why the walls and floor can
+        // still be written as a plain four-field initializer.
+        Quaternion rotation = { 0.0f, 0.0f, 0.0f, 1.0f };
     };
     std::vector<Piece> pieces;
 
+    // One ramp, drawn as a single continuous surface. Its collision is still the
+    // boxes in `pieces`, which are marked invisible; this mesh is generated from
+    // the same arc in the same call, so the two cannot drift apart.
+    //
+    // Drawing the boxes instead made a transparent ramp read as stacked bands:
+    // eight overlapping boxes compound their alpha wherever they overlap, and
+    // each one blends its near face and its far face. A strip has neither.
+    struct RampMesh
+    {
+        Model model;
+        Color color;
+    };
+    std::vector<RampMesh> rampMeshes;
+
     Model boxModel = {}; // unit cube, scaled per piece
     bool boxModelLoaded = false;
+
+private:
+    // Appends one quarter-circle ramp, as rampSegments tilted boxes.
+    //
+    // corner  the line where the wall meets the flat surface
+    // inward  horizontal unit vector, from the wall towards the middle of the arena
+    // up      unit vector off the flat surface into open air (+Y floor, -Y ceiling)
+    // runAxis unit vector the ramp is extruded along, centred on runCenter
+    void AddFillet(Vector3 corner, Vector3 inward, Vector3 up, Vector3 runAxis,
+                   float radius, float runCenter, float runHalfLength, Color color);
 };
 
 #endif

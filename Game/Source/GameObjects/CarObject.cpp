@@ -98,19 +98,44 @@ void CarObject::Update(float deltaTime)
     JPH::Vec3 forward = rotation * JPH::Vec3(0.0f, 0.0f, -1.0f);
     JPH::Vec3 right = rotation * JPH::Vec3(1.0f, 0.0f, 0.0f);
     JPH::Vec3 up = rotation * JPH::Vec3(0.0f, 1.0f, 0.0f);
-    uprightness = up.Dot(worldUp);
 
-    // Two probes straight down from the middle of the box. The short one gates
-    // driving; the long one gates the righting assist, because a car resting on
-    // its roof or balanced on an edge sits too high for the short probe to hit.
     const JPH::BroadPhaseLayerFilter broadPhaseFilter;
     const JPH::ObjectLayerFilter objectFilter;
     const JPH::IgnoreSingleBodyFilter selfFilter(bodyID);
     JPH::RayCastResult hit;
 
-    JPH::RRayCast groundRay(position, JPH::Vec3(0.0f, -(halfExtents.y + groundProbe), 0.0f));
+    // The drive probe casts along the car's OWN down, not the world's, which is
+    // the whole of what lets the car hold a wall or the ceiling: on level ground
+    // with an upright car the two are the same ray. The surface it finds is then
+    // what everything below measures against, instead of the world up.
+    // A 3.2 m box bridges a concave curve: on the 5 m ramp its middle rides
+    // 0.26 m higher than its ends, which eats most of a probe sized for flat
+    // ground and drops the car exactly where it is trying to climb. So once
+    // grounded, keep probing further until it genuinely leaves — `grounded` still
+    // holds the previous step's answer here.
+    // Not while a jump is in progress: a jump clears only 0.72 m in the 0.15 s of
+    // jumpLockout, so a probe reaching 0.75 m would still find the floor as the
+    // lockout expired, hand the jumps straight back, and let the car jump forever
+    // — the exact bug jumpLockout exists to stop.
+    JPH::Vec3 surfaceNormal = worldUp;
+    const bool stickyGround = grounded && jumpLockoutRemaining <= 0.0f;
+    JPH::RRayCast groundRay(position, -up * (halfExtents.y + (stickyGround ? groundStickyProbe : groundProbe)));
     grounded = scene->physicsSystem.GetNarrowPhaseQuery().CastRay(groundRay, hit, broadPhaseFilter,
                                                                  objectFilter, selfFilter);
+    if (grounded)
+    {
+        JPH::BodyLockRead surfaceLock(scene->physicsSystem.GetBodyLockInterface(), hit.mBodyID);
+        if (surfaceLock.Succeeded())
+        {
+            surfaceNormal = surfaceLock.GetBody().GetWorldSpaceSurfaceNormal(
+                hit.mSubShapeID2, groundRay.GetPointOnRay(hit.mFraction));
+        }
+    }
+
+    // The recovery probe stays WORLD down on purpose. It exists for a car resting
+    // on its roof or balanced on an edge, and such a car has its own down pointing
+    // at the sky — a local ray would never find the floor it needs to be righted
+    // onto.
     bool nearGround = grounded;
     if (!nearGround)
     {
@@ -118,6 +143,11 @@ void CarObject::Update(float deltaTime)
         nearGround = scene->physicsSystem.GetNarrowPhaseQuery().CastRay(recoveryRay, hit, broadPhaseFilter,
                                                                        objectFilter, selfFilter);
     }
+
+    // Standing on a surface, align to that surface; otherwise fall back to the
+    // world, so a car being recovered off its roof still comes back level.
+    const JPH::Vec3 alignTo = grounded ? surfaceNormal : worldUp;
+    uprightness = up.Dot(alignTo);
 
     // Self-righting torque, so a bad landing or a hard bump never leaves the car stuck.
     // The axis is normalised on purpose: its raw length is sin(tilt), which vanishes
@@ -132,7 +162,7 @@ void CarObject::Update(float deltaTime)
 
     if (nearGround && !aerialInput && uprightness < 0.999f)
     {
-        JPH::Vec3 uprightAxis = up.Cross(worldUp);
+        JPH::Vec3 uprightAxis = up.Cross(alignTo);
         if (uprightAxis.LengthSq() < 1.0e-4f)
             uprightAxis = forward; // perfectly inverted is a tie, so pick an axis to roll around
 
@@ -220,6 +250,16 @@ void CarObject::Update(float deltaTime)
         bodies.SetAngularVelocity(bodyID, tumble + up * yawSpin);
         return;
     }
+
+    // Hold the car against the surface. Nothing else does: on a vertical wall
+    // gravity pulls along the wall rather than into it, so contact is lost the
+    // moment the car stops being pressed there, and on the ceiling gravity pulls
+    // straight off. Scaled by how far the surface has tilted past level, which is
+    // 0 on the floor (so ground handling is bit-for-bit what it was), half on a
+    // wall, and full upside down — where it has to beat gravity to work at all.
+    float stickFraction = (1.0f - surfaceNormal.Dot(worldUp)) * 0.5f;
+    if (stickFraction > 0.0f)
+        bodies.AddForce(bodyID, -surfaceNormal * (surfaceStick * stickFraction * mass));
 
     float forwardSpeed = velocity.Dot(forward);
 

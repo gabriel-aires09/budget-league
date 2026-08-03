@@ -105,13 +105,25 @@ public:
     float bodyFriction = 0.55f;
     float bodyRestitution = 0.05f;
     float groundProbe = 0.35f;     // how far below the box counts as driving
+    // Reach of the same probe once already grounded, so bridging a concave curve
+    // does not drop the car mid-climb. Only ever extends contact the car already
+    // had, which is why it does not make the car grounded in mid air.
+    float groundStickyProbe = 0.75f;
     float recoveryProbe = 1.30f;   // how far below the box the righting assist still works
     float uprightTorque = 6500.0f; // rolls the car back onto its wheels
     float tumbleDamping = 4.0f;    // bleeds off bump-induced pitch and roll, per second
     float driveUprightMin = 0.35f; // below this the car rights itself instead of driving
+    // Holds the car against a wall or the ceiling, in m/s^2 into the surface. It
+    // ramps in with the surface tilt and is exactly zero on level ground, so the
+    // handling tuned in Milestone 04 is untouched. Must beat gravity on the
+    // ceiling, where the full value applies.
+    float surfaceStick = 22.0f;
 
     bool grounded = false;
-    float uprightness = 1.0f; // 1 on its wheels, -1 on its roof
+    // Alignment with the surface the car is standing on: 1 sitting flat on it,
+    // -1 inverted relative to it. On the floor that is the world up, on a wall it
+    // is the wall's normal, which is what lets the same test work everywhere.
+    float uprightness = 1.0f;
 
     StaticModelAsset carModel;
     // Fitted in Initialize() so the model always matches the collision box.
