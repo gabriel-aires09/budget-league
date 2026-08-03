@@ -41,6 +41,15 @@ public:
     float ceilingRampRadius = 3.5f;
     int rampSegments = 8;
 
+    // The vertical rounded corner that replaces each 90 degree wall intersection,
+    // measured in the XZ plane. Must stay larger than floorRampRadius: the floor
+    // ramp is carried around it on a circle of radius (cornerRadius - floorRamp),
+    // which has to be positive for the corner to have any flat floor left in it.
+    // Its own division is shared by the corner and both of its ramps, so their
+    // facets line up and the three surfaces meet without a step.
+    float cornerRadius = 8.0f;
+    int cornerSegments = 10;
+
     float FlatHalfWidth() const { return width * 0.5f - floorRampRadius; }
     float FlatHalfLength() const { return length * 0.5f - floorRampRadius; }
 
@@ -89,8 +98,22 @@ private:
     // inward  horizontal unit vector, from the wall towards the middle of the arena
     // up      unit vector off the flat surface into open air (+Y floor, -Y ceiling)
     // runAxis unit vector the ramp is extruded along, centred on runCenter
+    //
+    // Nothing here assumes `up` is vertical, which is what lets the same routine
+    // build a vertical rounded corner out of two walls.
+    // The drawn strip may cover less of the run than the collision does. Straight
+    // runs still overlap into the rounded corners, because trimming their solid
+    // measurably changed how a car takes a corner — but glass never writes depth,
+    // so every overlapping layer that IS drawn keeps blending and lights the
+    // corner up. Collision overlaps; drawing stops at the corner.
     void AddFillet(Vector3 corner, Vector3 inward, Vector3 up, Vector3 runAxis,
-                   float radius, float runCenter, float runHalfLength, Color color);
+                   float radius, float runCenter, float runHalfLength, Color color, int segments,
+                   float drawCenter, float drawHalfLength, float drawTaper);
+
+    // One rounded vertical corner: the quarter cylinder joining two walls, plus
+    // the floor and ceiling ramps carried around it as a ring of short straight
+    // fillets — a faceted torus.
+    void AddCorner(float sideX, float sideZ);
 };
 
 #endif

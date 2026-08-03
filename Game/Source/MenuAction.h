@@ -6,6 +6,7 @@
 enum class MenuAction
 {
     None,
+    SelectCar,
     StartMatch,
     MainMenu,
     ExitGame

@@ -4,23 +4,34 @@ Project state for whoever continues the work. Update this file whenever the proj
 
 ## Current state
 
-**Milestone 01 — Project Structure: DONE.**
-**Milestone 02 — Base Scene and Car Movement: DONE.**
-**Milestone 03 — Main Menu and Pause Menu: DONE.**
-**Milestone 04 — Car Handling and Feel: DONE.**
-**Asset pipeline — FBX cooking + car models (CLAUDE.md 4.1): DONE.**
-**Milestone 05 — Ball and Car-Ball Interaction: DONE.**
-**Lighting — pulled forward from Milestone 14 on request: DONE.**
-**Milestone 06 — Arena, Goals and Scoring: DONE.**
-**Milestone 07 — Boost System and Boost Pads: DONE.**
-**Milestone 09 — Jumps, Flips and Air Control: DONE.**
-**Arena ramps + wall and ceiling driving (PROMPTS.md): DONE.**
-**Milestone 08 — Car Selection: NOT STARTED.** It was inserted into CLAUDE.md after the milestones
-above were built, which is why it is out of order here. Everything from the old Milestone 08 onwards
-shifted up by one; this document uses the new numbering throughout. A second new milestone,
-**Milestone 16 — UI Polish (raygui)**, was added at the end of the list.
+- [x] **Milestone 01 — Project Structure**
+- [x] **Milestone 02 — Base Scene and Car Movement**
+- [x] **Milestone 03 — Main Menu and Pause Menu**
+- [x] **Milestone 04 — Car Handling and Feel**
+- [x] **Milestone 05 — Ball and Car-Ball Interaction**
+- [x] **Milestone 06 — Arena, Goals and Scoring**
+- [x] **Milestone 07 — Boost System and Boost Pads**
+- [x] **Milestone 08 — Car Selection**
+- [x] **Milestone 09 — Jumps, Flips and Air Control**
+- [ ] **Milestone 10 — Camera Modes** — the next one; no ball-cam and no wall occlusion yet
+- [ ] **Milestone 11 — HUD** — score, clock and boost meter exist as a placeholder in `MatchScene`
+- [ ] **Milestone 12 — Bot Opponent (or Solo Practice)**
+- [ ] **Milestone 13 — Tuning Panels (Debug/Development)**
+- [ ] **Milestone 14 — Visual Polish and Effects** — lighting is done, pulled forward; shadows, bloom and effects are not
+- [ ] **Milestone 15 — Audio**
+- [ ] **Milestone 16 — UI Polish (raygui)**
 
-The game opens on a main menu (Play / Settings / Exit). Play starts a real match: an enclosed
+Two pieces of work outside the milestone list are also done: the **asset pipeline** (FBX cooking plus
+the car models, CLAUDE.md 4.1) and the **arena ramps with wall and ceiling driving** (PROMPTS.md).
+
+Milestone 08 was inserted into CLAUDE.md after 09 was already built, which is why it was finished out
+of order. Everything from the old Milestone 08 onwards shifted up by one; this document uses the new
+numbering throughout. A second new milestone, Milestone 16 — UI Polish (raygui), was added at the end
+of the list.
+
+The game opens on a main menu (Play / Settings / Exit). Play now opens the car picker — six of the
+seven cooked cars on a 2 x 3 grid of pedestals, spinning slowly in the team colour — and starting
+from there opens a real match: an enclosed
 55 x 80 m arena with side walls, back walls, a ceiling and two coloured goals; a player car driven
 with WASD/arrows on a Jolt rigid body; a ball; a score, a match clock and a kickoff countdown; and
 a smooth third-person chase camera. A goal resets the field and counts down again, and the match
@@ -175,6 +186,15 @@ physics directly (removed afterwards):
 | 32 m/s into the ramp | launches off it at 3.8 m, stays upright (uprightness 0.77) |
 | Ball at 50 m/s into a ramp, five angles | contained; max abs(x) 26.4, abs(z) 38.8, peak y 13.8 under the 15 m ceiling |
 | Ramp reads as joining the wall | yes, after the seam line and mullions were added — checked on a screenshot |
+| Rounded corner profile vs the ideal | within 0.055 m at every height and angle |
+| Smoothness around a corner | biggest jump 0.010 m between samples 10 degrees apart |
+| All four corners the same shape | identical to 3 decimals, sampled every 15 degrees |
+| Driving a wall straight through a corner | grounded **100%** of 2 s at both 7.5 m and 10.5 m, 63% of the run spent on the far wall |
+| Ball at 60 m/s straight into each corner, 3 heights | 12 of 12 contained, nothing escaped |
+| Wall-to-corner handover, scanned every 0.5 m | continuous, no gap |
+| Corner brightness after trimming the drawn overlap | matches the flat walls |
+| Boost pads vs the rounded flat floor | 0 of 18 overhang; worst rise under any pad rim 0.000 m |
+| Arena size | 770 collision pieces, 94 drawn ramp meshes |
 | Ramp drawn as one surface, no alpha banding | yes; forcing the ramps opaque shows full coverage, correct facing, goal mouth left clear |
 | Debug teardown with 10 ramp models | 10 VAOs unloaded, lit shader unloaded exactly once, no errors |
 
@@ -199,6 +219,19 @@ starts and measures differently, **not** because anything regressed — the orig
 2.13 s on this harness too. Compare within a column, not across harnesses.
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank |
 
+Milestone 08 car selection, verified with the input-shim harness described at the end of this
+document (removed afterwards) plus screenshots of the scene:
+
+| Check | Result |
+|---|---|
+| All six previews load and paint | yes, one `MODEL: loaded` line each, all in team blue |
+| Grid reads evenly | yes — every preview is fitted to the same 3.8 m length, and all six sit at the same distance from the camera |
+| Scripted right, then down, then Enter | selection went SPORTS CAR → POLICE → COMPACT, exactly the grid arithmetic |
+| The pick reaches the match | the match then loaded `NormalCar2.evmodel`, and the screenshot shows that car |
+| Frames and labels track their car | yes, projected from each pedestal, so both rows and any window size line up |
+| Scene teardown | all six models unloaded, lit shader unloaded exactly once, exit 0 |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank |
+
 ## Layout
 
 ```
@@ -206,6 +239,7 @@ Game/Source/
   Main.cpp, App.h/cpp          entry point, window, settings, scene switching, smoke test
   Scene.h/cpp                  camera + GameObjects + Jolt PhysicsSystem, fixed step loop
   MainMenuScene.h/cpp          title, Play / Settings / Exit, credits and build string
+  CarSelectScene.h/cpp         the car picker: six cooked cars on a 2 x 3 grid of pedestals
   MatchScene.h/cpp             the gameplay scene, pause overlay, score/clock readout
   Match.h/cpp                  score, clock, kickoff/goal/full time state machine
   GameSettings.h               the settings struct App owns
@@ -247,7 +281,8 @@ Controls so far: **WASD / arrows** drive and steer on the ground and pitch/yaw i
 **Space** jumps (again for a double jump, or a flip if a direction is held), **Shift** boosts
 (held), **Q/E** air roll, **R** resets the car, **Esc** or **P** pauses.
 In menus: **up/down** or **W/S** move, **Enter**/**Space** activate, **left/right** change a value,
-and the mouse works too.
+and the mouse works too. In the car picker: **arrows** or **WASD** move around the grid, **Enter**
+or **Space** starts the match, **Esc** goes back to the main menu, and clicking a car picks it.
 
 `make clean` removes the build output. `make clean-thirdparty` additionally forces a raylib rebuild.
 The first build takes a few minutes (raylib + 153 Jolt translation units per config); after that it
@@ -409,6 +444,59 @@ is incremental.
 - **The back-wall ramps stop either side of the goal mouth.** A ramp across the mouth would wall the
   goal off. This leaves the floor flat right up to the goal line, which is also how Rocket League
   reads, and it keeps `GoalObject`'s analytic line test untouched.
+- **The four vertical wall intersections are rounded too** (`ArenaObject::AddCorner`, `cornerRadius`
+  8 m). Three surfaces meet at each: the quarter cylinder replacing the 90 degree intersection, and
+  the floor and ceiling ramps carried around it as a torus. The torus is a ring of `cornerSegments`
+  short straight fillets laid on the chords of the corner arc, so `AddFillet` builds all three and
+  nothing new was written — it only had to take an explicit segment count, because the corner needs
+  a finer division (10) than a ramp profile (8).
+- **`AddFillet` never assumed `up` was vertical, which is what made the corner free.** A vertical
+  corner is the same quarter-circle join with a horizontal `up` and a vertical run. If that
+  assumption is ever added to it, the corners break.
+- **All three corner surfaces share one angular division, and that is what makes them seamless.**
+  Their chord midpoints then coincide, and the arithmetic lines up exactly: at the top of the floor
+  ramp the torus is `(cornerRadius - floorRampRadius) + floorRampRadius = cornerRadius` from the
+  corner axis, which is the cylinder. Measured across the whole corner, the surface tracks the ideal
+  profile to 0.055 m with a biggest jump of 0.010 m between samples 10 degrees apart.
+- **`cornerRadius` must stay larger than `floorRampRadius`.** The floor ramp is carried around a
+  circle of radius `cornerRadius - floorRampRadius`; at or below zero the corner has no flat floor
+  left in it and the torus turns inside out. It also sets the shape of the pitch: the flat floor is
+  now a rounded rectangle, 45 x 70 with corners of radius 3.
+- **Adding the corners needed no trimming of the *collision* — but the *drawing* had to be trimmed.**
+  Everything the straight walls and ramps put in the corner region sits further from the corner axis
+  than the corner surfaces do, so it is buried in solid and the rounded corner is what the car
+  reaches first. Glass never writes depth though, so every buried layer still blends: with the
+  straight runs, the corner cylinder and the tori all drawn on top of each other, the corners lit up
+  about two and a half times brighter than the walls. `AddFillet` therefore takes a `drawCenter` and
+  `drawHalfLength` separate from the collision run — collision overlaps into the corner, drawing
+  stops at it.
+- **Do not "simplify" that by trimming the collision to match the drawing.** It was tried, and it is
+  wrong: near the corner entrance the straight ramp surface and the corner cylinder are only about
+  4 cm apart, so removing the straight one changes which surface a car rides for a stretch. Measured,
+  a car carrying the wall through a corner went from **100% grounded to 78%**, and reached the far
+  wall later. The drawn strip is a strict subset of the solid, on purpose.
+- **The draw range needs its own centre, not just its own length.** The back-wall floor ramps are the
+  one case where the two are not concentric — collision runs from the goal mouth to the far wall,
+  drawing stops at the corner — and reusing the collision centre with a shorter length drew the
+  strip in the wrong place, leaving a dark gap beside the goal.
+- **A corner ramp's drawn strips must taper, because a torus narrows as it comes off the wall**
+  (`drawTaper`). A straight fillet is an extrusion of constant width, and a ring of them is not: at
+  the top of the ramp each run wants the full chord (1.26 m at these radii) but at the toe the true
+  arc is only 0.47 m, so untapered runs overlapped about **2.7x** near the toe. That piled two or
+  three layers of glass on each other and smeared the flat shading, which is the whole thing that
+  makes the slope readable — the corner looked like a plain dark bowl next to a straight ramp with
+  clean bands. The taper is the ratio of the flat end's distance from the corner axis to the wall
+  end's, so it is `(cornerRadius - floorRampRadius) / cornerRadius` for the floor and the
+  `ceilingRampRadius` equivalent for the roof; everything straight passes 1.0 and is unaffected.
+- **The taper is drawing only — the collision boxes stay over-wide, and that is fine.** An over-wide
+  box at the toe sticks out *tangentially*, which puts its ends further from the corner axis, i.e.
+  deeper into the solid. It never protrudes into free space, so the measured corner profile is
+  unchanged.
+- **Lines buried in solid still show through glass, because glass never writes depth.** The old
+  square top-of-wall edges and the vertical posts at the sharp corners had to go, not just be left
+  to be occluded — they were drawn over the rounded corner. The roof outline now traces the real
+  edge where the ceiling ramps end, corners included, and the field markings are clipped to the
+  rounded flat floor rather than squared off.
 - **Every ramp is glass, like the walls**, so the whole edge of the arena is one continuous
   see-through surface. The floor ramps are held at alpha 90 against the walls' 52 because they are
   driven on and the slope still has to read. Colour alpha alone decides which pass a piece lands in,
@@ -556,6 +644,41 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - Light colours are constants in `Lighting.cpp` and set into the program once at load, since the
   light never moves. Milestone 13 can bind them to the ImGui panel.
 
+### Car selection
+- **The pick lives in `GameSettings::playerCarModel`,** a model name string, even though it is not a
+  row in the settings panel. That struct is the one thing every scene can already see, so it is what
+  carries the choice from the picker to `MatchScene` and back again — the picker re-selects whatever
+  is stored when it opens, so returning to the menu and pressing Play twice keeps your car. The
+  default is `SportsCar`, which is also what the smoke test gets, since it skips both menus.
+- **`MenuAction::SelectCar` sits between the menu and the match.** Play no longer starts a match; it
+  asks `App` for `CarSelectScene`, and only that scene raises `StartMatch`. Nothing else changed in
+  the scene-switching flow.
+- **The six previews are the real cooked models, drawn directly rather than through `CarObject`.**
+  A `CarObject` would need a `PhysicsSystem`, a body and a controller for a rotating showroom prop.
+  `StaticModelAsset` already loads, paints and lights a model on its own, so the scene has no
+  physics at all and holds nothing but six of those.
+- **The cars stand in the plane z = 0, not on a floor.** Laid out on a floor the back row would be
+  further from the camera and would render smaller; standing them in a plane facing the camera keeps
+  all six the same size, which is what makes it read as a grid rather than a diorama. Each is fitted
+  to the same 3.8 m length (`PREVIEW_LENGTH`) so the pack's own scale differences — an SUV is 4.2 m
+  and a NormalCar2 3.3 m — do not make one cell look bigger than another.
+- **The camera is above the top row and tilted down.** A level camera looking at the middle of the
+  grid puts the top row overhead and shows the underside of those three cars, which looked broken.
+  Anything that moves the rows has to keep `camera.position.y` above `ROW_Y[0]`.
+- **Each cell rectangle is projected from its own pedestal, not laid out in screen space.** The two
+  rows are seen from different angles, so a fixed pixel box around the projected centre fits one row
+  and misses the other; projecting the top of the car, the near edge of the pedestal and both sides
+  gives a frame and a label position that follow the car at any window size. This is also the mouse
+  hit box, so hover, click and the drawn frame can never disagree.
+- **The labels are display names, not the asset names.** `NormalCar1` and `NormalCar2` show as COUPE
+  and COMPACT, `Cop` as POLICE. The asset name is the first field of the same `CARS` table, so the
+  two cannot drift apart.
+- **Mouse selection lands a frame after keyboard selection.** Grid keys are read before the 3D pass
+  and hover after it (the cells only exist once projected), so clicking a car draws its 2D frame
+  immediately but grows its pedestal on the next frame. Not worth splitting the pass in two.
+- **`Shutdown` unloads all six models**, and `StaticModelAsset::Unload` detaches the lit shader
+  first — the same trap as everywhere else in this project.
+
 ### Menus
 - **`App` owns the single `GameSettings`** and hands each scene a pointer, which is what makes the
   settings shared between the main menu and the pause menu. The `SettingsMenu` *widget* is per scene
@@ -571,8 +694,8 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   silently overflow the panel — the first version had exactly that bug, with "Back" hanging outside.
 - `SetExitKey(KEY_NULL)` in `App::Initialize`: Esc must pause, not kill the window. Quitting goes
   through `MenuAction::ExitGame` and the `App::running` flag.
-- The smoke test starts **directly in the match**, skipping the menu, because that is the scene that
-  needs rendering validation.
+- The smoke test starts **directly in the match**, skipping both the menu and the car picker, because
+  that is the scene that needs rendering validation. It therefore always drives the default car.
 
 ## Known deviations / things to be aware of
 
@@ -610,10 +733,9 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   `python3 -m venv .venv && .venv/bin/pip install -r Tools/requirements.txt`.
 - The chase camera has no wall-occlusion handling yet (Milestone 10 / 6.2); it only clamps its own
   height above the floor.
-- **The vertical corners, where two walls meet, are not filleted.** The four floor ramps simply
-  overlap there, so the corner is solid and drivable-into but visibly faceted rather than the smooth
-  corner patch Rocket League has. Rocket League also has 45-degree diagonal corner walls, which this
-  arena does not; both are arena-shape work rather than ramp work.
+- **Rocket League also has 45-degree diagonal corner walls, which this arena does not.** The corners
+  are rounded now, but the arena is still fundamentally a rectangle with rounded edges rather than an
+  octagon. That is arena-shape work, not ramp work.
 - **A box has no wheels, so the car cannot climb steps.** A vertical lip taller than a few
   centimetres stops it dead: the contact normal barely tilts up, so lift never beats the car's
   weight. Rounding the box enough to climb would make the underside nearly cylindrical and wreck
@@ -627,7 +749,12 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   resolution and the post-processing flag are the only ones with an effect today, and post-processing
   is just a stored flag until Milestone 14.
 - **Settings live for the session only.** Nothing is written to disk; Milestone 13 introduces the
-  config file, and that is the natural place to persist them.
+  config file, and that is the natural place to persist them. The picked car is in the same struct,
+  so it is forgotten on exit along with everything else.
+- **`SportsCar2` is deliberately not in the picker** (CLAUDE.md Milestone 08 says to use six of the
+  seven). It is still cooked and still loadable by name.
+- **All six previews are painted blue,** because the player is always on the blue team. If teams ever
+  become selectable, `SetPaintColor` in `CarSelectScene::Initialize` is the one place to change.
 
 ## Next steps — Milestone 10 (Camera Modes)
 
@@ -650,6 +777,8 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 
 The opponent car (Milestone 12) needs no new asset work: give the second `CarObject` a different
 `modelName` and the orange `teamColor` before `Initialize()` and it cooks, fits and paints itself.
+It should not be given `settings->playerCarModel` — that field is the player's car; pick the bot's
+from the same `CARS` table in `CarSelectScene.cpp`, or simply leave it on the `SportsCar` default.
 
 ### Verifying without a keyboard
 There is no `xdotool`/`wtype` here, so every milestone so far was verified with a temporary harness

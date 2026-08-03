@@ -64,14 +64,15 @@ static Vector3 ArcPoint(Vector3 arcCenter, Vector3 inward, Vector3 up, float rad
 // The boxes are the collision and are never drawn. What is drawn is one strip
 // through the same arc — see RampMesh.
 void ArenaObject::AddFillet(Vector3 corner, Vector3 inward, Vector3 up, Vector3 runAxis,
-                            float radius, float runCenter, float runHalfLength, Color color)
+                            float radius, float runCenter, float runHalfLength, Color color,
+                            int segments, float drawCenter, float drawHalfLength, float drawTaper)
 {
-    const float step = (PI * 0.5f) / (float)rampSegments;
+    const float step = (PI * 0.5f) / (float)segments;
     const float chordHalf = radius * sinf(step * 0.5f);
     const float midRadius = radius * cosf(step * 0.5f);
     const Vector3 arcCenter = Vector3Add(corner, Vector3Scale(Vector3Add(inward, up), radius));
 
-    for (int i = 0; i < rampSegments; ++i)
+    for (int i = 0; i < segments; ++i)
     {
         // Angle at the middle of this segment: 0 lies on the flat surface, 90
         // degrees on the wall.
@@ -100,7 +101,7 @@ void ArenaObject::AddFillet(Vector3 corner, Vector3 inward, Vector3 up, Vector3 
     // The drawn surface: one strip through the points where consecutive chords
     // meet, which are exactly the ends of the box top faces above.
     Mesh mesh = {};
-    mesh.triangleCount = rampSegments * 2;
+    mesh.triangleCount = segments * 2;
     mesh.vertexCount = mesh.triangleCount * 3;
     mesh.vertices = (float *)MemAlloc((unsigned int)mesh.vertexCount * 3 * sizeof(float));
 
@@ -109,19 +110,31 @@ void ArenaObject::AddFillet(Vector3 corner, Vector3 inward, Vector3 up, Vector3 
     // the two side walls are passed the same runAxis but mirror each other, so
     // taking it from the basis is what keeps every ramp facing into the arena.
     const Vector3 runDirection = Vector3CrossProduct(up, inward);
-    const Vector3 runOffset = Vector3Scale(runAxis, runCenter);
+    const Vector3 drawOffset = Vector3Scale(runAxis, drawCenter);
     int vertex = 0;
 
-    for (int i = 0; i < rampSegments; ++i)
+    for (int i = 0; i < segments; ++i)
     {
-        Vector3 lower = Vector3Add(ArcPoint(arcCenter, inward, up, radius, i * step), runOffset);
-        Vector3 upper = Vector3Add(ArcPoint(arcCenter, inward, up, radius, (i + 1) * step), runOffset);
-        Vector3 back = Vector3Scale(runDirection, -runHalfLength);
-        Vector3 front = Vector3Scale(runDirection, runHalfLength);
+        const float angleLow = i * step;
+        const float angleHigh = (i + 1) * step;
+        // A ring of these runs around a corner is a torus, and a torus narrows as
+        // it comes down off the wall: at the top each run wants the full chord,
+        // at the toe it wants only drawTaper of it. Without this the runs overlap
+        // near the toe — 2.7x over at the corner radii in use — which piles glass
+        // on glass and smears the flat shading that makes the slope readable.
+        const float halfLow = drawHalfLength * (drawTaper + (1.0f - drawTaper) * sinf(angleLow));
+        const float halfHigh = drawHalfLength * (drawTaper + (1.0f - drawTaper) * sinf(angleHigh));
 
-        const Vector3 corners[6] = { Vector3Add(lower, back),  Vector3Add(lower, front),
-                                     Vector3Add(upper, back),  Vector3Add(lower, front),
-                                     Vector3Add(upper, front), Vector3Add(upper, back) };
+        Vector3 lower = Vector3Add(ArcPoint(arcCenter, inward, up, radius, angleLow), drawOffset);
+        Vector3 upper = Vector3Add(ArcPoint(arcCenter, inward, up, radius, angleHigh), drawOffset);
+        Vector3 lowBack = Vector3Scale(runDirection, -halfLow);
+        Vector3 lowFront = Vector3Scale(runDirection, halfLow);
+        Vector3 highBack = Vector3Scale(runDirection, -halfHigh);
+        Vector3 highFront = Vector3Scale(runDirection, halfHigh);
+
+        const Vector3 corners[6] = { Vector3Add(lower, lowBack),   Vector3Add(lower, lowFront),
+                                     Vector3Add(upper, highBack),  Vector3Add(lower, lowFront),
+                                     Vector3Add(upper, highFront), Vector3Add(upper, highBack) };
         for (int k = 0; k < 6; ++k, ++vertex)
         {
             mesh.vertices[vertex * 3 + 0] = corners[k].x;
@@ -137,6 +150,60 @@ void ArenaObject::AddFillet(Vector3 corner, Vector3 inward, Vector3 up, Vector3 
     rampMeshes.push_back(ramp);
 }
 
+// One rounded vertical corner. Three surfaces have to meet here: the quarter
+// cylinder that replaces the 90 degree wall intersection, and the floor and
+// ceiling ramps carried around it.
+//
+// The two ramps become a torus, approximated by a ring of short straight fillets
+// laid on the chords of the corner arc — which is why AddFillet does the work
+// again rather than anything new being written. All three share `cornerSegments`
+// and the same angular division, so every chord midpoint lines up and the
+// surfaces meet flush: at the top of the floor ramp the torus is exactly
+// (cornerRadius - floorRampRadius) + floorRampRadius = cornerRadius from the
+// axis, which is the cylinder.
+//
+// Nothing existing needs trimming. Everything the straight walls and ramps put
+// in this region sits further from the corner axis than these surfaces do, so it
+// ends up buried in solid and the rounded corner is what the car touches.
+void ArenaObject::AddCorner(float sideX, float sideZ)
+{
+    const float halfWidth = width * 0.5f;
+    const float halfLength = length * 0.5f;
+    const float axisX = sideX * (halfWidth - cornerRadius);
+    const float axisZ = sideZ * (halfLength - cornerRadius);
+    const float step = (PI * 0.5f) / (float)cornerSegments;
+    const float chordHalf = cornerRadius * sinf(step * 0.5f);
+    const float midRadius = cornerRadius * cosf(step * 0.5f);
+
+    // The corner itself, over the stretch of wall that is neither ramp. Extended
+    // past both ramps so the three always overlap into one solid.
+    const float low = floorRampRadius - 0.1f;
+    const float high = wallHeight - ceilingRampRadius + 0.1f;
+    AddFillet(Vector3{ sideX * halfWidth, 0.0f, sideZ * halfLength },
+              Vector3{ -sideX, 0.0f, 0.0f }, Vector3{ 0.0f, 0.0f, -sideZ },
+              Vector3{ 0.0f, 1.0f, 0.0f }, cornerRadius,
+              (low + high) * 0.5f, (high - low) * 0.5f, WALL_COLOR, cornerSegments,
+              (low + high) * 0.5f, (high - low) * 0.5f, 1.0f);
+
+    for (int i = 0; i < cornerSegments; ++i)
+    {
+        const float angle = (i + 0.5f) * step;
+        // Radial and tangential directions of the corner arc in the XZ plane. Both
+        // stay unit length and perpendicular for either sign of sideX and sideZ.
+        const Vector3 inward = { -sideX * cosf(angle), 0.0f, -sideZ * sinf(angle) };
+        const Vector3 tangent = { -sideX * sinf(angle), 0.0f, sideZ * cosf(angle) };
+        // Where this facet's wall meets the floor: the midpoint of its chord.
+        const Vector3 mid = { axisX - midRadius * inward.x, 0.0f, axisZ - midRadius * inward.z };
+
+        AddFillet(Vector3{ mid.x, 0.0f, mid.z }, inward, Vector3{ 0.0f, 1.0f, 0.0f },
+                  tangent, floorRampRadius, 0.0f, chordHalf + 0.02f, RAMP_COLOR, rampSegments,
+                  0.0f, chordHalf, (midRadius - floorRampRadius) / midRadius);
+        AddFillet(Vector3{ mid.x, wallHeight, mid.z }, inward, Vector3{ 0.0f, -1.0f, 0.0f },
+                  tangent, ceilingRampRadius, 0.0f, chordHalf + 0.02f, WALL_COLOR, rampSegments,
+                  0.0f, chordHalf, (midRadius - ceilingRampRadius) / midRadius);
+    }
+}
+
 void ArenaObject::Initialize(Scene &owner)
 {
     scene = &owner;
@@ -150,7 +217,14 @@ void ArenaObject::Initialize(Scene &owner)
     pieces.push_back({ { 0.0f, -floorThickness * 0.5f, 0.0f },
                        { halfWidth, floorThickness * 0.5f, halfLength }, FLOOR_COLOR, true });
 
-    // Side walls, overlapping the corners so there is no seam to catch on.
+    // Every straight run stops where the rounded corner starts, and the corner
+    // takes it from there. They used to overrun into each other, which was
+    // harmless while it only meant buried solid — but glass never writes depth,
+    // so each overlapping layer still blends and the corners lit up about two and
+    // a half times brighter than the walls.
+    const float cornerHalfLength = halfLength - cornerRadius;   // where the corner takes over
+    const float cornerHalfWidth = halfWidth - cornerRadius;
+
     for (float side = -1.0f; side <= 1.0f; side += 2.0f)
     {
         pieces.push_back({ { side * (halfWidth + t * 0.5f), wallHeight * 0.5f, 0.0f },
@@ -161,12 +235,12 @@ void ArenaObject::Initialize(Scene &owner)
     for (float end = -1.0f; end <= 1.0f; end += 2.0f)
     {
         const float wallZ = end * (halfLength + t * 0.5f);
-        const float panelHalfWidth = (halfWidth - halfGoal) * 0.5f;
+        const float solidPanelHalf = (halfWidth - halfGoal) * 0.5f;
 
         for (float side = -1.0f; side <= 1.0f; side += 2.0f)
         {
-            pieces.push_back({ { side * (halfGoal + panelHalfWidth), wallHeight * 0.5f, wallZ },
-                               { panelHalfWidth, wallHeight * 0.5f, t * 0.5f }, WALL_COLOR, true });
+            pieces.push_back({ { side * (halfGoal + solidPanelHalf), wallHeight * 0.5f, wallZ },
+                               { solidPanelHalf, wallHeight * 0.5f, t * 0.5f }, WALL_COLOR, true });
         }
 
         pieces.push_back({ { 0.0f, (goalHeight + wallHeight) * 0.5f, wallZ },
@@ -183,19 +257,21 @@ void ArenaObject::Initialize(Scene &owner)
     {
         AddFillet(Vector3{ side * halfWidth, 0.0f, 0.0f }, Vector3{ -side, 0.0f, 0.0f },
                   Vector3{ 0.0f, 1.0f, 0.0f }, Vector3{ 0.0f, 0.0f, 1.0f },
-                  floorRampRadius, 0.0f, halfLength + t, RAMP_COLOR);
+                  floorRampRadius, 0.0f, halfLength + t, RAMP_COLOR, rampSegments, 0.0f, cornerHalfLength, 1.0f);
     }
 
     // Ramps from the floor up into each back wall, in two runs so the goal mouth
     // is left flat — a ramp across it would wall the goal off.
     for (float end = -1.0f; end <= 1.0f; end += 2.0f)
     {
-        const float panelHalfWidth = (halfWidth - halfGoal) * 0.5f;
+        const float panelHalfWidth = (cornerHalfWidth - halfGoal) * 0.5f;
+        const float solidPanelHalf = (halfWidth - halfGoal) * 0.5f;
         for (float side = -1.0f; side <= 1.0f; side += 2.0f)
         {
             AddFillet(Vector3{ 0.0f, 0.0f, end * halfLength }, Vector3{ 0.0f, 0.0f, -end },
                       Vector3{ 0.0f, 1.0f, 0.0f }, Vector3{ 1.0f, 0.0f, 0.0f },
-                      floorRampRadius, side * (halfGoal + panelHalfWidth), panelHalfWidth, RAMP_COLOR);
+                      floorRampRadius, side * (halfGoal + solidPanelHalf), solidPanelHalf, RAMP_COLOR,
+                      rampSegments, side * (halfGoal + panelHalfWidth), panelHalfWidth, 1.0f);
         }
     }
 
@@ -206,13 +282,21 @@ void ArenaObject::Initialize(Scene &owner)
     {
         AddFillet(Vector3{ side * halfWidth, wallHeight, 0.0f }, Vector3{ -side, 0.0f, 0.0f },
                   Vector3{ 0.0f, -1.0f, 0.0f }, Vector3{ 0.0f, 0.0f, 1.0f },
-                  ceilingRampRadius, 0.0f, halfLength + t, WALL_COLOR);
+                  ceilingRampRadius, 0.0f, halfLength + t, WALL_COLOR, rampSegments, 0.0f, cornerHalfLength, 1.0f);
     }
     for (float end = -1.0f; end <= 1.0f; end += 2.0f)
     {
         AddFillet(Vector3{ 0.0f, wallHeight, end * halfLength }, Vector3{ 0.0f, 0.0f, -end },
                   Vector3{ 0.0f, -1.0f, 0.0f }, Vector3{ 1.0f, 0.0f, 0.0f },
-                  ceilingRampRadius, 0.0f, halfWidth + t, WALL_COLOR);
+                  ceilingRampRadius, 0.0f, halfWidth + t, WALL_COLOR, rampSegments, 0.0f, cornerHalfWidth, 1.0f);
+    }
+
+    // Round off the four vertical wall intersections, so a car can carry a wall
+    // straight through a corner onto the next one.
+    for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
+    {
+        for (float sideZ = -1.0f; sideZ <= 1.0f; sideZ += 2.0f)
+            AddCorner(sideX, sideZ);
     }
 
     JPH::StaticCompoundShapeSettings compound;
@@ -264,22 +348,63 @@ void ArenaObject::Draw()
 
     // Field markings, drawn as unlit lines just above the floor. Explicit lines
     // rather than DrawGrid, which is square and cannot match a 55 x 80 field.
-    // They stop where the floor stops being flat, since past that they would be
-    // buried inside the ramps.
+    //
+    // The flat floor is a rounded rectangle: the ramps take the outer 5 m, and the
+    // corners are arcs of (cornerRadius - floorRampRadius) about each corner axis.
+    // Every marking is clipped to that, since past it they would be buried in a
+    // ramp — which is also why the outline traces the arcs rather than squaring
+    // them off.
     const float halfWidth = FlatHalfWidth();
     const float halfLength = FlatHalfLength();
+    const float cornerAxisX = width * 0.5f - cornerRadius;
+    const float cornerAxisZ = length * 0.5f - cornerRadius;
+    const float flatCorner = cornerRadius - floorRampRadius;
     const Color gridColor = { 90, 190, 255, 45 };
-    for (float x = -halfWidth; x <= halfWidth + 0.01f; x += 5.0f)
-        DrawLine3D(Vector3{ x, 0.02f, -halfLength }, Vector3{ x, 0.02f, halfLength }, gridColor);
-    for (float z = -halfLength; z <= halfLength + 0.01f; z += 5.0f)
-        DrawLine3D(Vector3{ -halfWidth, 0.02f, z }, Vector3{ halfWidth, 0.02f, z }, gridColor);
+    const Color lineColor = { 90, 190, 255, 190 };
 
-    DrawCircle3D(Vector3{ 0.0f, 0.02f, 0.0f }, 8.0f, Vector3{ 1.0f, 0.0f, 0.0f }, 90.0f,
-                 Color{ 90, 190, 255, 190 });
-    DrawCubeWires(Vector3{ 0.0f, 0.02f, 0.0f }, halfWidth * 2.0f, 0.04f, halfLength * 2.0f,
-                  Color{ 90, 190, 255, 120 });
-    DrawLine3D(Vector3{ -halfWidth, 0.03f, 0.0f }, Vector3{ halfWidth, 0.03f, 0.0f },
-               Color{ 90, 190, 255, 190 });
+    // How far a grid line may run before it reaches the rounded corner.
+    for (float x = -halfWidth; x <= halfWidth + 0.01f; x += 5.0f)
+    {
+        float over = fabsf(x) - cornerAxisX;
+        float limit = over <= 0.0f ? halfLength
+                    : cornerAxisZ + sqrtf(fmaxf(flatCorner * flatCorner - over * over, 0.0f));
+        DrawLine3D(Vector3{ x, 0.02f, -limit }, Vector3{ x, 0.02f, limit }, gridColor);
+    }
+    for (float z = -halfLength; z <= halfLength + 0.01f; z += 5.0f)
+    {
+        float over = fabsf(z) - cornerAxisZ;
+        float limit = over <= 0.0f ? halfWidth
+                    : cornerAxisX + sqrtf(fmaxf(flatCorner * flatCorner - over * over, 0.0f));
+        DrawLine3D(Vector3{ -limit, 0.02f, z }, Vector3{ limit, 0.02f, z }, gridColor);
+    }
+
+    DrawCircle3D(Vector3{ 0.0f, 0.02f, 0.0f }, 8.0f, Vector3{ 1.0f, 0.0f, 0.0f }, 90.0f, lineColor);
+    DrawLine3D(Vector3{ -halfWidth, 0.03f, 0.0f }, Vector3{ halfWidth, 0.03f, 0.0f }, lineColor);
+
+    // Pitch outline: four straights between the corner arcs, then the arcs.
+    const Color outline = { 90, 190, 255, 120 };
+    for (float side = -1.0f; side <= 1.0f; side += 2.0f)
+    {
+        DrawLine3D(Vector3{ side * halfWidth, 0.02f, -cornerAxisZ },
+                   Vector3{ side * halfWidth, 0.02f, cornerAxisZ }, outline);
+        DrawLine3D(Vector3{ -cornerAxisX, 0.02f, side * halfLength },
+                   Vector3{ cornerAxisX, 0.02f, side * halfLength }, outline);
+    }
+    for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
+    {
+        for (float sideZ = -1.0f; sideZ <= 1.0f; sideZ += 2.0f)
+        {
+            for (int i = 0; i < cornerSegments; ++i)
+            {
+                float a = (PI * 0.5f) * i / (float)cornerSegments;
+                float b = (PI * 0.5f) * (i + 1) / (float)cornerSegments;
+                DrawLine3D(Vector3{ sideX * (cornerAxisX + flatCorner * cosf(a)), 0.02f,
+                                    sideZ * (cornerAxisZ + flatCorner * sinf(a)) },
+                           Vector3{ sideX * (cornerAxisX + flatCorner * cosf(b)), 0.02f,
+                                    sideZ * (cornerAxisZ + flatCorner * sinf(b)) }, outline);
+            }
+        }
+    }
 }
 
 void ArenaObject::DrawGlassWalls()
@@ -311,21 +436,39 @@ void ArenaObject::DrawGlassWalls()
 
     rlEnableDepthMask();
 
-    // Edges kept solid, so the boundary still reads even though the panels are
-    // nearly see-through.
+    // Where the ceiling ramps finish and the flat roof begins. Glass never writes
+    // depth, so a line buried in solid still shows through it — which is why this
+    // traces the real edge of the roof rather than the old square top of the wall,
+    // and why the vertical posts at the old sharp corners are gone with them.
     const float halfWidth = width * 0.5f;
     const float halfLength = length * 0.5f;
+    const float cornerAxisX = halfWidth - cornerRadius;
+    const float cornerAxisZ = halfLength - cornerRadius;
+    const float roofX = halfWidth - ceilingRampRadius;
+    const float roofZ = halfLength - ceilingRampRadius;
+    const float roofCorner = cornerRadius - ceilingRampRadius;
     const Color edge = { 110, 160, 220, 150 };
+
+    for (float side = -1.0f; side <= 1.0f; side += 2.0f)
+    {
+        DrawLine3D(Vector3{ side * roofX, wallHeight, -cornerAxisZ },
+                   Vector3{ side * roofX, wallHeight, cornerAxisZ }, edge);
+        DrawLine3D(Vector3{ -cornerAxisX, wallHeight, side * roofZ },
+                   Vector3{ cornerAxisX, wallHeight, side * roofZ }, edge);
+    }
     for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
     {
-        DrawLine3D(Vector3{ sideX * halfWidth, wallHeight, -halfLength },
-                   Vector3{ sideX * halfWidth, wallHeight, halfLength }, edge);
         for (float sideZ = -1.0f; sideZ <= 1.0f; sideZ += 2.0f)
         {
-            DrawLine3D(Vector3{ sideX * halfWidth, 0.0f, sideZ * halfLength },
-                       Vector3{ sideX * halfWidth, wallHeight, sideZ * halfLength }, edge);
-            DrawLine3D(Vector3{ -halfWidth, wallHeight, sideZ * halfLength },
-                       Vector3{ halfWidth, wallHeight, sideZ * halfLength }, edge);
+            for (int i = 0; i < cornerSegments; ++i)
+            {
+                float a = (PI * 0.5f) * i / (float)cornerSegments;
+                float b = (PI * 0.5f) * (i + 1) / (float)cornerSegments;
+                DrawLine3D(Vector3{ sideX * (cornerAxisX + roofCorner * cosf(a)), wallHeight,
+                                    sideZ * (cornerAxisZ + roofCorner * sinf(a)) },
+                           Vector3{ sideX * (cornerAxisX + roofCorner * cosf(b)), wallHeight,
+                                    sideZ * (cornerAxisZ + roofCorner * sinf(b)) }, edge);
+            }
         }
     }
 
@@ -341,12 +484,14 @@ void ArenaObject::DrawGlassWalls()
     const Color seam = { 130, 195, 250, 215 };
     const Color mullion = { 110, 160, 220, 60 };
 
+    // The straights stop where the rounded corners begin; the arcs below carry
+    // them round. Past that tangent point a straight line is buried in the corner.
     for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
     {
         const float x = sideX * (halfWidth - inset);
-        DrawLine3D(Vector3{ x, rampTop, -halfLength }, Vector3{ x, rampTop, halfLength }, seam);
-        DrawLine3D(Vector3{ x, wallTop, -halfLength }, Vector3{ x, wallTop, halfLength }, mullion);
-        for (float z = -halfLength; z <= halfLength + 0.01f; z += 5.0f)
+        DrawLine3D(Vector3{ x, rampTop, -cornerAxisZ }, Vector3{ x, rampTop, cornerAxisZ }, seam);
+        DrawLine3D(Vector3{ x, wallTop, -cornerAxisZ }, Vector3{ x, wallTop, cornerAxisZ }, mullion);
+        for (float z = -cornerAxisZ; z <= cornerAxisZ + 0.01f; z += 5.0f)
             DrawLine3D(Vector3{ x, rampTop, z }, Vector3{ x, wallTop, z }, mullion);
     }
 
@@ -358,11 +503,36 @@ void ArenaObject::DrawGlassWalls()
         for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
         {
             DrawLine3D(Vector3{ sideX * halfGoal, rampTop, z },
-                       Vector3{ sideX * halfWidth, rampTop, z }, seam);
+                       Vector3{ sideX * cornerAxisX, rampTop, z }, seam);
         }
-        DrawLine3D(Vector3{ -halfWidth, wallTop, z }, Vector3{ halfWidth, wallTop, z }, mullion);
-        for (float x = -halfWidth; x <= halfWidth + 0.01f; x += 5.0f)
+        DrawLine3D(Vector3{ -cornerAxisX, wallTop, z }, Vector3{ cornerAxisX, wallTop, z }, mullion);
+        for (float x = -cornerAxisX; x <= cornerAxisX + 0.01f; x += 5.0f)
             DrawLine3D(Vector3{ x, rampTop, z }, Vector3{ x, wallTop, z }, mullion);
+    }
+
+    // Round the corners off with the same two lines plus a mullion per facet, so
+    // the seam runs unbroken from one wall to the next the way the surface does.
+    const float cornerLine = cornerRadius - inset;
+    for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
+    {
+        for (float sideZ = -1.0f; sideZ <= 1.0f; sideZ += 2.0f)
+        {
+            for (int i = 0; i <= cornerSegments; ++i)
+            {
+                float a = (PI * 0.5f) * i / (float)cornerSegments;
+                Vector3 at = { sideX * (cornerAxisX + cornerLine * cosf(a)), 0.0f,
+                               sideZ * (cornerAxisZ + cornerLine * sinf(a)) };
+                DrawLine3D(Vector3{ at.x, rampTop, at.z }, Vector3{ at.x, wallTop, at.z }, mullion);
+                if (i == cornerSegments)
+                    continue;
+
+                float b = (PI * 0.5f) * (i + 1) / (float)cornerSegments;
+                Vector3 next = { sideX * (cornerAxisX + cornerLine * cosf(b)), 0.0f,
+                                 sideZ * (cornerAxisZ + cornerLine * sinf(b)) };
+                DrawLine3D(Vector3{ at.x, rampTop, at.z }, Vector3{ next.x, rampTop, next.z }, seam);
+                DrawLine3D(Vector3{ at.x, wallTop, at.z }, Vector3{ next.x, wallTop, next.z }, mullion);
+            }
+        }
     }
 }
 

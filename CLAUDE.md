@@ -68,7 +68,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - Do not run git add, git commit or git push commands
 - Maintain visual consistency with the rest of the application (colors, spacing, etc).
 - When the user requests a git commit, only generate a one-line description of the changes made, in English. Example: "refactor: move and enhanced script VAPID, add docs and hosting"
-- Create a markdown document `./HANDOFF.md` with the actual project state, decisions made, next steps and any important context for a different agent to continue the project. Whenever the project is modified, update the `./HANDOFF.md` document.
+- Create a markdown document `./HANDOFF.md` with the actual project state, decisions made, next steps and any important context for a different agent to continue the project. Whenever the project is modified, update the `./HANDOFF.md` document. > [!IMPORTANT]
+- Create checklist of the milestones that already made of in the `./HANDOFF.md` file. If the milestone is already made put a "x" in the checkbox `[ ]` using the markdown format
 
 # PROJECT
 # Arcade Car Soccer (Rocket League-style)
@@ -123,7 +124,8 @@ Build/
     Development/
     Release/
 Makefile
-.gitignore
+README.md # Description about the game, controls, how to run and checklist of the milestone that already or not already made for the game using the milestone from CLAUDE.md as refers. 
+.gitignore 
 ```
 
 ## 1.4. Code Conventions
