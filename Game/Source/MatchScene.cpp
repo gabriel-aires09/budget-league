@@ -1,5 +1,11 @@
 #include "MatchScene.h"
 
+#include "PostProcess.h"
+
+#include <raymath.h>
+
+#include <cmath>
+
 void MatchScene::Initialize()
 {
     InitializePhysics();
@@ -69,6 +75,7 @@ void MatchScene::Initialize()
         objects.push_back(&pad);
     }
 
+    effects::Load();
     physicsSystem.OptimizeBroadPhase();
     // Keep the camera under the ceiling: above it the ray that keeps the camera
     // out of the walls would start by hitting the ceiling slab itself.
@@ -162,19 +169,95 @@ void MatchScene::Update(float deltaTime)
     if (!match.IsFrozen())
         StepPhysics(deltaTime);
 
+    UpdateEffects(deltaTime);
+
     // Read every frame, so changing it in the pause menu is felt immediately.
     chaseCamera.sensitivity = settings->cameraSensitivity;
     chaseCamera.Update(camera, playerCar, ball.GetBodyPosition(), deltaTime);
 }
 
+// Every effect fires from a change this function watches for, so the effects
+// themselves stay a dumb particle pool with no idea what a match is.
+void MatchScene::UpdateEffects(float deltaTime)
+{
+    effects::Update(deltaTime);
+
+    Vector3 ballPosition = ball.GetBodyPosition();
+    float ballSpeed = ball.GetSpeed();
+
+    if (match.state != previousState)
+    {
+        if (match.state == MatchState::Celebration)
+        {
+            // In the scoring team's colour, thrown back out of the net.
+            Color team = match.lastScoringTeam == 0 ? uistyle::TeamBlue : uistyle::TeamOrange;
+            Vector3 outward = { 0.0f, 0.5f, match.lastScoringTeam == 0 ? -1.0f : 1.0f };
+            effects::Burst(ballPosition, outward, 90, 26.0f, 0.85f, team, 0.55f, 1.6f);
+            effects::Burst(ballPosition, Vector3{ 0.0f, 1.0f, 0.0f }, 40, 18.0f, 1.0f,
+                           Color{ 255, 255, 255, 255 }, 0.35f, 1.1f);
+        }
+        else if (match.state == MatchState::Kickoff)
+        {
+            effects::Clear(); // the field was just re-centred; nothing should linger
+        }
+        previousState = match.state;
+    }
+
+    // A hit is a jump in the ball's speed. Reading it here rather than from a
+    // contact listener keeps the physics free of callbacks, and the size of the
+    // jump is exactly how hard the hit was.
+    float gained = ballSpeed - previousBallSpeed;
+    if (gained > 7.0f && match.state == MatchState::Playing)
+    {
+        float punch = fminf(gained / 25.0f, 1.0f);
+        effects::Burst(ballPosition, Vector3{ 0.0f, 1.0f, 0.0f }, 8 + (int)(18.0f * punch),
+                       6.0f + 10.0f * punch, 1.0f, Color{ 255, 236, 190, 255 },
+                       0.18f + 0.16f * punch, 0.5f);
+    }
+    previousBallSpeed = ballSpeed;
+
+    for (CarObject *car : { &playerCar, botActive ? &botCar : &playerCar })
+    {
+        if (car->jumpPending)
+        {
+            // Down at the wheels, thrown outwards, as if off the floor.
+            Vector3 under = car->GetBodyPosition();
+            under.y -= car->halfExtents.y;
+            effects::Burst(under, Vector3{ 0.0f, -0.2f, 0.0f }, 10, 4.5f, 1.0f,
+                           Color{ 190, 210, 240, 255 }, 0.16f, 0.35f);
+            car->jumpPending = false;
+        }
+
+        // The trail: a couple of embers a frame while the boost is held, which is
+        // what makes a boosting car legible from across the arena.
+        if (car->boosting)
+        {
+            Matrix rotation = car->GetBodyRotation();
+            Vector3 exhaust = Vector3Add(car->GetBodyPosition(),
+                                         Vector3Transform(Vector3{ 0.0f, 0.05f, car->halfExtents.z }, rotation));
+            effects::Burst(exhaust, Vector3Transform(Vector3{ 0.0f, 0.1f, 1.0f }, rotation), 3,
+                           4.0f, 0.5f, Color{ 255, 190, 90, 255 }, 0.28f, 0.55f);
+        }
+    }
+}
+
 void MatchScene::Draw()
 {
+    // Bloom wraps the 3D pass only. The HUD is drawn afterwards at full
+    // resolution, so the text never goes through a blur.
+    bool captured = postprocess::Begin(settings->postProcessing);
+    if (captured)
+        ClearBackground(uistyle::Background);
+
     BeginMode3D(camera);
     for (GameObject *object : objects)
         object->Draw();
+    DrawEffects();
     // Last, and only after everything else: see the note on DrawGlassWalls.
     arena.DrawGlassWalls();
     EndMode3D();
+
+    postprocess::End();
 
     hud::Draw(match, playerCar);
 
@@ -239,8 +322,38 @@ void MatchScene::Draw()
         pendingAction = MenuAction::ExitGame;
 }
 
+// The parts of the effects that hang off an object rather than off an event.
+// After the objects and before the glass, so they blend over the field but the
+// see-through walls still come last.
+void MatchScene::DrawEffects()
+{
+    Vector3 ballPosition = ball.GetBodyPosition();
+
+    effects::DrawContactShadow(*this, ballPosition, ball.radius * 0.95f, ball.bodyID);
+    effects::DrawBallHighlight(ballPosition, ball.radius, fminf(ball.GetSpeed() / ball.maxSpeed, 1.0f));
+
+    for (CarObject *car : { &playerCar, botActive ? &botCar : &playerCar })
+    {
+        Vector3 position = car->GetBodyPosition();
+        effects::DrawContactShadow(*this, position, car->halfExtents.z * 0.8f, car->bodyID);
+        if (car->boosting)
+        {
+            // Flickering, because a constant flame reads as a solid object stuck
+            // to the back of the car.
+            float flicker = 0.85f + 0.15f * sinf((float)GetTime() * 42.0f);
+            effects::DrawBoostFlame(position, car->GetBodyRotation(), car->halfExtents.z, flicker);
+        }
+    }
+
+    // Last of the three-dimensional effects, so the bursts blend over the
+    // shadows and the flames rather than under them.
+    effects::Draw();
+}
+
 void MatchScene::Shutdown()
 {
+    effects::Unload();
+
     JPH::BodyInterface &bodies = physicsSystem.GetBodyInterface();
     for (GameObject *object : objects)
     {

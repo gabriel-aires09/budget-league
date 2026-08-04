@@ -5,6 +5,7 @@
 #include "Lighting.h"
 #include "ImGuiRaylib.h"
 #include "MainMenuScene.h"
+#include "PostProcess.h"
 #include "MatchScene.h"
 #include "UserInterface.h"
 
@@ -48,6 +49,7 @@ bool App::Initialize(int argc, char **argv)
     JPH::RegisterTypes();
 
     lighting::Load();
+    postprocess::Load();
 
 #ifdef GAME_DEV_TOOLS
     imgui::Initialize();
@@ -129,6 +131,7 @@ void App::Shutdown()
 #endif
 
     // After the scenes, so every model has already detached from the shader.
+    postprocess::Unload();
     lighting::Unload();
 
     JPH::UnregisterTypes();

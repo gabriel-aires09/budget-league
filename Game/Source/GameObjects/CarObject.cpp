@@ -200,6 +200,7 @@ void CarObject::Update(float deltaTime)
         // Along the car's own up, so jumping off a wall pushes away from it.
         bodies.AddImpulse(bodyID, up * jumpImpulse);
         jumpUsed = true;
+        jumpPending = true;
         jumpLockoutRemaining = jumpLockout;
     }
     else if (jumpEdge && jumpUsed && !doubleJumpUsed)
@@ -220,6 +221,7 @@ void CarObject::Update(float deltaTime)
             bodies.AddImpulse(bodyID, up * secondJumpImpulse);
         }
         doubleJumpUsed = true;
+        jumpPending = true;
     }
 
     if (!grounded)

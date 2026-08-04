@@ -4,6 +4,7 @@
 #include "Scene.h"
 #include "BotController.h"
 #include "ChaseCamera.h"
+#include "Effects.h"
 #include "HUD.h"
 #include "Match.h"
 #include "PlayerController.h"
@@ -30,6 +31,8 @@ public:
     virtual void Shutdown() override;
 
     void BuildBoostPads();
+    void UpdateEffects(float deltaTime);
+    void DrawEffects();
 
     ArenaObject arena;
     BallObject ball;
@@ -47,6 +50,10 @@ public:
     PlayerController playerController;
     BotController botController;
     ChaseCamera chaseCamera;
+
+    // Watched frame to frame so the effects fire on the change, not on the state.
+    MatchState previousState = MatchState::Kickoff;
+    float previousBallSpeed = 0.0f;
 
     bool paused = false;
     bool settingsOpen = false;

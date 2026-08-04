@@ -128,6 +128,12 @@ static void DrawCelebration(const Match &match)
     if (wipe <= 0.0f)
         return;
 
+    // A short flash of the scoring team's colour over the whole screen, which is
+    // the punch the celebration was missing. It is over in a third of a second.
+    float flash = 1.0f - (match.celebrationTime - match.stateTimer) / 0.35f;
+    if (flash > 0.0f)
+        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(team, 0.45f * flash));
+
     float height = 150.0f * scale * wipe;
     float centerY = GetScreenHeight() * 0.38f;
     Rectangle band = { 0.0f, centerY - height * 0.5f, (float)GetScreenWidth(), height };
