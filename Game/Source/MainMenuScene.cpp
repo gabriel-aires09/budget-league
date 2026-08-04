@@ -122,20 +122,22 @@ void MainMenuScene::Draw()
     const float rowHeight = 46.0f * scale;
     const float rowGap = 10.0f * scale;
     const float columnX = 64.0f * scale;
-    const float columnCenterX = columnX + rowWidth * 0.5f;
-
-    uistyle::DrawShadowedText("BUDGET LEAGUE", columnCenterX, 92.0f * scale, 40.0f, uistyle::Text);
-
+    // const float columnCenterX = columnX + rowWidth * 0.5f;
+   
     if (settingsOpen)
     {
-        // Centred, as it is in the pause menu: the panel is the screen's subject
-        // while it is open.
-        Rectangle area = { GetScreenWidth() * 0.5f - SettingsMenu::PreferredWidth() * 0.5f, 200.0f * scale,
+        // Centred on both axes and with no game title above it: while it is open
+        // the panel is the only thing on the screen, over the live showcase
+        // rather than over a flat backdrop (CLAUDE.md Milestone 19).
+        Rectangle area = { GetScreenWidth() * 0.5f - SettingsMenu::PreferredWidth() * 0.5f,
+                           GetScreenHeight() * 0.5f - SettingsMenu::PreferredHeight() * 0.5f,
                            SettingsMenu::PreferredWidth(), SettingsMenu::PreferredHeight() };
-        settingsOpen = settingsMenu.Draw(*settings, area);
+        settingsOpen = settingsMenu.Draw(*settings, area, SettingsBackground::Showcase);
     }
     else
     {
+        // uistyle::DrawShadowedText("BUDGET LEAGUE", columnCenterX, 92.0f * scale, 40.0f, uistyle::Text);
+        //
         Rectangle row = { columnX, 300.0f * scale, rowWidth, rowHeight };
 
         menu.itemCount = 4;

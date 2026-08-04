@@ -22,6 +22,7 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 16 — Arena Field Dimensions**
 - [x] **Milestone 17 — Title Screen ("Press Any Button")**
 - [x] **Milestone 18 — Main Menu Showcase**
+- [x] **Milestone 19 — Settings Screen (main-menu layout)**
 
 Every milestone in CLAUDE.md is now done; what is left is the section 6 polish list.
 
@@ -543,6 +544,19 @@ screenshots and a temporary probe that logged each pick and built the scene twic
 | Teardown across two menu scenes | Debug: no Jolt assert, exactly three shader programs unloaded at exit (lit, Bright, Blur) |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no warnings or errors in the log |
 
+Milestone 19 settings screen, implemented on `feat/new-menu` on 2026-08-04, verified from screenshots
+of both contexts (temporary probes that forced each one open, removed afterwards):
+
+| Check | From the main menu | From the pause menu |
+|---|---|---|
+| Game title above the panel | gone | never had one |
+| Panel position | centred on both axes | unchanged, 105 units from the top |
+| Behind the panel | the showcase, arena and car still visible | the paused match under the pause overlay |
+| Dimming | the module lays down 0.35 of its own | none of its own; the scene already dims 0.65 |
+| 1280x720 / 1920x1080 / 960x540 | centred at all three | unchanged |
+| Rows, sections and Back | the same widget, so identical in both | identical |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no warnings or errors in the log | |
+
 ## Layout
 
 ```
@@ -969,6 +983,18 @@ is incremental.
 - **The settings panel stays centred rather than moving into the column.** It is the shared widget at
   its own preferred size, and while it is open it is what the screen is about - the same treatment it
   gets in the pause menu.
+
+### Settings screen
+- **The panel is one widget with a background flag, not two panels.** `SettingsBackground` says what
+  the panel is being drawn over, and that is genuinely the only difference between its two homes:
+  the pause menu has already darkened the whole screen, the main menu has not.
+- **The flag decides who dims.** In `Showcase` the module lays down 0.35 itself, so the panel is the
+  focal element while the arena and the car still read behind it; in `Dimmed` it draws nothing extra,
+  because `MatchScene` has already drawn its 0.65 pause overlay and a second one would stack.
+- **The main-menu panel is centred from `PreferredWidth/PreferredHeight`**, which are derived from the
+  layout constants, so adding a settings row keeps it centred instead of pushing it off the bottom.
+- **The game title moved inside the else branch rather than being deleted.** It is the menu's header,
+  not the screen's, so it comes back the moment the panel closes.
 
 ### Title screen and the texture pipeline
 - **The title is a real scene showing the real arena, not a picture of one.** It builds

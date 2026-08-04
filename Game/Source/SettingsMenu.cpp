@@ -42,9 +42,15 @@ float SettingsMenu::PreferredHeight()
 
 // Esc is deliberately not handled here: the scene that owns the panel closes it,
 // so the key is never consumed twice in one frame.
-bool SettingsMenu::Draw(GameSettings &settings, Rectangle area)
+bool SettingsMenu::Draw(GameSettings &settings, Rectangle area, SettingsBackground background)
 {
     const float scale = uistyle::Scale();
+
+    // Over the showcase the panel has to make itself the focal element, since
+    // nothing else on that screen dims. Light enough that the arena and the car
+    // still read behind it; the pause menu has already laid down its own.
+    if (background == SettingsBackground::Showcase)
+        uistyle::DrawDimmer(0.35f);
 
     uistyle::DrawPanel(area);
     uistyle::DrawTextAt("SETTINGS", area.x + PADDING * scale, area.y + 18.0f * scale, 26.0f, uistyle::Text);
