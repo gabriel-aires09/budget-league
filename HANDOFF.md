@@ -164,7 +164,7 @@ Milestone 07 boost, measured by a temporary harness (removed afterwards):
 | Pad on cooldown | gives nothing |
 | Pad after its cooldown | ready again at exactly 4.0 s / 10.0 s |
 | Car 5 m directly above a pad | pad not taken |
-| Nearest pad edge to the kickoff spot | 2.00 m, so kickoff never grabs one (2.20 m since the pads were trimmed — see the size row in the Milestone 16 table) |
+| Nearest pad edge to the kickoff spot | 2.00 m, so kickoff never grabs one (2.40 m since the pads were trimmed — see the size row in the Milestone 16 table) |
 
 Milestone 09 jumps and air control, measured by a temporary harness (removed afterwards):
 
@@ -362,7 +362,7 @@ Milestone 16 arena dimensions, implemented on `feat/arena` on 2026-08-04:
 | Flat floor inside the 5 m ramps | 66.81 x 92.41 m |
 | Goals, kickoff spawns, bot limits and camera ceiling | continue to derive from `ArenaObject` |
 | Boost pads | all 18 preserve their old proportional layout across the enlarged flat floor |
-| Boost pad size | small pads use a 1.6 m radius; full pads use 2.4 m — trimmed about 11% on 2026-08-04, down from 1.8 / 2.7 |
+| Boost pad size | small pads use a 1.4 m radius; full pads use 2.2 m — trimmed on 2026-08-04, down from 1.8 / 2.7. `radius` is the drawn size *and* the XZ pickup radius; there is no separate visual field, so shrinking a pad also makes it slightly harder to clip |
 | Ground appearance | deterministic 6 m green triangle mosaic creates a procedural low-poly grass effect |
 | Soccer markings | centre circle, halfway line and pitch boundary render at 4 px; decorative grid remains thin |
 | Wall appearance | metallic gray transparent panels use staggered connected diamond cells matching the low-poly metal-grid reference |
