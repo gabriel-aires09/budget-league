@@ -49,6 +49,14 @@ The main menu carries a **How to play** screen with the rules and the full contr
 | **Esc** | Close the settings panel / go back |
 | Mouse | Hover to select, click to activate |
 
+### Full time
+
+| Input | Action |
+|---|---|
+| **Enter** | Rematch |
+| Mouse | REMATCH or MAIN MENU |
+| **Esc** or **P** | Pause menu, to leave any other way |
+
 ### Car picker
 
 | Input | Action |
@@ -131,7 +139,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **08 — Car Selection** — six of the seven cooked cars on a 2 x 3 grid, shown after Play; the pick carries into the match.
 - [x] **09 — Jumps, Flips and Air Control** — single and double jump, directional flips, pitch/yaw/roll in the air, aerial ball touches.
 - [x] **10 — Camera Modes** — smooth chase cam, ball cam on **C**, and the camera keeps itself out of the arena geometry by ray cast rather than clipping through it.
-- [ ] **11 — HUD** — score, clock and boost meter exist as a placeholder readout in `MatchScene`; the real HUD widget, pad hints and goal banner are still to do.
+- [x] **11 — HUD** — scoreboard, clock, boost meter, speed, kickoff countdown, goal banner and a full-time screen with a rematch. Boost-pad state is read from the pads' own glow in the world, not from a HUD hint.
 - [ ] **12 — Bot Opponent (or Solo Practice)** — no opponent car yet; `CarInput` already carries everything a bot needs.
 - [ ] **13 — Tuning Panels (Debug/Development)** — ImGui is linked and `GAME_DEV_TOOLS` is defined, but no panels are drawn and nothing is saved to a config.
 - [ ] **14 — Visual Polish and Effects** — flat-shaded lighting was pulled forward and is done; shadows, bloom, boost flame/trail and goal particles are not.
