@@ -401,7 +401,7 @@ void ArenaObject::Draw()
     }
 
     // Field markings, drawn as unlit lines just above the floor. Explicit lines
-    // rather than DrawGrid, which is square and cannot match a 55 x 80 field.
+    // rather than DrawGrid, which is square and cannot match this rectangular field.
     //
     // The flat floor is a rounded rectangle: the ramps take the outer 5 m, and the
     // corners are arcs of (cornerRadius - floorRampRadius) about each corner axis.

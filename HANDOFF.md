@@ -19,21 +19,22 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 13 — Tuning Panels (Debug/Development)**
 - [x] **Milestone 14 — Visual Polish and Effects**
 - [ ] **Milestone 15 — Audio** — the next one
-- [ ] **Milestone 16 — UI Polish (raygui)**
+- [x] **Milestone 16 — Arena Field Dimensions**
+- [ ] **Milestone 17 — Car and Ball Dimensions**
 
 Two pieces of work outside the milestone list are also done: the **asset pipeline** (FBX cooking plus
 the car models, CLAUDE.md 4.1) and the **arena ramps with wall and ceiling driving** (PROMPTS.md).
 
 Milestone 08 was inserted into CLAUDE.md after 09 was already built, which is why it was finished out
 of order. Everything from the old Milestone 08 onwards shifted up by one; this document uses the new
-numbering throughout. A second new milestone, Milestone 16 — UI Polish (raygui), was added at the end
-of the list.
+numbering throughout. The current list ends with Milestone 16 — Arena Field Dimensions and Milestone
+17 — Car and Ball Dimensions.
 
 The game opens on a main menu (Play / How to play / Settings / Exit). How to play is its own screen
 of rules and controls. Play opens the car picker — six of the
 seven cooked cars on a 2 x 3 grid of pedestals, spinning slowly in the team colour — and starting
 from there opens a real match: an enclosed
-55 x 80 m arena with side walls, back walls, a ceiling and two coloured goals; a player car driven
+76.81 x 102.41 m arena with a 20.73 m ceiling, side walls, back walls and two coloured goals; a player car driven
 with WASD/arrows on a Jolt rigid body; a ball; a score, a match clock and a kickoff countdown; and
 a smooth third-person chase camera; and an orange bot opponent that chases the ball and shoots at
 the player's goal, or solo practice when it is switched off in the settings. A goal resets the field
@@ -349,6 +350,20 @@ Milestone 14 effects, verified from screenshots of each effect forced into view 
 | `assets/Shaders/Bright.fs` missing | logs `POSTFX: bloom shaders unavailable`, renders unbloomed, exit 0 |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no errors in the log |
 
+Milestone 16 arena dimensions, implemented on `feat/arena` on 2026-08-04:
+
+| Check | Result |
+|---|---|
+| Sideline to sideline | 76.81 m along X |
+| Goal line to goal line | 102.41 m along Z |
+| Floor to ceiling | 20.73 m |
+| Flat floor inside the 5 m ramps | 66.81 x 92.41 m |
+| Goals, kickoff spawns, bot limits and camera ceiling | continue to derive from `ArenaObject` |
+| Boost pads | all 18 preserve their old proportional layout across the enlarged flat floor |
+| Boost pad size | small pads use a 1.8 m radius; full pads use 2.7 m (10% smaller) |
+| Debug / Development / Release | all build successfully |
+| Release smoke test | blocked by the environment: GLFW cannot open display `:1`, and no Xvfb is installed |
+
 ## Layout
 
 ```
@@ -540,10 +555,9 @@ is incremental.
   mean the same thing, would need a `ContactListener`, and would still depend on when Jolt happened
   to generate the contact. This is why `physics::Trigger` is still unused; boost pads in Milestone
   07 can most likely do the same thing with a distance check.
-- **Z is the goal-to-goal axis, X is sideline to sideline.** The field was 80 x 55 with the long axis
-  across the pitch, which would have put the goals on the short side; the numbers are now swapped
-  (55 wide, 80 long, a 0.69 ratio close to a real football pitch). 80 m at 32 m/s is a 2.5 s run
-  from goal to goal. Blue defends +Z, orange defends -Z, and the player kicks off in front of blue.
+- **Z is the goal-to-goal axis, X is sideline to sideline.** Milestone 16 sets the supplied
+  Rocket League reference dimensions directly: 76.81 m wide, 102.41 m long and 20.73 m high.
+  Blue defends +Z, orange defends -Z, and the player kicks off in front of blue.
 - **The arena and each goal are one Jolt compound body each**, built from a `Piece` list that
   physics and rendering both read. That list is the single source of truth, so the collision cannot
   drift away from what is drawn — worth preserving when Milestone 14 adds trim and stands.
@@ -563,9 +577,9 @@ is incremental.
   `R(1 - cos(Δθ/2))`: 2.4 cm at the floor's 5 m radius, 1.7 cm at the ceiling's 3.5 m. At 6 facets it
   is 4.3 cm, which is into the range that a box car notices. Raising the radius or the segment count
   is safe; lowering either is not.
-- **The floor ramp radius is 5 m and the ceiling's is 3.5 m**, so the flat playing surface is 45 x 70
-  inside an arena that is still 55 x 80, and the wall is truly vertical only between y = 5 and
-  y = 11.5. `FlatHalfWidth()` / `FlatHalfLength()` report that flat area; anything that has to lie on
+- **The floor ramp radius is 5 m and the ceiling's is 3.5 m**, so the flat playing surface is
+  66.81 x 92.41 m inside the 76.81 x 102.41 m arena, and the wall is truly vertical only between
+  y = 5 and y = 17.23. `FlatHalfWidth()` / `FlatHalfLength()` report that flat area; anything that has to lie on
   the floor must be placed against them, not against `width` / `length`.
 - **The back-wall ramps stop either side of the goal mouth.** A ramp across the mouth would wall the
   goal off. This leaves the floor flat right up to the goal line, which is also how Rocket League
@@ -684,8 +698,8 @@ is incremental.
 - **Physics runs at a fixed 120 Hz** with an accumulator (`Scene::StepPhysics`, 0.25 s clamp).
   `GameObject::Update` is called once per *fixed step*, right before the simulation runs — this
   matters because Jolt forces only persist for one step, so applying them per frame would be wrong.
-- **Field scale:** 80 m (X) × 55 m (Z), car 1.7 × 0.7 × 3.2 m, top speed 32 m/s. Chosen so the car
-  crosses the field in a couple of seconds. The ball should be sized against this later (~2.5 m).
+- **Field scale:** 76.81 m (X) x 102.41 m (Z) x 20.73 m (Y), with a 1.7 x 0.7 x 3.2 m car and
+  32 m/s non-boosted top speed. Car and ball dimensions remain Milestone 17 work.
 - **Forward is local −Z**, right is +X, up is +Y — the OpenGL/raylib convention, shared with Jolt.
   Positive yaw turns left, so steering negates it.
 - The car spawns at `(0, 0.45, 15)` facing the middle of the field.

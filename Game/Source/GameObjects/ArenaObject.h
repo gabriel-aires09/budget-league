@@ -27,9 +27,9 @@ public:
     // the car, and that only works if nothing writes depth over the car first.
     void DrawGlassWalls();
 
-    float width = 55.0f;  // along X, sideline to sideline
-    float length = 80.0f; // along Z, goal line to goal line
-    float wallHeight = 15.0f;
+    float width = 76.81f;   // along X, sideline to sideline
+    float length = 102.41f; // along Z, goal line to goal line
+    float wallHeight = 20.73f;
     float wallThickness = 2.0f;
     float floorThickness = 2.0f;
 

@@ -7,7 +7,8 @@ maths and [Dear ImGui](https://github.com/ocornut/imgui) for the in-engine tunin
 
 ## The game
 
-Pick one of six low-poly cars, then kick off in a 55 x 80 m glass-walled arena. Drive, boost, jump,
+Pick one of six low-poly cars, then kick off in a 76.81 x 102.41 m glass-walled arena with a
+20.73 m ceiling. Drive, boost, jump,
 double-jump, flip and fly: every edge of the arena is ramped like Rocket League, so you can carry a
 wall and, with enough boost, cross the ceiling. Put the heavy-but-bouncy ball fully across the
 opponent's goal line to score. The match runs on a clock, a goal resets the field with a kickoff
@@ -146,7 +147,8 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **13 — Tuning Panels (Debug/Development)** — **F1** opens a Dear ImGui panel over the match with live sliders for gravity, the ball, car handling, boost and camera smoothing, and a Save button writing `Tuning.cfg` next to the executable, which the next match loads. Release contains none of it.
 - [x] **14 — Visual Polish and Effects** — contact shadows, a boost flame and ember trail, a ball highlight, particle bursts on goals, big hits and jumps, a goal screen flash, blocky stands and light rigs outside the glass, and toggleable bloom that costs about 0.1 ms a frame.
 - [ ] **15 — Audio** — not started; the audio device is not initialised and the volume settings are stored but unused.
-- [ ] **16 — UI Polish (raygui)** — not started; the UI is drawn with the project's own `uistyle` helpers.
+- [x] **16 — Arena Field Dimensions** — the arena now follows the supplied Rocket League reference at 76.81 m wide, 102.41 m goal-to-goal and 20.73 m floor-to-ceiling.
+- [ ] **17 — Car and Ball Dimensions** — not started; current gameplay dimensions remain unchanged.
 
 ### Final milestone — polish
 

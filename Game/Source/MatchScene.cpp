@@ -102,8 +102,11 @@ void MatchScene::Initialize()
 // arena.FlatHalfWidth/FlatHalfLength are the limits, minus the pad's own radius.
 void MatchScene::BuildBoostPads()
 {
-    const float smallRows[] = { -28.0f, -14.0f, 14.0f, 28.0f };
-    const float smallColumns[] = { -16.0f, 0.0f, 16.0f };
+    const float halfWidth = arena.FlatHalfWidth();
+    const float halfLength = arena.FlatHalfLength();
+    const float smallRows[] = { -halfLength * 0.8f, -halfLength * 0.4f,
+                                 halfLength * 0.4f, halfLength * 0.8f };
+    const float smallColumns[] = { -halfWidth * 0.71f, 0.0f, halfWidth * 0.71f };
 
     // Sized up front: see the note on boostPads in the header.
     boostPads.reserve(4 + 3 * 4 + 2);
@@ -113,8 +116,9 @@ void MatchScene::BuildBoostPads()
         for (float sideZ = -1.0f; sideZ <= 1.0f; sideZ += 2.0f)
         {
             BoostPadObject pad;
-            pad.position = Vector3{ sideX * 19.0f, 0.0f, sideZ * 31.0f };
-            pad.radius = 3.0f;
+            pad.position = Vector3{ sideX * halfWidth * 0.84f, 0.0f,
+                                    sideZ * halfLength * 0.89f };
+            pad.radius = 2.7f;
             pad.refillAmount = 100.0f;
             pad.cooldownTime = 10.0f;
             pad.fullRefill = true;
@@ -135,7 +139,7 @@ void MatchScene::BuildBoostPads()
     for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
     {
         BoostPadObject pad;
-        pad.position = Vector3{ sideX * 20.0f, 0.0f, 0.0f };
+        pad.position = Vector3{ sideX * halfWidth * 0.89f, 0.0f, 0.0f };
         boostPads.push_back(pad);
     }
 }
