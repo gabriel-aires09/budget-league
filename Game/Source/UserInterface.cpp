@@ -57,6 +57,13 @@ namespace uistyle
         DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, alpha));
     }
 
+    void DrawShadowedText(const char *text, float centerX, float y, float baseSize, Color color)
+    {
+        float offset = 2.0f * Scale();
+        DrawTextCentered(text, centerX + offset, y + offset, baseSize, Fade(Background, 0.85f));
+        DrawTextCentered(text, centerX, y, baseSize, color);
+    }
+
     bool Button(Rectangle bounds, const char *label, bool primary)
     {
         bool hovered = CheckCollisionPointRec(GetMousePosition(), bounds);

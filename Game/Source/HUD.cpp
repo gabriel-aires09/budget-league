@@ -7,16 +7,6 @@
 // Brighter than uistyle::Boost, for the moment the boost is actually firing.
 static const Color BoostActive = { 255, 232, 150, 255 };
 
-// HUD text drawn over the field rather than over a panel, where the background
-// can be any brightness - the countdown in particular lands over the far goal.
-static void DrawShadowedText(const char *text, float centerX, float y, float baseSize, Color color)
-{
-    float offset = 2.0f * uistyle::Scale();
-    uistyle::DrawTextCentered(text, centerX + offset, y + offset, baseSize,
-                              Fade(uistyle::Background, 0.85f));
-    uistyle::DrawTextCentered(text, centerX, y, baseSize, color);
-}
-
 // Score, clock and both team blocks, centred at the top of the screen.
 static void DrawScoreboard(const Match &match)
 {
@@ -95,7 +85,7 @@ static void DrawKickoff(const Match &match)
 
     // Shadowed, because the countdown lands over the far goal, which is the one
     // bright thing at the centre of the screen.
-    DrawShadowedText("KICKOFF", centerX, 152.0f * scale, 24.0f, uistyle::TextDim);
+    uistyle::DrawShadowedText("KICKOFF", centerX, 152.0f * scale, 24.0f, uistyle::TextDim);
 
     int count = (int)ceilf(match.stateTimer);
     if (count <= 0)
@@ -109,7 +99,7 @@ static void DrawKickoff(const Match &match)
     // it centred while the size changes, since DrawTextCentered grows downwards.
     float settle = match.stateTimer - floorf(match.stateTimer);
     float size = 72.0f + 26.0f * settle * settle;
-    DrawShadowedText(TextFormat("%d", count), centerX, (190.0f + (98.0f - size) * 0.5f) * scale,
+    uistyle::DrawShadowedText(TextFormat("%d", count), centerX, (190.0f + (98.0f - size) * 0.5f) * scale,
                  size, uistyle::Text);
 }
 
