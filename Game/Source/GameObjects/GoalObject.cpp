@@ -1,6 +1,5 @@
 #include "GoalObject.h"
 
-#include "Lighting.h"
 #include "Scene.h"
 
 #include <raymath.h>
@@ -11,15 +10,6 @@
 
 #include <cmath>
 
-GoalObject::~GoalObject()
-{
-    if (boxModelLoaded)
-    {
-        lighting::Detach(boxModel);
-        UnloadModel(boxModel);
-    }
-}
-
 void GoalObject::Initialize(Scene &owner)
 {
     scene = &owner;
@@ -27,27 +17,26 @@ void GoalObject::Initialize(Scene &owner)
     const float halfWidth = width * 0.5f;
     const float t = frameThickness;
     const float midZ = lineZ + direction * depth * 0.5f;
-    const Color netColor = { (unsigned char)(teamColor.r / 3), (unsigned char)(teamColor.g / 3),
-                             (unsigned char)(teamColor.b / 3), 255 };
-
+    // These pieces define collision only. The enclosure is intentionally not
+    // rendered, leaving an unobstructed view of cars and the ball in the goal.
     // Side panels, just outside the mouth so they never narrow it.
     for (float side = -1.0f; side <= 1.0f; side += 2.0f)
     {
         pieces.push_back({ { side * (halfWidth + t * 0.5f), height * 0.5f, midZ },
-                           { t * 0.5f, height * 0.5f, depth * 0.5f }, teamColor });
+                           { t * 0.5f, height * 0.5f, depth * 0.5f } });
     }
 
     // Floor of the recess. The arena floor slab ends at the goal line, so without
     // this anything that follows the ball into the net drops out of the world -
     // measured with the bot, which chased a rolling ball in and fell for good.
     pieces.push_back({ { 0.0f, -floorThickness * 0.5f, midZ },
-                       { halfWidth + t, floorThickness * 0.5f, depth * 0.5f + t }, netColor });
+                       { halfWidth + t, floorThickness * 0.5f, depth * 0.5f + t } });
 
     // Back of the net and its roof.
     pieces.push_back({ { 0.0f, height * 0.5f, lineZ + direction * (depth + t * 0.5f) },
-                       { halfWidth + t, height * 0.5f, t * 0.5f }, netColor });
+                       { halfWidth + t, height * 0.5f, t * 0.5f } });
     pieces.push_back({ { 0.0f, height + t * 0.5f, midZ },
-                       { halfWidth + t, t * 0.5f, depth * 0.5f + t }, teamColor });
+                       { halfWidth + t, t * 0.5f, depth * 0.5f + t } });
 
     JPH::StaticCompoundShapeSettings compound;
     compound.SetEmbedded();
@@ -68,9 +57,6 @@ void GoalObject::Initialize(Scene &owner)
 
     bodyID = scene->physicsSystem.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
 
-    boxModel = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
-    lighting::Apply(boxModel);
-    boxModelLoaded = true;
 }
 
 bool GoalObject::IsBallFullyInside(Vector3 ballCenter, float ballRadius) const
@@ -84,13 +70,8 @@ bool GoalObject::IsBallFullyInside(Vector3 ballCenter, float ballRadius) const
 
 void GoalObject::Draw()
 {
-    for (const Piece &piece : pieces)
-    {
-        DrawModelEx(boxModel, piece.center, Vector3{ 0.0f, 1.0f, 0.0f }, 0.0f,
-                    Vector3Scale(piece.halfExtents, 2.0f), piece.color);
-    }
-
-    // The goal line itself, so it is obvious where the ball has to end up.
+    // Only the solid-colour mouth frame is rendered. The collision enclosure
+    // stays invisible so cars and the ball are always readable inside the net.
     DrawLine3D(Vector3{ -width * 0.5f, 0.03f, lineZ }, Vector3{ width * 0.5f, 0.03f, lineZ }, teamColor);
     DrawCubeWires(Vector3{ 0.0f, height * 0.5f, lineZ }, width, height, 0.06f, teamColor);
 }

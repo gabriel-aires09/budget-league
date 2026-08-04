@@ -15,7 +15,7 @@
 class GoalObject final : public GameObject
 {
 public:
-    virtual ~GoalObject();
+    virtual ~GoalObject() = default;
 
     virtual void Initialize(Scene &owner) override;
     virtual void Draw() override;
@@ -43,12 +43,8 @@ public:
     {
         Vector3 center;
         Vector3 halfExtents;
-        Color color;
     };
     std::vector<Piece> pieces;
-
-    Model boxModel = {};
-    bool boxModelLoaded = false;
 };
 
 #endif

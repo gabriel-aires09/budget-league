@@ -80,7 +80,8 @@ public:
 
     // One ramp, drawn as a single continuous surface. Its collision is still the
     // boxes in `pieces`, which are marked invisible; this mesh is generated from
-    // the same arc in the same call, so the two cannot drift apart.
+    // the same arc in the same call, so the two cannot drift apart. Floor ramps
+    // carry vertex colors for their subtle gray transparency gradient.
     //
     // Drawing the boxes instead made a transparent ramp read as stacked bands:
     // eight overlapping boxes compound their alpha wherever they overlap, and

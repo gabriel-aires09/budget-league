@@ -341,6 +341,8 @@ Milestone 14 effects, verified from screenshots of each effect forced into view 
 | Boost trail | embers behind a boosting car, which is what actually reads from a chase camera |
 | Goal burst | 90 team-coloured plus 40 white cubes thrown out of the net |
 | Goal screen flash | team colour over the whole screen, gone in a third of a second |
+| Ball appearance | wireframe polygon overlay removed; only the lit faceted shading and contact shadow remain |
+| Goal space | enclosure collision remains, but its dark boxes are not rendered; cars and the ball are unobstructed inside, while the goal frame remains visible |
 | Big-hit burst | fires on a jump in the ball's speed over 7 m/s, sized by how big the jump was |
 | Jump puff | at the wheels, on both the first and the second jump |
 | Stadium | three tiers of stands and ten light rigs, visible through the glass, none of it solid |
@@ -361,6 +363,15 @@ Milestone 16 arena dimensions, implemented on `feat/arena` on 2026-08-04:
 | Goals, kickoff spawns, bot limits and camera ceiling | continue to derive from `ArenaObject` |
 | Boost pads | all 18 preserve their old proportional layout across the enlarged flat floor |
 | Boost pad size | small pads use a 1.8 m radius; full pads use 2.7 m (10% smaller) |
+| Ground appearance | deterministic 6 m green triangle mosaic creates a procedural low-poly grass effect |
+| Soccer markings | centre circle, halfway line and pitch boundary render at 4 px; decorative grid remains thin |
+| Wall appearance | metallic gray transparent panels use staggered connected diamond cells matching the low-poly metal-grid reference |
+| Field line colour | centre circle, halfway line and boundary are white; decorative grid is faint white |
+| Upper cage | ceiling ramps share the silver-gray wall shade; the invisible ceiling collision is represented by an open diamond lattice |
+| Wall-grid transitions | rounded corners space visual nodes by arc length (~7 m), independent of their 10 collision facets, so cell density stays consistent |
+| Ramp seam lines | continuous white bands mark floor-ramp/wall, wall/ceiling-ramp and ceiling-ramp/ceiling joins, including rounded corners |
+| Goal-end metal grid | orange segments are generated from integer-indexed nodes and mirrored exactly onto blue, with the same continuous lower boundary and no vertical patch rails |
+| Floor-to-wall ramps | neutral gray with light transparency and a vertex-color gradient that brightens toward the wall |
 | Debug / Development / Release | all build successfully |
 | Release smoke test | blocked by the environment: GLFW cannot open display `:1`, and no Xvfb is installed |
 

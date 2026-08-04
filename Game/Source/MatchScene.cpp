@@ -334,7 +334,6 @@ void MatchScene::DrawEffects()
     Vector3 ballPosition = ball.GetBodyPosition();
 
     effects::DrawContactShadow(*this, ballPosition, ball.radius * 0.95f, ball.bodyID);
-    effects::DrawBallHighlight(ballPosition, ball.radius, fminf(ball.GetSpeed() / ball.maxSpeed, 1.0f));
 
     for (CarObject *car : { &playerCar, botActive ? &botCar : &playerCar })
     {

@@ -8,8 +8,8 @@
 
 class Scene;
 
-// Visual feedback: the boost flame and trail, the ball highlight, the contact
-// shadows and the particle bursts fired on goals, big hits and jumps.
+// Visual feedback: the boost flame and trail, contact shadows and the particle
+// bursts fired on goals, big hits and jumps.
 //
 // It is deliberately a dumb renderer with one particle pool. It decides nothing:
 // MatchScene watches the match and the ball and calls Burst on the events it
@@ -33,7 +33,6 @@ namespace effects
     // Behind a boosting car. strength scales the flame and how much trail it
     // leaves, so a car that just tapped boost does not look like one holding it.
     void DrawBoostFlame(Vector3 position, Matrix rotation, float carHalfLength, float strength);
-    void DrawBallHighlight(Vector3 position, float radius, float speedFraction);
 
     // A dark disc on whatever surface is under the object, laid on that surface's
     // normal so it follows the ramps. Fades out with height.

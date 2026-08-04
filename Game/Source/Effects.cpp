@@ -167,14 +167,6 @@ void effects::DrawBoostFlame(Vector3 position, Matrix rotation, float carHalfLen
     rlEnableBackfaceCulling();
 }
 
-void effects::DrawBallHighlight(Vector3 position, float radius, float speedFraction)
-{
-    // Brightens as the ball speeds up, so a ball that has just been hit hard is
-    // obvious across the arena.
-    Color highlight = { 150, 220, 255, 255 };
-    DrawSphereWires(position, radius * 1.03f, 7, 9, Fade(highlight, 0.16f + 0.34f * speedFraction));
-}
-
 void effects::DrawContactShadow(Scene &scene, Vector3 position, float radius, JPH::BodyID ignore)
 {
     if (!meshesLoaded)
