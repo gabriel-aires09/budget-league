@@ -164,7 +164,7 @@ Milestone 07 boost, measured by a temporary harness (removed afterwards):
 | Pad on cooldown | gives nothing |
 | Pad after its cooldown | ready again at exactly 4.0 s / 10.0 s |
 | Car 5 m directly above a pad | pad not taken |
-| Nearest pad edge to the kickoff spot | 2.00 m, so kickoff never grabs one |
+| Nearest pad edge to the kickoff spot | 2.00 m, so kickoff never grabs one (2.20 m since the pads were trimmed — see the size row in the Milestone 16 table) |
 
 Milestone 09 jumps and air control, measured by a temporary harness (removed afterwards):
 
@@ -342,7 +342,7 @@ Milestone 14 effects, verified from screenshots of each effect forced into view 
 | Goal burst | 90 team-coloured plus 40 white cubes thrown out of the net |
 | Goal screen flash | team colour over the whole screen, gone in a third of a second |
 | Ball appearance | wireframe polygon overlay removed; only the lit faceted shading and contact shadow remain |
-| Goal space | enclosure collision remains, but its dark boxes are not rendered; cars and the ball are unobstructed inside, while the goal frame remains visible |
+| Goal space | this row described the enclosure being left unrendered; that was undone on 2026-08-04 and the goal draws its own pieces again — see the goal frame note below |
 | Big-hit burst | fires on a jump in the ball's speed over 7 m/s, sized by how big the jump was |
 | Jump puff | at the wheels, on both the first and the second jump |
 | Stadium | three tiers of stands and ten light rigs, visible through the glass, none of it solid |
@@ -362,7 +362,7 @@ Milestone 16 arena dimensions, implemented on `feat/arena` on 2026-08-04:
 | Flat floor inside the 5 m ramps | 66.81 x 92.41 m |
 | Goals, kickoff spawns, bot limits and camera ceiling | continue to derive from `ArenaObject` |
 | Boost pads | all 18 preserve their old proportional layout across the enlarged flat floor |
-| Boost pad size | small pads use a 1.8 m radius; full pads use 2.7 m (10% smaller) |
+| Boost pad size | small pads use a 1.6 m radius; full pads use 2.4 m — trimmed about 11% on 2026-08-04, down from 1.8 / 2.7 |
 | Ground appearance | deterministic 6 m green triangle mosaic creates a procedural low-poly grass effect |
 | Soccer markings | centre circle, halfway line and pitch boundary render at 4 px; decorative grid remains thin |
 | Wall appearance | metallic gray transparent panels use staggered connected diamond cells matching the low-poly metal-grid reference |
@@ -373,7 +373,58 @@ Milestone 16 arena dimensions, implemented on `feat/arena` on 2026-08-04:
 | Goal-end metal grid | orange segments are generated from integer-indexed nodes and mirrored exactly onto blue, with the same continuous lower boundary and no vertical patch rails |
 | Floor-to-wall ramps | neutral gray with light transparency and a vertex-color gradient that brightens toward the wall |
 | Debug / Development / Release | all build successfully |
-| Release smoke test | blocked by the environment: GLFW cannot open display `:1`, and no Xvfb is installed |
+
+Goal visibility, fixed on `feat/arena` on 2026-08-04. The report was that a car or the ball
+disappeared into a black slab on entering either net. **The slab was not the goal at all — it was the
+stadium stands, standing inside the recess.** Two attempts before this one went to `GoalObject` and
+made its enclosure invisible, which could never have worked: the enclosure was already invisible, and
+hiding it only exposed the stands behind it more. The fix is entirely in `ArenaObject::AddStadium`.
+
+| Check | Before | After |
+|---|---|---|
+| End stand tier 0 | z 52.80 – 57.60, y 0 – 4.0, **inside** the 4 m recess (51.21 – 55.21) | z 56.20 – 61.00, clear |
+| End stand tier 1 | z 57.80 – 62.60, y 0 – 8.5, **inside** the recess | z 61.20 – 66.00, clear |
+| End stand tier 2 | z 62.80 – 67.61, clear | z 66.20 – 71.00, clear |
+| Colour reaching the screen | `{30,38,58} x (0.34, 0.365, 0.43)` = `(10,14,25)`, near black | nothing opaque left in the recess |
+| Car and ball 2.5 m into the net | car occluded past ~1.6 m | both fully visible, screenshotted |
+| Stand ring at the four corners | continuous | continuous — side banks were run out to meet the ends |
+| Physics / camera | — | unchanged: the stands are `solid = false`, so they are in neither the compound shape nor the camera's occlusion ray |
+| Debug / Development / Release | — | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors in the log |
+
+Verified with a temporary probe that parked the car and the ball inside a net and aimed the camera at
+the mouth (removed afterwards). **The environment can run the game now**: `DISPLAY=:1` works, so the
+smoke test is no longer blocked the way the Milestone 16 note said. There is still no Xvfb, and still
+no `xdotool`/`wtype` for key presses.
+
+**Reverted on request, the same day:** a team-coloured opaque net backdrop, solid goalposts and a
+crossbar and a `netTeamMix` colour control were all built on top of this fix and then taken back out.
+Only the stands fix was kept from that round.
+
+**Goal frame restored from history, same day.** The goal was then asked to match a reference image
+(`img/color-intensity.png`), and the answer was already in the repository: `GoalObject` rendered its
+own pieces until commit `3f0dd3f`, which replaced that with a bare wire outline. `git checkout
+ba71bd4 -- GoalObject.h GoalObject.cpp` restores it exactly, and the diff between that commit and
+`3f0dd3f` is *only* the removal, so nothing newer was lost by going back.
+
+| Surface | Reference | Restored render | Delta |
+|---|---|---|---|
+| Interior back wall | `(41,23,12)` | `(44,25,9)` | 8 |
+| Front band, unlit face | `(92,50,23)` | `(87,52,21)` predicted, measured on the +Z goal | ~5 |
+| Front band, sunlit face | — | `(132,76,28)`, matches the shader to the digit | 0 |
+
+- **The frame is `teamColor`; the floor and back of the net are `teamColor / 3`.** That one-third is
+  the whole scheme: a bright shell around a dark interior, which is exactly what the reference shows.
+- **It is drawn through a lit `boxModel` with `DrawModelEx`, not `DrawCubeV`.** That is what gives
+  the bright top face and the darker front band - flat immediate-mode cubes render one uniform tone
+  and read as a coloured card rather than a solid object. It also means `~GoalObject` must call
+  `lighting::Detach` before `UnloadModel`, or the two goals destroy the one shared lit shader; the
+  restored destructor does, and teardown was checked (three shader programs unloaded: lit, Bright,
+  Blur).
+- **The two goals are legitimately different brightnesses, and it is the sun, not a bug.** The sun
+  points `(0.30, 0.90, 0.32)`, so the -Z goal's front face takes `key = 0.317` and renders
+  `(132,76,28)`, while the +Z goal's front face faces away, takes `key = 0` and renders `(87,52,21)`.
+  The reference image is of the unlit-face end. Both were verified against the shader arithmetic
+  rather than by eye.
 
 ## Layout
 
@@ -574,6 +625,17 @@ is incremental.
   drift away from what is drawn — worth preserving when Milestone 14 adds trim and stands.
 - **The ceiling has collision but is never drawn.** Drawing it would put a slab between the chase
   camera and the field the moment the car climbs a wall.
+- **The stadium stands must start beyond the goal recess, and `ArenaObject::goalDepth` is what tells
+  them where that is.** The recess reaches `goalDepth` behind the back wall, and `AddStadium` used to
+  place the end banks `4 + tier * 5` metres out from `halfLength` — which put two opaque, non-solid
+  boxes *inside* both nets, spanning the full mouth. That is the black slab that hid every car and
+  ball more than about 1.6 m into a goal. Both of the previous attempts at it went to `GoalObject`
+  and made its own enclosure invisible, which could never have worked: the enclosure was already
+  invisible, and hiding it only exposed the stands behind it more. If the recess is ever deepened
+  again, the stands move with it automatically — that is the whole reason the depth is a field on
+  `ArenaObject` rather than only on `GoalObject`.
+- **The side banks are extruded out to meet the end banks, not to `halfLength + out`.** Once the ends
+  moved back the ring stopped closing, and a notch opened at each of the four corners.
 - **Every arena edge is a quarter-circle ramp, built from tilted boxes** (`ArenaObject::AddFillet`).
   `Piece` gained a `rotation`; it defaults to identity, which is why the floor, walls and ceiling are
   still written as plain four-field initializers. The rotation is derived from the surface basis

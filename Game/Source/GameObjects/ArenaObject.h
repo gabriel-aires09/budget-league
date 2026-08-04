@@ -53,10 +53,14 @@ public:
     float FlatHalfWidth() const { return width * 0.5f - floorRampRadius; }
     float FlatHalfLength() const { return length * 0.5f - floorRampRadius; }
 
-    // The opening in each back wall. GoalObject must be built from the same
-    // numbers, so MatchScene copies them across rather than repeating them.
+    // The opening in each back wall, and how far the net recess reaches behind
+    // it. GoalObject must be built from the same numbers, so MatchScene copies
+    // them across rather than repeating them. The depth is the arena's business
+    // as well as the goal's: the stands have to start beyond the recess, or they
+    // stand inside it (see AddStadium).
     float goalWidth = 14.0f;
     float goalHeight = 5.0f;
+    float goalDepth = 4.0f;
 
     // One box of the arena. Physics and rendering both read this list, so the
     // collision can never drift away from what is on screen.

@@ -246,14 +246,25 @@ void ArenaObject::AddStadium()
         float top = 4.0f + tier * 4.5f;
         Color color = tier % 2 == 0 ? STAND_COLOR : STAND_TRIM;
 
+        // The end banks stand off further than the side ones, because the goal
+        // recess reaches goalDepth behind the back wall. At the side banks'
+        // offset an end bank is an opaque box *inside* the net, standing exactly
+        // where a car that followed the ball in has to stay visible - it, and the
+        // tier behind it, are the dark slab that used to fill each goal mouth.
+        // Half the bank depth plus a metre of clearance puts its near face just
+        // behind the back of the net.
+        float endZ = halfLength + goalDepth + 3.4f + tier * 5.0f;
+
         for (float side = -1.0f; side <= 1.0f; side += 2.0f)
         {
+            // Run the side banks all the way to the end ones, so the ring still
+            // closes at the corners now that the ends sit further back.
             Piece bank = { { side * (halfWidth + out), top * 0.5f, 0.0f },
-                           { 2.4f, top * 0.5f, halfLength + out }, color, true };
+                           { 2.4f, top * 0.5f, endZ + 2.4f }, color, true };
             bank.solid = false;
             pieces.push_back(bank);
 
-            Piece end = { { 0.0f, top * 0.5f, side * (halfLength + out) },
+            Piece end = { { 0.0f, top * 0.5f, side * endZ },
                           { halfWidth + out, top * 0.5f, 2.4f }, color, true };
             end.solid = false;
             pieces.push_back(end);

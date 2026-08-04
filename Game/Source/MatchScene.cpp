@@ -28,6 +28,7 @@ void MatchScene::Initialize()
     {
         goal->width = arena.goalWidth;
         goal->height = arena.goalHeight;
+        goal->depth = arena.goalDepth;
         goal->Initialize(*this);
     }
 
@@ -118,7 +119,7 @@ void MatchScene::BuildBoostPads()
             BoostPadObject pad;
             pad.position = Vector3{ sideX * halfWidth * 0.84f, 0.0f,
                                     sideZ * halfLength * 0.89f };
-            pad.radius = 2.7f;
+            pad.radius = 2.2f;
             pad.refillAmount = 100.0f;
             pad.cooldownTime = 10.0f;
             pad.fullRefill = true;

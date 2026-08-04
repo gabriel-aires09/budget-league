@@ -24,7 +24,7 @@ public:
     bool IsReady() const { return cooldownRemaining <= 0.0f; }
 
     Vector3 position = {};   // on the floor
-    float radius = 1.8f;     // pickup radius, measured in the XZ plane
+    float radius = 1.4f;     // pickup radius, measured in the XZ plane
     float refillAmount = 12.0f;
     float cooldownTime = 4.0f;
     // A full-refill pad, as opposed to one of the small ones. It is what the two
