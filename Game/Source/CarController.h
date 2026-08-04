@@ -23,11 +23,15 @@ struct CarInput
 };
 
 // Input source of a CarObject: keyboard for the player, AI for the bot.
+//
+// Poll runs once per fixed physics step, and is given that step so a controller
+// can hold timers of its own - the bot's stuck detection is one. The player
+// controller ignores it.
 class CarController
 {
 public:
     virtual ~CarController() {}
-    virtual CarInput Poll() = 0;
+    virtual CarInput Poll(float deltaTime) = 0;
 };
 
 #endif

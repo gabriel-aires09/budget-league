@@ -2,8 +2,9 @@
 
 #include <raylib.h>
 
-CarInput PlayerController::Poll()
+CarInput PlayerController::Poll(float deltaTime)
 {
+    (void)deltaTime; // the keyboard needs no timers of its own
     CarInput input;
 
     if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP))

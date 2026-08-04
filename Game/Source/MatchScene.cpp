@@ -30,6 +30,27 @@ void MatchScene::Initialize()
     playerCar.controller = &playerController;
     playerCar.Initialize(*this);
 
+    // With the bot switched off the scene is exactly what it was: solo practice
+    // with two working goals and a scoreboard.
+    botActive = settings->botEnabled;
+    if (botActive)
+    {
+        // SportsCar2 is the one cooked car the picker never offers, so the bot can
+        // never turn up driving the same model as the player.
+        botCar.spawnPosition = Vector3{ 0.0f, 0.36f, -arena.length * 0.3f };
+        botCar.spawnYawDegrees = 180.0f; // facing the middle, from the other end
+        botCar.modelName = "SportsCar2";
+        botCar.teamColor = uistyle::TeamOrange;
+        botCar.controller = &botController;
+        botCar.Initialize(*this);
+
+        botController.car = &botCar;
+        botController.ball = &ball;
+        botController.targetGoalZ = blueGoal.lineZ; // it attacks the goal the player defends
+        botController.fieldHalfWidth = arena.FlatHalfWidth();
+        botController.fieldHalfLength = arena.FlatHalfLength();
+    }
+
     BuildBoostPads();
 
     objects.push_back(&arena);
@@ -37,9 +58,13 @@ void MatchScene::Initialize()
     objects.push_back(&orangeGoal);
     objects.push_back(&ball);
     objects.push_back(&playerCar);
+    if (botActive)
+        objects.push_back(&botCar);
     for (BoostPadObject &pad : boostPads)
     {
         pad.cars.push_back(&playerCar);
+        if (botActive)
+            pad.cars.push_back(&botCar);
         pad.Initialize(*this);
         objects.push_back(&pad);
     }
@@ -51,6 +76,8 @@ void MatchScene::Initialize()
     chaseCamera.Initialize(camera, playerCar);
 
     match.AddCar(playerCar);
+    if (botActive)
+        match.AddCar(botCar);
     match.Begin(ball, blueGoal, orangeGoal, (float)settings->matchDurationMinutes);
 }
 

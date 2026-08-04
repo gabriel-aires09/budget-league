@@ -2,6 +2,7 @@
 #define MATCHSCENE_H
 
 #include "Scene.h"
+#include "BotController.h"
 #include "ChaseCamera.h"
 #include "HUD.h"
 #include "Match.h"
@@ -34,11 +35,16 @@ public:
     GoalObject blueGoal;
     GoalObject orangeGoal;
     CarObject playerCar;
+    // Only built when GameSettings::botEnabled; without it the scene is the solo
+    // practice fallback CLAUDE.md allows for.
+    CarObject botCar;
+    bool botActive = false;
     // Filled completely before any pointer is taken into Scene::objects, because
     // a later push_back would reallocate and leave those pointers dangling.
     std::vector<BoostPadObject> boostPads;
     Match match;
     PlayerController playerController;
+    BotController botController;
     ChaseCamera chaseCamera;
 
     bool paused = false;

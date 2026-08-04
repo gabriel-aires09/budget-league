@@ -21,7 +21,8 @@ itself after a tumble.
 
 The main menu carries a **How to play** screen with the rules and the full control list.
 
-**Current state:** playable solo — there is no opponent yet (see the milestone checklist below).
+An orange bot opponent chases the ball and shoots at your goal. It can be switched off in Settings,
+which turns the match into solo practice with both goals still scoring.
 
 ## Controls
 
@@ -64,8 +65,8 @@ The main menu carries a **How to play** screen with the rules and the full contr
 | **Arrows** or **WASD** | Move around the 2 x 3 grid |
 | **Enter** / **Space** | Start the match with the highlighted car |
 | **Esc** | Back to the main menu |
-| Left click | Pick a car |
-| **Right click a car** | Pick it and start the match in one go |
+| Right click | Pick a car |
+| **Left click a car** | Pick it and start the match in one go |
 
 ## How to run
 
@@ -140,7 +141,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **09 — Jumps, Flips and Air Control** — single and double jump, directional flips, pitch/yaw/roll in the air, aerial ball touches.
 - [x] **10 — Camera Modes** — smooth chase cam, ball cam on **C**, and the camera keeps itself out of the arena geometry by ray cast rather than clipping through it.
 - [x] **11 — HUD** — scoreboard, clock, boost meter, speed, kickoff countdown, goal banner and a full-time screen with a rematch. Boost-pad state is read from the pads' own glow in the world, not from a HUD hint.
-- [ ] **12 — Bot Opponent (or Solo Practice)** — no opponent car yet; `CarInput` already carries everything a bot needs.
+- [x] **12 — Bot Opponent (or Solo Practice)** — an orange bot that drives at the ball from the side its shot comes from, boosts down the long approaches and frees itself when it gets blocked. 6-1 against a player who never moves. Switchable off for solo practice.
 - [ ] **13 — Tuning Panels (Debug/Development)** — ImGui is linked and `GAME_DEV_TOOLS` is defined, but no panels are drawn and nothing is saved to a config.
 - [ ] **14 — Visual Polish and Effects** — flat-shaded lighting was pulled forward and is done; shadows, bloom, boost flame/trail and goal particles are not.
 - [ ] **15 — Audio** — not started; the audio device is not initialised and the volume settings are stored but unused.
@@ -156,7 +157,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [ ] Screen and particle punch on goals and big hits.
 - [ ] Boost flame/trail scaling with boost use.
 - [x] Boost-pad glow reads ready vs cooldown.
-- [ ] Bot behaviour — waits on milestone 12.
+- [x] Bot behaviour — it keeps its target on the flat floor, backs out when blocked and takes a reset if it is ever wedged for five seconds.
 - [ ] Post-processing degrading gracefully — the setting is stored but nothing consumes it yet.
 - [x] No major errors in the log during a run.
 
