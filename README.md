@@ -21,7 +21,8 @@ simulated suspension, so acceleration is strong, cornering is drift-friendly and
 itself after a tumble.
 
 The game opens on a title screen — the badge and wordmark with a "press any button" prompt, over a live view of the
-arena — and any key, mouse button or gamepad button takes you to the main menu, which carries a
+arena — and any key, mouse button or gamepad button takes you to the main menu, which is itself a
+showcase: a random car turntabling on the pitch with the menu down the left. It carries a
 **How to play** screen with the rules and the full control list.
 
 An orange bot opponent chases the ball and shoots at your goal. It can be switched off in Settings,
@@ -153,7 +154,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **15 — Audio** — ten procedural cues generated at startup from one synthesis table (no sound files): UI hover and click, jump, car-ball hit, wall/car impact, boost pad, countdown ticks, kickoff go, goal and full time, plus a boost roar held on a running audio stream. Master and SFX volumes are live from the settings panel.
 - [x] **16 — Arena Field Dimensions** — the arena now follows the supplied Rocket League reference at 76.81 m wide, 102.41 m goal-to-goal and 20.73 m floor-to-ceiling.
 - [x] **17 — Title Screen ("Press Any Button")** — the game now boots on a title card over a live view of the real arena: the cooked badge beside the BUDGET LEAGUE wordmark, a pulsing prompt, and the ball resting on the pitch beside the far goal. Any key, mouse button or gamepad button goes to the main menu.
-- [ ] **18 — Main Menu Showcase** — not started; the main menu is still the plain panel list.
+- [x] **18 — Main Menu Showcase** — the main menu is now a live showcase: the real arena behind it, a random one of the seven cooked cars parked on the pitch in a random team colour on a slow turntable, and the menu list down the left. Re-rolled every time the menu is entered.
 
 ### Final milestone — polish
 

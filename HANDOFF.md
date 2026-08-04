@@ -21,7 +21,9 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 15 — Audio**
 - [x] **Milestone 16 — Arena Field Dimensions**
 - [x] **Milestone 17 — Title Screen ("Press Any Button")**
-- [ ] **Milestone 18 — Main Menu Showcase** — the next one
+- [x] **Milestone 18 — Main Menu Showcase**
+
+Every milestone in CLAUDE.md is now done; what is left is the section 6 polish list.
 
 Two pieces of work outside the milestone list are also done: the **asset pipeline** (FBX cooking plus
 the car models, CLAUDE.md 4.1) and the **arena ramps with wall and ceiling driving** (PROMPTS.md).
@@ -34,7 +36,9 @@ Showcase, which is where the list now ends.
 
 The game opens on a title screen: the cooked logo over a live view of the real arena, with the ball
 resting on the pitch beside the far goal and a pulsing "press any button to start". Any key, mouse
-button or gamepad button goes to the main menu (Play / How to play / Settings / Exit). How to play is its own screen
+button or gamepad button goes to the main menu, which is a showcase of the same kind: the arena
+behind it, one of the seven cooked cars parked on the pitch in a random team colour turning slowly,
+and the list (Play / How to play / Settings / Exit) down the left. How to play is its own screen
 of rules and controls. Play opens the car picker — six of the
 seven cooked cars on a 2 x 3 grid of pedestals, spinning slowly in the team colour — and starting
 from there opens a real match: an enclosed
@@ -519,6 +523,26 @@ every 100 frames (also removed):
 | Missing `assets/Textures` | logs `TEXTURE: could not read ...`, draws the name alone centred, keeps running |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no warnings or errors in the log |
 
+Milestone 18 main menu showcase, implemented on `feat/new-menu` on 2026-08-04, verified from
+screenshots and a temporary probe that logged each pick and built the scene twice in one process
+(both removed afterwards):
+
+| Check | Result |
+|---|---|
+| Live 3D behind the menu | the real arena and both nets, with one cooked car parked at the centre spot |
+| Angle | 3/4 front, camera low at 1.9 m and off to the left, so the car fills the right of the frame |
+| Turntable | 12 degrees a second, the only thing in the scene that moves |
+| Random pick | `Cop` blue then `SUV` orange from two entries in one process; `SportsCar2`, `Taxi`, `NormalCar1` and `NormalCar2` all seen across runs |
+| Re-roll on re-entry | yes - the pick is in `Initialize`, and entering the menu is what runs it |
+| Menu | Play / How to play / Settings / Exit down the left, keyboard and mouse, accent bar on the selected row |
+| Weekly Challenges panel | not built, as CLAUDE.md requires |
+| Settings | opens centred over the showcase, closes back to the list |
+| Credits and build string | bottom left, as in the base menu |
+| 1280x720 / 1920x1080 / 960x540 | the column, the title and the credits all hold their place |
+| Missing `assets/Models` | falls back to the box stand-in in the team colour, no crash |
+| Teardown across two menu scenes | Debug: no Jolt assert, exactly three shader programs unloaded at exit (lit, Bright, Blur) |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no warnings or errors in the log |
+
 ## Layout
 
 ```
@@ -526,7 +550,7 @@ Game/Source/
   Main.cpp, App.h/cpp          entry point, window, settings, scene switching, smoke test
   Scene.h/cpp                  camera + GameObjects + Jolt PhysicsSystem, fixed step loop
   TitleScene.h/cpp             the launch screen: logo and prompt over the live arena
-  MainMenuScene.h/cpp          title, Play / How to play / Settings / Exit, credits and build string
+  MainMenuScene.h/cpp          the showcase menu: arena and a turntabling car behind the list
   HowToPlayScene.h/cpp         the how-to-play screen: six panels of rules and controls
   CarSelectScene.h/cpp         the car picker: six cooked cars on a 2 x 3 grid of pedestals
   MatchScene.h/cpp             the gameplay scene and the pause overlay
@@ -917,6 +941,34 @@ is incremental.
   working directory. `TextureAsset` should reuse it rather than adding a second scheme.
 - **The cooked model is optional.** If `assets/Models` is missing, `CarObject` falls back to the old
   box; the game still runs from an uncooked build instead of crashing.
+
+### Main menu showcase
+- **The showcase car is a `StaticModelAsset` drawn directly, not a `CarObject`.** A `CarObject` would
+  want a `PhysicsSystem`, a body and a controller for a prop that only turns on the spot. This is the
+  same reasoning - and very nearly the same code - as the car picker's six previews.
+- **The scene still calls `InitializePhysics`, because `ArenaObject` builds a body**, and physics is
+  never stepped. It is the title screen's arrangement exactly: the bodies exist so the arena has its
+  `pieces` list and the contact shadow has something to ray cast against.
+- **All seven cooked cars are in the showcase pool, `SportsCar2` included.** The six-car restriction
+  is the picker's (CLAUDE.md Milestone 08 says to use six of the seven); a showcase has no reason to
+  hide one, and it is the one car the player can never otherwise see up close.
+- **The pick is in `Initialize`, which is what "re-rolled every time the menu is re-entered" means
+  here**: `App::SetScene` builds a fresh `MainMenuScene` every time, so there is no separate re-roll
+  to write. Verified by building the scene twice in one process - `Cop` blue, then `SUV` orange.
+- **Nothing re-seeds the random sequence**, so two launches inside the same second can show the same
+  car: raylib seeds from the clock in `InitWindow`. Within a session it always differs.
+- **The menu rows moved left but the widget did not change.** `uistyle::MenuList` lays out from the
+  rectangle it is handed, so the column is a change to where `Draw` puts `row` - which is what
+  CLAUDE.md means by wiring the pieces that already exist rather than building new UI.
+- **"How to play" stays on the list.** CLAUDE.md Milestone 18 names Play, Settings and Exit, and what
+  it explicitly rules out is the reference's online/shop/pass/garage/profile entries and its Weekly
+  Challenges panel. Dropping the row would strand the how-to-play screen with no way in, so it was
+  kept; delete it only together with `HowToPlayScene`.
+- **The credits and build string were commented out in this file and are drawn again**, bottom left,
+  because the milestone asks for them.
+- **The settings panel stays centred rather than moving into the column.** It is the shared widget at
+  its own preferred size, and while it is open it is what the screen is about - the same treatment it
+  gets in the pause menu.
 
 ### Title screen and the texture pipeline
 - **The title is a real scene showing the real arena, not a picture of one.** It builds
@@ -1435,29 +1487,21 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **All six previews are painted blue,** because the player is always on the blue team. If teams ever
   become selectable, `SetPaintColor` in `CarSelectScene::Initialize` is the one place to change.
 
-## Next steps — Milestone 18 (Main Menu Showcase)
+## Next steps — the milestone list is finished
 
-1. It is the same trick the title screen just built, applied to `MainMenuScene`: the live arena
-   behind the menu, with one car parked on the field on a slow turntable. `TitleScene.cpp` is the
-   template - arena plus goals plus a fixed camera, physics never stepped - and the menu list it
-   already draws goes on top unchanged.
-2. The car is the one new part. `CarSelectScene` already loads, paints and lights a cooked model
-   through `StaticModelAsset` without any physics at all, which is exactly what a showcase prop
-   needs; take the pedestal-free version of that code rather than building a `CarObject`.
-3. The model and the team colour are re-rolled every time the menu is entered, so the pick belongs in
-   `MainMenuScene::Initialize`. All seven cooked cars are allowed here, `SportsCar2` included - the
-   six-car restriction is the picker's, not the showcase's.
-4. CLAUDE.md is explicit that the reference's Weekly Challenges panel is **not** wanted, and that no
-   new UI or assets are to be built for this: it is wiring, not design.
-5. The menu itself moves to the left of the screen. `uistyle::MenuList` lays out from a rectangle the
-   caller passes, so that is a change to where `MainMenuScene::Draw` puts `row`, not to the widget.
+Every milestone in CLAUDE.md section 5 is done, so what is left is the section 6 polish list, all of
+whose items are ticked in README.md, plus whatever the known-deviations list above still calls out.
+The four worth picking up first, in order of how much they would be felt:
 
-Nothing is left over from Milestone 17. The old Milestone 17 (car and ball dimensions) was dropped
-from CLAUDE.md before it was started, so the car is still 1.7 x 0.7 x 3.2 m and the ball 2.5 m
-across; if those numbers are ever wanted at Rocket League scale again, the note is that nothing
-hardcodes either one - the car model is fitted to `halfExtents` at runtime and the goal test takes
-the ball's radius as an argument - but the handling in Milestones 04, 05 and 09 was all measured
-against the current sizes and would need re-measuring.
+1. **The bot never jumps** (see the bot decisions). It is the single biggest thing standing between
+   the current opponent and one that feels like a player.
+2. **Nothing is written to disk except `Tuning.cfg`.** Settings, the picked car and the volumes are
+   all forgotten on exit; that config file is the natural place to persist them, and it already has a
+   loader.
+3. **The tuning panel covers neither the bot nor the audio**, which are the two hardest parts of the
+   game to judge by reading numbers.
+4. **The arena is a rounded rectangle, not an octagon.** Rocket League's 45 degree corner walls are
+   arena-shape work that `AddFillet` and `AddCorner` were built general enough to take.
 
 ### Verifying without a keyboard
 There is no `xdotool`/`wtype` here, so every milestone so far was verified with a temporary harness

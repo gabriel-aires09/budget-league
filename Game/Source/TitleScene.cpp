@@ -162,9 +162,9 @@ void TitleScene::Draw()
                               Fade(uistyle::Accent, pulse));
 
     // Over the pitch rather than over a panel, so both lines are shadowed too.
-    uistyle::DrawShadowedText("Made with raylib, Jolt Physics and Dear ImGui", centerX,
+    uistyle::DrawShadowedText("MiraSoft", centerX,
                               screenHeight - 58.0f * scale, 16.0f, uistyle::TextDim);
-    uistyle::DrawShadowedText(TextFormat("Arcade Car Soccer - %s build - %s", BUILD_NAME, __DATE__),
+    uistyle::DrawShadowedText(TextFormat("Budget League - 2026 MiraSoft. All Rights Reserved"),
                               centerX, screenHeight - 34.0f * scale, 16.0f, uistyle::TextDim);
 
     if (elapsed < FADE_IN)
