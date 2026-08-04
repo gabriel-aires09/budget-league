@@ -3,6 +3,7 @@
 #include "CarSelectScene.h"
 #include "HowToPlayScene.h"
 #include "Lighting.h"
+#include "ImGuiRaylib.h"
 #include "MainMenuScene.h"
 #include "MatchScene.h"
 #include "UserInterface.h"
@@ -49,7 +50,7 @@ bool App::Initialize(int argc, char **argv)
     lighting::Load();
 
 #ifdef GAME_DEV_TOOLS
-    ImGui::CreateContext();
+    imgui::Initialize();
 #endif
 
     // The smoke test goes straight to the match, which is what needs validating.
@@ -79,11 +80,18 @@ void App::Run()
     int frame = 0;
     while (running && !WindowShouldClose())
     {
+#ifdef GAME_DEV_TOOLS
+        // Before the scene, so its panels can call ImGui while they draw.
+        imgui::BeginFrame(GetFrameTime());
+#endif
         activeScene->Update(GetFrameTime());
 
         BeginDrawing();
         ClearBackground(uistyle::Background);
         activeScene->Draw();
+#ifdef GAME_DEV_TOOLS
+        imgui::EndFrame(); // on top of the game, still inside BeginDrawing
+#endif
         EndDrawing();
 
         if (smokeTest && ++frame >= smokeTestFrames)
@@ -117,7 +125,7 @@ void App::Shutdown()
     }
 
 #ifdef GAME_DEV_TOOLS
-    ImGui::DestroyContext();
+    imgui::Shutdown();
 #endif
 
     // After the scenes, so every model has already detached from the shader.

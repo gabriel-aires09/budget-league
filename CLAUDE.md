@@ -319,6 +319,8 @@ Add a simple **BotController**: drives toward the ball, aims its hits roughly to
 Add Dear ImGui **tuning panels** (Debug/Development only) to adjust, live: gravity, ball restitution/friction/angular damping, car acceleration/top speed/steering/grip, jump and flip impulses, air-control strength, boost drain/refill rates, and camera smoothing. Include a button to save the current values back to a config the game loads on startup.
 → verify: changing a slider immediately changes gameplay feel; saved values persist across restarts; Release builds contain no tuning UI.
 
+At any moment during gameplay, the developer can press a button to open/hide the Level Editor (**F1**). When the editor is opened, the game is paused. 
+
 ## Milestone 14 — Visual Polish and Effects
 Bring the arena to life: futuristic indoor stadium, arena trim, colored goals, boost-pad glow, clear team colors, a boost flame/trail, a ball highlight, goal-explosion particles, lighting, and shadows. Add **bloom / subtle post-processing** only if performance allows (toggleable).
 → verify: the game reads as an energetic arcade sports game; effects fire on the right events (boost, jump, ball hit, goal); frame rate stays smooth on a common laptop.
@@ -339,6 +341,7 @@ Improve the current arena field dimensions. I want a arena simulation from rocke
 - Floor to ceiling: 2,048 Unreal Units, equivalent to approximately **20.73 meters**
 
 ## Milestone 18 - Car and ball dimensions 
+Change the actual size of ball and cars simulating the rocket league game objects sizes1
 - Ball height: approximately 182 Unreal Units, equivalent to roughly **1.83 meters**
 - Cars size: lenght 118.01 Unreal units, width 84.20 Unreal Units and height 36.16 Unreal units 
 

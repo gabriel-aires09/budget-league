@@ -8,6 +8,7 @@
 #include "Match.h"
 #include "PlayerController.h"
 #include "SettingsMenu.h"
+#include "TuningPanel.h"
 #include "UserInterface.h"
 #include "GameObjects/ArenaObject.h"
 #include "GameObjects/BallObject.h"
@@ -51,6 +52,11 @@ public:
     bool settingsOpen = false;
     uistyle::MenuList pauseMenu;
     SettingsMenu settingsMenu;
+
+#ifdef GAME_DEV_TOOLS
+    // F1 opens it, and the match is frozen for as long as it is up.
+    TuningPanel tuningPanel;
+#endif
 };
 
 #endif

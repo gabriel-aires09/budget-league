@@ -16,8 +16,8 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 10 — Camera Modes**
 - [x] **Milestone 11 — HUD**
 - [x] **Milestone 12 — Bot Opponent (or Solo Practice)**
-- [ ] **Milestone 13 — Tuning Panels (Debug/Development)** — the next one
-- [ ] **Milestone 14 — Visual Polish and Effects** — lighting is done, pulled forward; shadows, bloom and effects are not
+- [x] **Milestone 13 — Tuning Panels (Debug/Development)**
+- [ ] **Milestone 14 — Visual Polish and Effects** — the next one; lighting is done, pulled forward, shadows, bloom and effects are not
 - [ ] **Milestone 15 — Audio**
 - [ ] **Milestone 16 — UI Polish (raygui)**
 
@@ -44,7 +44,7 @@ painted in the team colour, and the whole scene is flat-shaded by one directiona
 boosts, drawing on a 0-100 meter refilled by 18 boost pads spread across the field. Space jumps,
 a second press flips in whatever direction is held, and the car can be pitched, yawed and rolled in
 the air, so aerial ball touches work. Esc or P pauses, with Resume / Settings / Return to main menu
-/ Exit.
+/ Exit. In Debug and Development, **F1** opens a Dear ImGui tuning panel over the match.
 
 **C** toggles between the chase camera and a ball cam that sits on the far side of the car from the
 ball so both are in frame, and the camera now keeps itself inside the arena: it is clamped under the
@@ -313,6 +313,23 @@ so every number below is the bot playing against a car that never moves (removed
 | Bot switched off in settings | no bot car is built at all; the scene is exactly the solo practice it was |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no errors in the log |
 
+Milestone 13 tuning panel, verified by a temporary probe that wrote a config, ran a match and read
+the values back out of Jolt rather than out of the C++ fields (removed afterwards), plus screenshots
+of the panel:
+
+| Check | Result |
+|---|---|
+| Panel renders | title bar, scroll bar, six collapsing sections, 24 sliders, Save button |
+| Labels | full at the default window size, including `highSpeedSteerScale` |
+| Save | writes `Tuning.cfg` next to the executable, one `Section.name = value` line per slider |
+| Load | a match started after a save comes up with the saved values on the objects |
+| Load reaches Jolt, not just the fields | gravity -25.00, ball restitution 0.20, ball friction 0.90 read back from the body interface |
+| Car entries move the bot too | `maxSpeed` 21.5 on the player's car and 21.5 on the bot's |
+| Pad refills split by kind | small pads 40, full pads 60, from two sliders |
+| No config file | defaults, no warning, exit 0 |
+| Release build | `Tuning (F1)` appears 0 times in the binary; Development, 1 |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no errors in the log |
+
 ## Layout
 
 ```
@@ -323,6 +340,8 @@ Game/Source/
   HowToPlayScene.h/cpp         the how-to-play screen: six panels of rules and controls
   CarSelectScene.h/cpp         the car picker: six cooked cars on a 2 x 3 grid of pedestals
   MatchScene.h/cpp             the gameplay scene and the pause overlay
+  ImGuiRaylib.h/cpp            namespace imgui: the whole Dear ImGui backend, dev builds only
+  TuningPanel.h/cpp            the F1 tuning panel and its Tuning.cfg, dev builds only
   HUD.h/cpp                    namespace hud: every in-match readout, plus the full time screen
   Match.h/cpp                  score, clock, kickoff/goal/full time state machine
   GameSettings.h               the settings struct App owns
@@ -728,7 +747,8 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   and every camera-facing surface fell into fill light; because the chase camera swings all the way
   around the car, only a high sun keeps whichever side faces the player readable.
 - Light colours are constants in `Lighting.cpp` and set into the program once at load, since the
-  light never moves. Milestone 13 can bind them to the ImGui panel.
+  light never moves. They are deliberately not on the tuning panel, which carries the physics and
+  camera values CLAUDE.md lists.
 
 ### Camera
 - **The ball cam is a direction, not a second camera.** It swaps the flat direction the camera sits
@@ -864,6 +884,46 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   Those two stay in `MatchScene::Draw` behind `GAME_DEV_TOOLS`, so Release draws neither — verified on
   a Release screenshot.
 
+### Tuning panel and the ImGui backend
+- **The sliders point straight at the live fields.** An `Entry` holds a `float *` into the real
+  `CarObject` / `BallObject` / `ChaseCamera`, so there is no second copy of the tuning to keep in
+  step, and one table drives all three of drawing the panel, writing the config and reading it back.
+  Adding a tunable is one `entries.push_back` and nothing else.
+- **Every car entry carries the bot's matching field as a `mirror`.** The two cars are separate
+  objects with their own copies of every handling number, so without it, tuning the player's
+  acceleration would quietly leave the bot faster than the player.
+- **Three values are not a field of anything** — gravity and the two pad refill amounts — so the
+  panel owns them and an `Apply` step pushes them into the physics system and across the pad list.
+  `Apply` also calls the existing `ApplyTuning` on the ball and both cars, because Jolt caches
+  restitution, friction and damping on the body rather than reading the object every step.
+- **`BoostPadObject::fullRefill` was added so a refill slider knows which pads it means.** The two
+  kinds were only distinguishable by their amount, which is exactly the thing being edited.
+- **The config is loaded at `MatchScene::Initialize`, not at startup.** The values live on objects
+  that are built per match, so that is the only point where there is something to load them onto.
+  Practically it is better as well: a rematch picks up whatever was last saved.
+- **The config is parsed by splitting on `=`, not by scanning a token.** Section names contain
+  spaces (`Car drive.maxSpeed`), and the first version used `sscanf("%[^= ] = %f")`, which stops at
+  the space, read half a key and silently dropped every car line while the ball lines worked. The
+  round-trip check is what caught it.
+- **rlgl batches vertices, but `rlScissor` is immediate GL state, so the batch has to be flushed
+  before every scissor change.** Without the flush, each ImGui command's geometry is drawn under
+  whatever rectangle a *later* command set. The symptom was window title bars silently missing —
+  clipped away by a scissor belonging to a slider further down the window. This is the single
+  sharpest edge in the backend.
+- **ImGui draws through rlgl's immediate-mode batch rather than a shader and buffers of its own.**
+  A panel is a few thousand 2D triangles, which is exactly what that batch is for, and it keeps the
+  backend free of GL calls. rlgl splits the batch at triangle boundaries by itself, so a command of
+  any length is safe between one `rlBegin` and `rlEnd`.
+- **ImGui 1.92 hands textures over on demand.** The backend sets
+  `ImGuiBackendFlags_RendererHasTextures` and services `WantCreate` / `WantUpdates` / `WantDestroy`
+  each frame; the older single-atlas `GetTexDataAsRGBA32` path is not what this version expects.
+  Updates re-upload the whole texture rather than the requested sub-rectangle, because ImGui's
+  `Pixels` array is the whole texture and a rectangle out of it is not contiguous.
+- **`io.IniFilename` is null.** ImGui would otherwise write `imgui.ini` into whatever directory the
+  game was launched from.
+- **The whole of `ImGuiRaylib.cpp` and `TuningPanel.cpp` is inside `#ifdef GAME_DEV_TOOLS`**, so
+  Release links neither and the panel's strings are absent from the binary — checked, not assumed.
+
 ### Bot opponent
 - **The bot aims by choosing where to drive, not by deciding when to hit.** Its target is a point
   `approachOffset` behind the ball on the far side from the goal it is attacking, so simply driving
@@ -976,6 +1036,21 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   slopes, never as steps. The wall transitions are now exactly that (see the ramp notes above, and
   the measured "biggest backward step 0.000 m"); keep it true for boost pads and any Milestone 14
   trim.
+- **F1 freezes the match, which is at odds with "changing a slider immediately changes gameplay
+  feel".** CLAUDE.md's Milestone 13 asks for both: the verify line wants live feel, and the line
+  added later says the game is paused while the panel is open. The pause is what is implemented,
+  since it is the more specific and more recent instruction. It still works in practice because the
+  sliders write to the live objects as they move, so closing F1 lets the change be felt at once —
+  but there is no way to feel a slider *while dragging it*. Worth revisiting if it gets in the way.
+- **F1 currently opens the tuning panel, and EDITOR.md's Arena Editor wants the same key.** That
+  editor is its own milestone and is not built. When it lands, the two belong behind one F1 overlay
+  with the panel as one window in it, not two keys.
+- **The tuning panel does not expose the bot.** CLAUDE.md lists exactly what the panel should carry
+  and `BotController` is not on it. Its fields are the hardest thing in the project to judge by
+  reading, so they are the obvious first addition if the panel is ever extended.
+- **`Tuning.cfg` is per build configuration**, because it sits next to the executable in
+  `Build/<Config>/`. Debug and Development do not share one. That is deliberate - it keeps a wild
+  experiment in one build - but it does mean saving in Debug does not change Development.
 - **The bot can teleport.** A five second jam sends it back to its own spawn (see the bot decisions
   above). It is deliberate and it is the only hard guarantee that it never sits stuck, but it is a
   thing a player cannot do, so it is worth knowing before anyone reports it as a bug.
@@ -996,20 +1071,20 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **All six previews are painted blue,** because the player is always on the blue team. If teams ever
   become selectable, `SetPaintColor` in `CarSelectScene::Initialize` is the one place to change.
 
-## Next steps — Milestone 13 (Tuning panels, Debug/Development only)
+## Next steps — Milestone 14 (Visual polish and effects)
 
-1. ImGui is already linked and initialised, and `GAME_DEV_TOOLS` is already defined in Debug and
-   Development only — `App.cpp` has the two `#ifdef` blocks. `ImGuiRaylib.h/cpp` (namespace `imgui`,
-   CLAUDE.md 2.3) does not exist yet and is what the panels need.
-2. Nearly everything worth tuning is already a public field with a comment saying so: `CarObject`
-   (drive, steering, boost, jump, air control, stability), `BallObject` (gravity factor, restitution,
-   friction, damping) and `ChaseCamera`. `CarObject::ApplyTuning` and `BallObject::ApplyTuning` exist
-   precisely to push the body-level ones back into Jolt after a slider moves — call them.
-3. `BotController`'s fields belong on a panel too, and it is the cheapest way to judge whether the bot
-   is beatable: `steerGain`, `approachOffset`, `leadTime` and the boost thresholds all change how it
-   plays within one match.
-4. The milestone also asks for a save button and a config the game loads at startup. That config is
-   the natural home for `GameSettings` as well, which currently lives only for the session.
+1. Lighting was already pulled forward and is done (see the Lighting decisions). What Milestone 14
+   still owns is shadows, bloom / post-processing, and `Effects.h/cpp` — the boost flame and trail,
+   the ball highlight, goal-explosion particles and a hit punch.
+2. `CarObject::boosting` is already set every step and is what a flame should read; `Match` already
+   raises the Celebration state a goal banner is drawn from, so the particles have their trigger.
+3. `GameSettings` carries the post-processing flag, stored and unread since Milestone 03. It is the
+   toggle CLAUDE.md asks for, and `PostProcess.h/cpp` (2.5) is where it should land.
+4. The arena is one `Piece` list that physics and rendering both read (see the arena decisions).
+   Trim, stands and light rigs should join that list rather than being drawn separately, or the
+   collision and the visuals will drift apart.
+5. Anything added to the arena that a car can touch must be a slope, never a step: a box with no
+   wheels stops dead against a lip of a few centimetres.
 
 ### Verifying without a keyboard
 There is no `xdotool`/`wtype` here, so every milestone so far was verified with a temporary harness

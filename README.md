@@ -39,6 +39,7 @@ which turns the match into solo practice with both goals still scoring.
 | **C** | Toggle chase cam / ball cam |
 | **R** | Reset the car to its spawn |
 | **Esc** or **P** | Pause |
+| **F1** | Tuning panel (Debug and Development builds only) — freezes the match while open |
 
 ### Menus
 
@@ -142,7 +143,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **10 — Camera Modes** — smooth chase cam, ball cam on **C**, and the camera keeps itself out of the arena geometry by ray cast rather than clipping through it.
 - [x] **11 — HUD** — scoreboard, clock, boost meter, speed, kickoff countdown, goal banner and a full-time screen with a rematch. Boost-pad state is read from the pads' own glow in the world, not from a HUD hint.
 - [x] **12 — Bot Opponent (or Solo Practice)** — an orange bot that drives at the ball from the side its shot comes from, boosts down the long approaches and frees itself when it gets blocked. 6-1 against a player who never moves. Switchable off for solo practice.
-- [ ] **13 — Tuning Panels (Debug/Development)** — ImGui is linked and `GAME_DEV_TOOLS` is defined, but no panels are drawn and nothing is saved to a config.
+- [x] **13 — Tuning Panels (Debug/Development)** — **F1** opens a Dear ImGui panel over the match with live sliders for gravity, the ball, car handling, boost and camera smoothing, and a Save button writing `Tuning.cfg` next to the executable, which the next match loads. Release contains none of it.
 - [ ] **14 — Visual Polish and Effects** — flat-shaded lighting was pulled forward and is done; shadows, bloom, boost flame/trail and goal particles are not.
 - [ ] **15 — Audio** — not started; the audio device is not initialised and the volume settings are stored but unused.
 - [ ] **16 — UI Polish (raygui)** — not started; the UI is drawn with the project's own `uistyle` helpers.
