@@ -23,6 +23,7 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 17 — Title Screen ("Press Any Button")**
 - [x] **Milestone 18 — Main Menu Showcase**
 - [x] **Milestone 19 — Settings Screen (main-menu layout)**
+- [x] **Milestone 20 — Soundtrack (OST playlist)**
 
 Every milestone in CLAUDE.md is now done; what is left is the section 6 polish list.
 
@@ -557,6 +558,24 @@ of both contexts (temporary probes that forced each one open, removed afterwards
 | Rows, sections and Back | the same widget, so identical in both | identical |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no warnings or errors in the log | |
 
+Milestone 20 soundtrack, implemented on `feat/ost` on 2026-08-04. It is the first thing in the game
+that streams audio from disk; every sound effect is still generated at startup. Verified with a
+temporary probe that seeked each track to a second from its end, so a whole playlist ran in a minute
+(removed afterwards):
+
+| Check | Result |
+|---|---|
+| Tracks cooked | all 6, copied into `assets/Music` in every configuration, 33 MB |
+| Playback | one track streams at launch and the playlist runs unattended |
+| Advance on end | **50 advances in 60 s**, every one of them at the end of a track |
+| Same track twice in a row | **0 of 50** |
+| Spread over the 6 tracks | 6, 8, 8, 9, 9, 10 - even, and all six were reached |
+| Music volume slider | `settings.musicVolume` reaches the stream live: measured 0.60 → 0.25 → 1.00 while a track played |
+| Settings panel | the new row sits under SFX volume and the panel grows with it; Back stays inside |
+| Missing `assets/Music` | logs the directory warning once, reports `0 music track(s)`, game runs silent and exits 0 |
+| No audio device | the playlist is never even scanned - it is behind the same `ready` gate as the cues |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no errors in the log |
+
 ## Layout
 
 ```
@@ -983,6 +1002,31 @@ is incremental.
 - **The settings panel stays centred rather than moving into the column.** It is the shared widget at
   its own preferred size, and while it is open it is what the screen is about - the same treatment it
   gets in the pause menu.
+
+### Soundtrack
+- **The playlist is found by scanning `assets/Music`, not by a list in the code.** Adding a track is
+  dropping a `.mp3` into `Game/Assets/Sounds/`; the cooker copies it and the game picks it up. That
+  is also why the file names with spaces in them are no problem - nothing ever types one.
+- **The tracks are copied, not cooked.** They are streamed from disk by raylib a buffer at a time,
+  so decoding them at cook time would trade 33 MB of MP3 for hundreds of MB of PCM for no gain. This
+  is the same reasoning that leaves the shaders as plain text.
+- **`track.looping = false` is what makes it a playlist.** raylib defaults music streams to looping,
+  and with it on the first song would simply never end. With it off `UpdateMusicStream` stops the
+  stream at the end, so `!IsMusicStreamPlaying` is the whole end-of-track test - no timers, no
+  comparing `GetMusicTimePlayed` against the length.
+- **One stream is loaded at a time**, and the previous one is unloaded before the next is loaded. The
+  playlist holds paths, so it costs nothing however long it gets.
+- **The shuffle never repeats a track back to back**: it re-rolls while the pick equals the current
+  one. Measured over 50 advances - 0 repeats, and all six tracks reached. With a single track in the
+  folder it plays that one again, which is the only sensible thing left to do.
+- **`audio::UpdateMusic` must be called every frame**, from `App::Run`. It is what refills the stream
+  as well as what notices a track ending; skipping frames would starve the buffer and stutter.
+- **Music keeps playing through the pause menu and the whole match.** It is a soundtrack, not a
+  gameplay cue, so nothing in the scenes touches it - unlike the boost loop, which every path that
+  stops updating the car has to release.
+- **The music volume is its own setting** (`GameSettings::musicVolume`, default 60), pushed from
+  `App::Run` every frame beside the master and SFX volumes, so the slider is heard as it moves. It
+  defaults under the effects because the cues are short and the music is continuous.
 
 ### Settings screen
 - **The panel is one widget with a background flag, not two panels.** `SettingsBackground` says what

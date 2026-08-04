@@ -297,6 +297,19 @@ def main():
         print("[cook] %s" % target.name)
         cooked += 1
 
+    # The soundtrack is streamed from disk by raylib at runtime, not decoded
+    # here, so the tracks are copied as they are. The engine finds them by
+    # scanning this folder, which is why the file names are not listed anywhere.
+    musicOut = args.output / "Music"
+    for source in sorted(args.assets.glob("Sounds/*.mp3")):
+        target = musicOut / source.name
+        if not args.force and target.exists() and target.stat().st_mtime >= source.stat().st_mtime:
+            continue
+        musicOut.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+        print("[cook] %-24s %.1f MB" % (target.name, target.stat().st_size / (1024.0 * 1024.0)))
+        cooked += 1
+
     if failed:
         return 1
     print("[cook] %s -> %s" % ("%d asset(s) cooked" % cooked if cooked else "up to date", args.output))

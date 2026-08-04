@@ -423,6 +423,28 @@ as before (no showcase) — the module just takes a "background mode" flag.
   and the arena+car still visible behind it; pause-menu Settings is unchanged; the
   panel stays centered on window resize.
 
+## Milestone 20 — Soundtrack (OST playlist)
+Add the game's soundtrack from the tracks in `Game/Assets/Sounds/`. Unlike the
+Milestone 15 cues, these are **real audio files streamed from disk**, not generated:
+the Asset Cooker copies them into each build's `assets/Music/` and the engine streams
+one at a time (raylib `Music`), so nothing is decoded at cook time.
+
+**Playlist behavior:**
+- One track plays at a time; when it **finishes, another one starts automatically**,
+  picked **randomly** — the playlist never stops on its own.
+- Never the **same track twice in a row**.
+- The track list is **found by scanning the cooked folder**, not listed in code:
+  adding or removing a song is dropping a `.mp3` in or out of `Game/Assets/Sounds/`.
+- The soundtrack runs through the whole game — title screen, menus and match alike.
+
+**Settings:** a **Music volume** slider in the Audio section of the modular
+SettingsMenu (section 2.3), separate from master and SFX, felt live as it moves.
+
+→ verify: a track plays at launch and the playlist keeps advancing on its own; a new
+  song starts when one ends and it is never the one that just played; the Music volume
+  slider changes the music without touching the sound effects; with `assets/Music`
+  missing the game logs a warning and runs silent instead of failing.
+
 ---
 
 # 6. Final Milestone — Polish (individual prompts)

@@ -8,7 +8,7 @@ static const float ROW_HEIGHT = 32.0f;
 static const float ROW_GAP = 4.0f;
 static const float PADDING = 26.0f;
 static const float BOTTOM_PAD = 22.0f;
-static const int ROW_COUNT = 9;     // 8 values plus Back
+static const int ROW_COUNT = 10;    // 9 values plus Back
 static const int SECTION_COUNT = 3; // Graphics, Gameplay, Audio
 
 static const int RESOLUTIONS[][2] = { { 0, 0 }, { 1280, 720 }, { 1600, 900 }, { 1920, 1080 } };
@@ -122,6 +122,11 @@ bool SettingsMenu::Draw(GameSettings &settings, Rectangle area, SettingsBackgrou
     delta = menu.ValueItem(row, "SFX volume", TextFormat("%i%%", settings.sfxVolume), index++);
     if (delta != 0)
         settings.sfxVolume = Clamp(settings.sfxVolume + delta * 5, 0, 100);
+    row.y += (ROW_HEIGHT + ROW_GAP) * scale;
+
+    delta = menu.ValueItem(row, "Music volume", TextFormat("%i%%", settings.musicVolume), index++);
+    if (delta != 0)
+        settings.musicVolume = Clamp(settings.musicVolume + delta * 5, 0, 100);
     row.y += (ROW_HEIGHT + ROW_GAP + SECTION_GAP) * scale;
 
     bool back = menu.Item(row, "Back", index++);

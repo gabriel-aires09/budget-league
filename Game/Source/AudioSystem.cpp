@@ -1,8 +1,12 @@
 #include "AudioSystem.h"
 
+#include "StaticModelAsset.h" // assets::Path, the one scheme for cooked files
+
 #include <raylib.h>
 
 #include <cmath>
+#include <string>
+#include <vector>
 
 namespace
 {
@@ -54,6 +58,45 @@ namespace
     CueSound cues[(int)AudioCue::Count] = {};
     bool ready = false;
     float sfxVolume = 0.8f;
+
+    // The soundtrack. One track streams at a time; the rest are just names, so
+    // the playlist costs nothing however long it gets.
+    std::vector<std::string> trackPaths;
+    Music track = {};
+    bool trackPlaying = false;
+    int currentTrack = -1;
+    float musicVolume = 0.7f;
+
+    // Starts a track that is not the one just played, so the shuffle never
+    // repeats a song back to back. With a single track it plays that one again.
+    void StartAnotherTrack()
+    {
+        if (trackPaths.empty())
+            return;
+
+        int next = GetRandomValue(0, (int)trackPaths.size() - 1);
+        if (trackPaths.size() > 1)
+            while (next == currentTrack)
+                next = GetRandomValue(0, (int)trackPaths.size() - 1);
+
+        if (trackPlaying)
+            UnloadMusicStream(track);
+
+        track = LoadMusicStream(trackPaths[next].c_str());
+        trackPlaying = IsMusicValid(track);
+        if (!trackPlaying)
+        {
+            TraceLog(LOG_WARNING, "MUSIC: could not stream %s", trackPaths[next].c_str());
+            return;
+        }
+
+        // Off, or the playlist would never reach a second song.
+        track.looping = false;
+        currentTrack = next;
+        SetMusicVolume(track, musicVolume);
+        PlayMusicStream(track);
+        TraceLog(LOG_INFO, "MUSIC: %s", GetFileName(trackPaths[next].c_str()));
+    }
 
     // The boost loop. gain is written by the game thread and read by the audio
     // one; it is a single float that only ever moves between 0 and 1, and the
@@ -180,14 +223,30 @@ void audio::Load()
     // stopping it is what would be heard as a click.
     PlayAudioStream(boostStream);
 
+    // The playlist is whatever the cooker copied, found by scanning rather than
+    // by a list in the code: adding a track is dropping a file in Assets/Sounds.
+    std::string musicFolder = assets::Path("Music");
+    FilePathList files = LoadDirectoryFilesEx(musicFolder.c_str(), ".mp3", false);
+    for (unsigned int i = 0; i < files.count; ++i)
+        trackPaths.push_back(files.paths[i]);
+    UnloadDirectoryFiles(files);
+
     ready = true;
-    TraceLog(LOG_INFO, "AUDIO: %i procedural cues ready", (int)AudioCue::Count);
+    TraceLog(LOG_INFO, "AUDIO: %i procedural cues ready, %i music track(s)",
+             (int)AudioCue::Count, (int)trackPaths.size());
+
+    StartAnotherTrack();
 }
 
 void audio::Unload()
 {
     if (!ready)
         return;
+
+    if (trackPlaying)
+        UnloadMusicStream(track);
+    trackPlaying = false;
+    trackPaths.clear();
 
     StopAudioStream(boostStream);
     UnloadAudioStream(boostStream);
@@ -205,14 +264,30 @@ void audio::Unload()
     ready = false;
 }
 
-void audio::SetVolumes(int masterPercent, int sfxPercent)
+void audio::SetVolumes(int masterPercent, int sfxPercent, int musicPercent)
 {
     sfxVolume = sfxPercent / 100.0f;
+    musicVolume = musicPercent / 100.0f;
     if (!ready)
         return;
 
     SetMasterVolume(masterPercent / 100.0f);
     SetAudioStreamVolume(boostStream, sfxVolume);
+    if (trackPlaying)
+        SetMusicVolume(track, musicVolume);
+}
+
+void audio::UpdateMusic()
+{
+    if (!ready || !trackPlaying)
+        return;
+
+    UpdateMusicStream(track);
+
+    // With looping off, raylib stops the stream when the track runs out, so
+    // "no longer playing" is the whole end-of-track test.
+    if (!IsMusicStreamPlaying(track))
+        StartAnotherTrack();
 }
 
 void audio::Play(AudioCue cue, float volume, float pitch)
