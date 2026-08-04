@@ -1,5 +1,6 @@
 #include "App.h"
 
+#include "AudioSystem.h"
 #include "CarSelectScene.h"
 #include "HowToPlayScene.h"
 #include "Lighting.h"
@@ -50,6 +51,7 @@ bool App::Initialize(int argc, char **argv)
 
     lighting::Load();
     postprocess::Load();
+    audio::Load();
 
 #ifdef GAME_DEV_TOOLS
     imgui::Initialize();
@@ -86,6 +88,9 @@ void App::Run()
         // Before the scene, so its panels can call ImGui while they draw.
         imgui::BeginFrame(GetFrameTime());
 #endif
+        // Read every frame rather than at Initialize, so both volume sliders are
+        // heard as they move, exactly like the camera sensitivity.
+        audio::SetVolumes(settings.masterVolume, settings.sfxVolume);
         activeScene->Update(GetFrameTime());
 
         BeginDrawing();
@@ -131,6 +136,7 @@ void App::Shutdown()
 #endif
 
     // After the scenes, so every model has already detached from the shader.
+    audio::Unload();
     postprocess::Unload();
     lighting::Unload();
 

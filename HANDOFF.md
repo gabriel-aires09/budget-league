@@ -18,9 +18,9 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 12 — Bot Opponent (or Solo Practice)**
 - [x] **Milestone 13 — Tuning Panels (Debug/Development)**
 - [x] **Milestone 14 — Visual Polish and Effects**
-- [ ] **Milestone 15 — Audio** — the next one
+- [x] **Milestone 15 — Audio**
 - [x] **Milestone 16 — Arena Field Dimensions**
-- [ ] **Milestone 17 — Car and Ball Dimensions**
+- [ ] **Milestone 17 — Car and Ball Dimensions** — the next one
 
 Two pieces of work outside the milestone list are also done: the **asset pipeline** (FBX cooking plus
 the car models, CLAUDE.md 4.1) and the **arena ramps with wall and ceiling driving** (PROMPTS.md).
@@ -46,6 +46,9 @@ boosts, drawing on a 0-100 meter refilled by 18 boost pads spread across the fie
 a second press flips in whatever direction is held, and the car can be pitched, yawed and rolled in
 the air, so aerial ball touches work. Esc or P pauses, with Resume / Settings / Return to main menu
 / Exit. In Debug and Development, **F1** opens a Dear ImGui tuning panel over the match.
+The game is also audible now: ten cues are synthesised at startup from one table in
+`AudioSystem.cpp` — no sound files exist — and the boost is a running audio stream rather than a
+repeated sound. Master and SFX volumes are read from the settings every frame.
 
 **C** toggles between the chase camera and a ball cam that sits on the far side of the car from the
 ball so both are in frame, and the camera now keeps itself inside the arena: it is clamped under the
@@ -352,6 +355,60 @@ Milestone 14 effects, verified from screenshots of each effect forced into view 
 | `assets/Shaders/Bright.fs` missing | logs `POSTFX: bloom shaders unavailable`, renders unbloomed, exit 0 |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no errors in the log |
 
+Milestone 15 audio, implemented on `feat/audio` on 2026-08-04. Two temporary probes, both removed
+afterwards: one exported every cue as a `.wav` at startup and measured it in Python, the other logged
+each cue as it fired while a scripted input harness played the game.
+
+The cues themselves, measured from the exported waves. The zero-crossing rate is what confirms the
+synthesis arithmetic: on the cues with no chord and no noise it lands on the table's own frequency.
+
+| Cue | Length | Peak | First / last sample | Clipped samples | Measured tone |
+|---|---|---|---|---|---|
+| UiHover | 0.060 s | 0.14 | 0.0000 / 0.0000 | 0 | 917 Hz against 900 in the table |
+| UiClick | 0.100 s | 0.23 | 0.0000 / 0.0000 | 0 | falls, 1500 → 700 |
+| Jump | 0.200 s | 0.34 | 0.0000 / 0.0001 | 0 | rises, 280 → 760 |
+| BallHit | 0.300 s | 0.69 | 0.0000 / 0.0000 | 0 | falls hard, 460 → 85 |
+| Impact | 0.220 s | 0.54 | 0.0000 / 0.0000 | 0 | 6718 crossings/s — mostly noise |
+| BoostPad | 0.300 s | 0.29 | 0.0000 / 0.0001 | 0 | rises, 620 → 1240 plus a fifth |
+| CountdownTick | 0.120 s | 0.37 | 0.0000 / 0.0001 | 0 | 717 Hz against 720 in the table |
+| CountdownGo | 0.360 s | 0.43 | 0.0000 / 0.0000 | 0 | 980 plus a fifth |
+| Goal | 0.900 s | 0.50 | 0.0000 / 0.0001 | 0 | rises, 440 → 880 plus a fifth |
+| MatchEnd | 1.200 s | 0.46 | 0.0000 / 0.0000 | 0 | 517 → 183 against 520 → 190 |
+
+Every cue starts and ends at zero and none clips, which is what says none of them can pop. BallHit is
+the loudest at 0.69 and UiHover the quietest at 0.14, so the mix has a deliberate order to it.
+
+Then the wiring, from one scripted run in the match (times are seconds from launch):
+
+| Event | Fired |
+|---|---|
+| Kickoff countdown | ticks at 0.10, 1.08, 2.08 — one per whole second, never twice |
+| Field going live | 3.08, exactly when the countdown ends |
+| Car hitting the ball | 4.27, pitched to 0.85 by the size of the hit |
+| Boost held | on at 5.02, off at 7.02 — the scripted Shift window to the frame |
+| Wall / car impact | 5.03 at volume 0.83, and 13.15 at 1.00 |
+| Goal | 6.10 and 14.62, on entering the celebration |
+| Jump | 8.22 |
+| Boost pad | 12.70, from the tank going up rather than from a new event on the pad |
+| Second kickoff | ticks at 8.60, 9.60, 10.60, live again at 11.60 |
+| Full time | 21.08 |
+| Boost during a kickoff freeze | never — the car is not stepped, so `boosting` stays false |
+| False pad pickup at match start | none, once `previousBoostAmount` was seeded (it fired before) |
+
+And the menus, from a second scripted run that walked the main menu and the settings panel:
+
+| Event | Fired |
+|---|---|
+| Keyboard moving the selection | one hover per press, 0 → 1 and 1 → 2 |
+| Mouse moving across rows | one hover per row crossed, never per frame |
+| Activating a row | click at 1.40 |
+| Changing a value with left/right | click at 1.80 |
+
+| Check | Result |
+|---|---|
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank |
+| Log during a run | `AUDIO: 10 procedural cues ready`, no warnings and no errors in any config |
+
 Milestone 16 arena dimensions, implemented on `feat/arena` on 2026-08-04:
 
 | Check | Result |
@@ -440,6 +497,7 @@ Game/Source/
   TuningPanel.h/cpp            the F1 tuning panel and its Tuning.cfg, dev builds only
   HUD.h/cpp                    namespace hud: every in-match readout, plus the full time screen
   Effects.h/cpp                namespace effects: particles, boost flame, ball highlight, contact shadows
+  AudioSystem.h/cpp            namespace audio: the ten procedural cues and the boost stream
   PostProcess.h/cpp            namespace postprocess: the optional bloom chain
   Match.h/cpp                  score, clock, kickoff/goal/full time state machine
   GameSettings.h               the settings struct App owns
@@ -1030,6 +1088,56 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **The render targets are rebuilt when the window size changes, not created at load.** The resolution
   setting can change at any time, and a stale target would stretch the scene.
 
+### Audio
+- **Every sound is synthesised at startup; there are no audio files and the cooker has no audio
+  step.** One `CueSpec` table in `AudioSystem.cpp` is the whole sound design: a swept oscillator,
+  an optional second oscillator a fifth up, some third harmonic, some lowpassed noise, and an
+  attack/decay envelope. A thump is a fast downward sweep, a chime an upward one, a crunch is mostly
+  noise. Adding a cue is a line in the table and an entry in `AudioCue` - nothing else.
+- **The one thing every cue must satisfy is starting and ending at zero**, or it clicks. The envelope
+  handles the start and a 4 ms linear fade handles the end; both were measured (see the table above)
+  rather than assumed, because a click is the kind of thing that is obvious on hardware and invisible
+  in code review.
+- **The boost is an `AudioStream` with a callback, not a looping `Sound`.** raylib's sound buffers do
+  not loop (`raudio.c` sets `looping = false`), so a held cue would have to be re-triggered every
+  time it ran out, which either gaps or clicks at every seam. Generating the roar straight into the
+  stream has neither, and it makes intensity a single float. `SetBoost` only moves that float; the
+  callback smooths it over about 25 ms, so the game thread and the audio thread never have to agree
+  on a frame.
+- **The stream is played once at startup and left running at a gain of zero.** Starting and stopping
+  it is exactly what would be heard as a click.
+- **Nothing in the callback calls into raylib**, which is why the noise comes from a local LCG rather
+  than `GetRandomValue`. The same generator builds the cues, and that is deliberate too: drawing from
+  raylib's global sequence at startup would shift every random number the effects later take.
+- **Three voices per cue, as aliases.** `PlaySound` on a sound that is already playing restarts it,
+  so two impacts in quick succession would cut each other off. `LoadSoundAlias` shares the sample
+  data and only duplicates the playback state, so the pool costs nothing. Voice 0 owns the data;
+  `Unload` frees the aliases first.
+- **`ready` gates every entry point, and a missing device is not an error.** `InitAudioDevice`
+  followed by `IsAudioDeviceReady` is the check; without one the game runs silent and still exits 0,
+  which is what the smoke test needs.
+- **The cues are fired from `MatchScene::UpdateEffects`, beside the particle bursts.** Every one of
+  them is a *change* that function already watches, so no new event, listener or flag was added to
+  the physics or the objects: the goal is the state edge, the ball hit is the jump in the ball's
+  speed, the jump is the existing `jumpPending` latch, the countdown ticks come off `match.stateTimer`.
+- **A boost pad pickup is read as the tank going up.** Boost only ever increases from a pad, so
+  `previousBoostAmount` is the whole detector and `BoostPadObject` needed no latch of its own. It has
+  to be seeded in `Initialize`, or the first frame reads a full tank as a pickup - it did, and the
+  probe caught it.
+- **A wall or car impact is the mirror of the ball-hit test: a sudden *drop* in the player's speed.**
+  The threshold is 5 m/s in one frame, and braking cannot reach it - `brakeForce` over the car's mass
+  is 39 m/s², which is 0.65 m/s in a 60 Hz frame. It is suppressed during the kickoff, where the
+  reset sets the velocity to zero in one step.
+- **The volumes are pushed every frame from `App::Run`**, the same treatment `cameraSensitivity`
+  gets, so both sliders are heard as they move. Master goes to `SetMasterVolume`, SFX is multiplied
+  into each `PlaySound` and into the stream's own volume.
+- **`SetBoost(false)` has to be called on every path that stops updating the car** - pause, the F1
+  panel and `Shutdown` - because it is the one cue that is held rather than fired. The kickoff freeze
+  needs no such call: the car is not stepped, so `boosting` is already false.
+- **Only the player's car makes a sound.** There is no spatialisation, so a bot impact across the
+  arena would be as loud as one under the camera. The ball hit is the exception, and it is fine
+  because it is the ball's own speed that is being watched, whoever hit it.
+
 ### Tuning panel and the ImGui backend
 - **The sliders point straight at the live fields.** An `Entry` holds a `float *` into the real
   `CarObject` / `BallObject` / `ChaseCamera`, so there is no second copy of the tuning to keep in
@@ -1195,6 +1303,10 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **F1 currently opens the tuning panel, and EDITOR.md's Arena Editor wants the same key.** That
   editor is its own milestone and is not built. When it lands, the two belong behind one F1 overlay
   with the panel as one window in it, not two keys.
+- **The tuning panel does not expose the audio either.** The cue table is a table of constants, so
+  every sound is a rebuild away. It is the obvious second addition to the panel after the bot.
+- **There is no music and no engine sound.** CLAUDE.md's Milestone 15 asks for a specific list of
+  cues and both are outside it; the boost roar is the only continuous sound in the game.
 - **The tuning panel does not expose the bot.** CLAUDE.md lists exactly what the panel should carry
   and `BotController` is not on it. Its fields are the hardest thing in the project to judge by
   reading, so they are the obvious first addition if the panel is ever extended.
@@ -1209,10 +1321,8 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   not just the bot. `GoalObject` now builds its own floor, flush with the arena's at y = 0.
 - **`GameSettings::botEnabled` is read once, at `MatchScene::Initialize`.** Toggling it in the pause
   menu therefore does nothing until the next match, exactly like `matchDurationMinutes`.
-- **Some settings are stored but not consumed yet**, because the systems that read them do not exist:
-  the master/SFX volumes (Milestone 15 — the audio device is not even
-  initialised). Fullscreen, resolution, camera sensitivity and the post-processing flag are the ones
-  with an effect today, and post-processing is just a stored flag until Milestone 14.
+- **Every setting is consumed now.** The master and SFX volumes were the last two that were stored
+  and unread; Milestone 15 pushes them into the audio system every frame.
 - **Settings live for the session only.** Nothing is written to disk; Milestone 13 introduces the
   config file, and that is the natural place to persist them. The picked car is in the same struct,
   so it is forgotten on exit along with everything else.
@@ -1221,19 +1331,19 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **All six previews are painted blue,** because the player is always on the blue team. If teams ever
   become selectable, `SetPaintColor` in `CarSelectScene::Initialize` is the one place to change.
 
-## Next steps — Milestone 15 (Audio)
+## Next steps — Milestone 17 (Car and Ball Dimensions)
 
-1. Nothing audio exists yet: `InitAudioDevice` is never called, and `GameSettings` carries master and
-   SFX volumes that have been stored and unread since Milestone 03.
-2. `AudioSystem.h/cpp` with procedural `AudioCue`s is what CLAUDE.md 2.4 asks for — no sound files.
-   raylib can play a generated `Wave`, so each cue is a short buffer built once at startup.
-3. Every event a cue needs is already detected and in one place: `MatchScene::UpdateEffects` fires on
-   goals, big ball hits, jumps and boost, and `Match` raises the kickoff countdown and full time.
-   An audio call belongs beside each existing `effects::Burst`, not in a new watcher.
-4. The boost cue is the one that loops while `CarObject::boosting` holds, so it needs starting and
-   stopping rather than a one-shot.
-5. UI click and hover belong in `uistyle::Button` and `MenuList`, which every screen already goes
-   through.
+1. CLAUDE.md asks for the Rocket League reference sizes: a **1.83 m** ball, and a car **1.18 m long,
+   0.84 m wide and 0.36 m high**. Today the ball's `radius` is 1.25 m (so 2.5 m across) and the car's
+   `halfExtents` are 0.85 x 0.35 x 1.6 (so 1.7 x 0.7 x 3.2 m) — the car is nearly three times the
+   reference length, which is the number to look at first.
+2. Nothing else in the game hardcodes either size: the car model is fitted to `halfExtents` at
+   runtime, the ball's spawn height and its contact shadow both come off `radius`, and the goal test
+   takes the radius as an argument. The arena is already at reference scale from Milestone 16.
+3. It is a handling change, not just a number. The car's mass, `centerOfMassOffsetY` and the two
+   ground probes are all in metres against the current box, and the note above on the ball leaving
+   the floor at ~24 degrees is pure geometry between the box top and the ball's centre — both move.
+   Re-measure Milestones 04, 05 and 09 afterwards with the harnesses those rows came from.
 
 ### Verifying without a keyboard
 There is no `xdotool`/`wtype` here, so every milestone so far was verified with a temporary harness
@@ -1252,3 +1362,20 @@ that was deleted afterwards. Three patterns, in increasing order of effort:
 - **Input shim** — force-include a header that `#define`s `IsKeyPressed` to a scripted driver, for
   testing menus and other real key handling (Milestone 03). Note ImGui also declares `IsKeyPressed`,
   so `#undef` it in `App.cpp`, and declare the shim `extern "C"` to match raylib's linkage.
+
+Four things Milestone 15 learnt about the shim, all of which cost a run:
+- **Adding `-include` to the Makefile does not rebuild anything.** The objects depend on the sources,
+  not on the flags, so only the files edited afterwards pick the shim up — and a shim that reaches
+  `UserInterface.cpp` but not `PlayerController.cpp` looks exactly like a bug in the game. Delete the
+  configuration's game objects (`find Build/Intermediate/<Config> -name '*.o' -not -path
+  '*ThirdParty*' -delete`) after adding it.
+- **`IsKeyPressed` must stay true for every query in the frame, not just the first.** `MenuList::Item`
+  asks for Enter once per row and only the selected row acts on it, so a shim that consumes the press
+  on first ask silently swallows the activation. Drive it from a per-frame tick called out of
+  `App::Run` rather than from `GetTime()`, which moves within a frame.
+- **`--smoke-test` starts in the match**, so it cannot reach the menus at all. Run the game without it
+  and script the way out (pause → Exit game) to test menu input.
+- **There is a live mouse pointer on `DISPLAY=:1` and it moves.** It hijacks `MenuList::selected`
+  through the hover path, so a scripted keyboard walk through a menu is not reproducible. Script
+  gameplay, and read menu behaviour from what the probe logs rather than from where the script
+  thought it was.

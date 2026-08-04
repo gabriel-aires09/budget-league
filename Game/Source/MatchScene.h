@@ -51,9 +51,13 @@ public:
     BotController botController;
     ChaseCamera chaseCamera;
 
-    // Watched frame to frame so the effects fire on the change, not on the state.
+    // Watched frame to frame so the effects and the audio cues fire on the
+    // change, not on the state.
     MatchState previousState = MatchState::Kickoff;
     float previousBallSpeed = 0.0f;
+    float previousCarSpeed = 0.0f;
+    float previousBoostAmount = 0.0f;
+    int previousCountdownDigit = -1;
 
     bool paused = false;
     bool settingsOpen = false;

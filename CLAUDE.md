@@ -337,10 +337,73 @@ Improve the current arena field dimensions. I want a arena simulation from rocke
 - Sideline to sideline: 7,680 Unreal Units, equivalent to approximately **76.81 meters**
 - Floor to ceiling: 2,048 Unreal Units, equivalent to approximately **20.73 meters**
 
-## Milestone 17 - Car and ball dimensions 
-Change the actual size of ball and cars simulating the rocket league game objects sizes1
-- Ball height: approximately 182 Unreal Units, equivalent to roughly **1.83 meters**
-- Cars size: lenght 118.01 Unreal units, width 84.20 Unreal Units and height 36.16 Unreal units 
+## Milestone 17 — Title Screen ("Press Any Button")
+The **first scene shown at launch**, before the main menu. A lightweight title card
+over a **live 3D view of the arena** — this is a title screen, not a marketing landing
+page. Reuses the existing arena, ball, lighting, and `uistyle` (section 2.3); imports
+no new assets except the game logo. For game logo, use `Game/Assets/Icon/budget-league-logo.png`. And for references to creation/title screen rocket-league like use `img/press-key-menu.png`
+
+**Boot flow:** `TitleScene` → `MainMenuScene` → `MatchScene`. Pressing any key, mouse
+button, or gamepad button leaves the title and goes to the main menu.
+
+**Background — live 3D (not a static image):**
+- Render the real arena (reuse the match arena + lighting) from a low, cinematic fixed
+  camera, with the **ball** (reuse `BallObject`) resting on the field in the foreground.
+- Subtle idle only: a very slow camera drift or a gentle ball spin — enough to read as
+  "alive", no gameplay.
+- Draw order: 3D scene inside BeginMode3D/EndMode3D first, then 2D overlay on top.
+
+**Overlay (2D, using `uistyle`):**
+- The **game logo**, centered (upper-middle). Cooked like the other UI textures
+  (section 3.2). For game logo use 
+- **"PRESS ANY BUTTON TO START"** below the logo, in the UI accent color, **pulsing**
+  (sine-based alpha/scale) so it draws the eye.
+- Studio credit + build string centered at the bottom (same info as the base menu).
+
+**Input:** any key (`GetKeyPressed()`), any mouse button, or any gamepad button
+(`GetGamepadButtonPressed()`) transitions to `MainMenuScene`. Optional short fade.
+
+→ verify: launch opens the title over the live low-poly arena with the ball visible;
+  the prompt text pulses; pressing any key/mouse/gamepad button goes to the main menu;
+  no gameplay happens on the title; layout stays centered and readable when the window
+  resizes.
+
+## Milestone 18 — Main Menu Showcase (Rocket League-style)
+Expands the main-menu portion of the Main Menu milestone. The first screen after
+launch is a **car showcase inside the arena**, with the menu overlaid — **reusing the
+existing MainMenuScene, the `uistyle` UI (section 2.3), the arena, and the Cars-pack
+(section 4)**. Do not build new UI or import new assets for this: only wire the
+pieces already in the game (raylib) into the showcase layout.
+
+**Background — live 3D showcase (not a static image):**
+- Render the real arena behind the menu (reuse the arena + lighting already built for
+  the match), with a single car parked on the field, shown from a 3/4 front angle.
+- The car is a **random model** picked from the Cars-pack (`Cop`, `NormalCar1`,
+  `NormalCar2`, `SportsCar`, `SportsCar2`, `SUV`, `Taxi`), tinted to a random team
+  color (blue/orange) via the diffuse material. Re-roll the pick every time the menu
+  is (re)entered.
+- Slow **turntable** rotation (a few degrees/sec) so it reads as a showcase. Fixed
+  showcase camera; subtle idle only.
+- Draw order: 3D scene first (arena + car inside BeginMode3D/EndMode3D), then the 2D
+  menu on top.
+
+**Menu (left side) — drawn with the existing `uistyle`:**
+- Vertical list using the same panel / accent / text colors as the rest of the UI:
+  **Play**, **Settings**, **Exit**. Local game — no online/shop/pass/garage/profile
+  entries.
+- The selected item is highlighted (accent bar/glow), like the reference. Works with
+  keyboard (up/down/enter) and mouse (hover/click).
+- Credits + game build in the bottom-left corner (as in the base main menu).
+
+**Explicitly removed:** the reference's **Weekly Challenges** panel is **not**
+included — no right-side challenges/quests panel at all.
+
+→ verify: launch goes straight to the showcase (no landing page); a random Cars-pack
+  car appears tinted and slowly turntabling in the arena; the left menu uses the
+  existing `uistyle` with a clear selection highlight and works via keyboard and mouse;
+  Play starts a match, Settings opens the shared settings menu, Exit quits; there is no
+  Weekly Challenges panel; re-entering the menu re-rolls the car; layout resizes
+  correctly on common laptop screens.
 
 ---
 
