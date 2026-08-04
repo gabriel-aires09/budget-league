@@ -166,7 +166,7 @@ Code lives in `Game/Source/`.
 - **GameObject.h/cpp** — Base class. Each instance represents an object in the 3D world with its own shape, logic, and physics. Specialized by the child classes in `Game/Source/GameObjects/`. Exposes `Initialize`, `Update`, `Draw`, and `GetWorldBounds` (AABB).
 
 Specializations in `Game/Source/GameObjects/`:
-- **CarObject** — The rocket car. Drives, jumps, double-jumps/flips, boosts, and has air control. Reused for both the player-controlled car and the bot (the controller decides the inputs — see 2.4). The **visual mesh comes from the low-poly `Cars-pack`** (see section 4); the physics body stays a simple box driven by arcade forces (2.5). The visual model is only attached to that box for rendering — it does not drive the simulation.
+- **CarObject** — The rocket car. Drives, jumps, double-jumps/flips, boosts, and has air control. Reused for both the player-controlled car and the bot (the controller decides the inputs — see 2.4). The **visual mesh comes from the low-poly `Cars-Pack`** (see section 4); the physics body stays a simple box driven by arcade forces (2.5). The visual model is only attached to that box for rendering — it does not drive the simulation.
 - **BallObject** — The soccer ball (a single dynamic sphere body, heavy but responsive).
 - **ArenaObject** — Static arena geometry: floor, curved/side walls, back walls, and a ceiling or high invisible bound. All collision is static.
 - **GoalObject** — A colored goal with a **trigger volume**. Fires a goal event when the ball fully crosses the goal line into the net.
@@ -329,6 +329,18 @@ Implement a simple, efficient **procedural sound** system for at least: boost (l
 
 ## Milestone 16 - UI Polish
 Improve the actual UI/UX of the game using [raygui](https://github.com/raysan5/raygui). You can use the cyber style from `raygui/styles`. Adapt the menu, Hud, settings, etc for the new design. Don't remove any feature - just organize and improve the UI/UX. 
+
+## Milestone 17 - Arena field dimensions
+Improve the current arena field dimensions. I want a arena simulation from rocket league. That measures for reference creation. There is two type of measures: real life measure using meters and engine units (Unreal Engine units)
+
+**Field Dimensions**
+- Goal line to goal line: 10,248 Unreal Units, equivalent to approximately **102.41 meters**
+- Sideline to sideline: 7,680 Unreal Units, equivalent to approximately **76.81 meters**
+- Floor to ceiling: 2,048 Unreal Units, equivalent to approximately **20.73 meters**
+
+## Milestone 18 - Car and ball dimensions 
+- Ball height: approximately 182 Unreal Units, equivalent to roughly **1.83 meters**
+- Cars size: lenght 118.01 Unreal units, width 84.20 Unreal Units and height 36.16 Unreal units 
 
 ---
 

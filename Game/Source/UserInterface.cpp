@@ -48,6 +48,19 @@ namespace uistyle
         DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, alpha));
     }
 
+    bool Button(Rectangle bounds, const char *label, bool primary)
+    {
+        bool hovered = CheckCollisionPointRec(GetMousePosition(), bounds);
+
+        DrawRectangleRec(bounds, hovered ? PanelHighlight : Panel);
+        DrawRectangleLinesEx(bounds, 2.0f * Scale(), (hovered || primary) ? Accent : Border);
+        DrawTextCentered(label, bounds.x + bounds.width * 0.5f,
+                         bounds.y + (bounds.height - FontSize(21.0f)) * 0.5f, 21.0f,
+                         (hovered || primary) ? Text : TextDim);
+
+        return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    }
+
     // Shared visuals of a menu row. Returns true when the row is the selected one.
     static bool DrawRow(MenuList &menu, Rectangle bounds, const char *label, int index)
     {

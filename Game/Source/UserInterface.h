@@ -29,6 +29,11 @@ namespace uistyle
     void DrawTextCentered(const char *text, float centerX, float y, float baseSize, Color color);
     void DrawDimmer(float alpha);
 
+    // Standalone button, for the screens that are not a vertical list. Mouse
+    // only: where one is used, the keyboard is driving something else. `primary`
+    // marks the action the screen is really about.
+    bool Button(Rectangle bounds, const char *label, bool primary);
+
     // Vertical menu driven by both keyboard and mouse. Set itemCount, call
     // Update once, then draw the rows.
     struct MenuList

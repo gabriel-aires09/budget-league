@@ -13,8 +13,8 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 07 — Boost System and Boost Pads**
 - [x] **Milestone 08 — Car Selection**
 - [x] **Milestone 09 — Jumps, Flips and Air Control**
-- [ ] **Milestone 10 — Camera Modes** — the next one; no ball-cam and no wall occlusion yet
-- [ ] **Milestone 11 — HUD** — score, clock and boost meter exist as a placeholder in `MatchScene`
+- [x] **Milestone 10 — Camera Modes**
+- [ ] **Milestone 11 — HUD** — the next one; score, clock and boost meter exist as a placeholder in `MatchScene`
 - [ ] **Milestone 12 — Bot Opponent (or Solo Practice)**
 - [ ] **Milestone 13 — Tuning Panels (Debug/Development)**
 - [ ] **Milestone 14 — Visual Polish and Effects** — lighting is done, pulled forward; shadows, bloom and effects are not
@@ -29,7 +29,8 @@ of order. Everything from the old Milestone 08 onwards shifted up by one; this d
 numbering throughout. A second new milestone, Milestone 16 — UI Polish (raygui), was added at the end
 of the list.
 
-The game opens on a main menu (Play / Settings / Exit). Play now opens the car picker — six of the
+The game opens on a main menu (Play / How to play / Settings / Exit). How to play is its own screen
+of rules and controls. Play opens the car picker — six of the
 seven cooked cars on a 2 x 3 grid of pedestals, spinning slowly in the team colour — and starting
 from there opens a real match: an enclosed
 55 x 80 m arena with side walls, back walls, a ceiling and two coloured goals; a player car driven
@@ -41,6 +42,11 @@ boosts, drawing on a 0-100 meter refilled by 18 boost pads spread across the fie
 a second press flips in whatever direction is held, and the car can be pitched, yawed and rolled in
 the air, so aerial ball touches work. Esc or P pauses, with Resume / Settings / Return to main menu
 / Exit. No opponent yet — the bot is Milestone 12.
+
+**C** toggles between the chase camera and a ball cam that sits on the far side of the car from the
+ball so both are in frame, and the camera now keeps itself inside the arena: it is clamped under the
+ceiling and ray cast against the real collision geometry, trading distance for height when a wall,
+a ramp or a corner is behind the car.
 
 Every edge of the arena is now ramped rather than square, as in Rocket League: a 5 m quarter-circle
 carries the floor up into the walls, and a 3.5 m one carries the walls into the ceiling. Driving into
@@ -219,6 +225,43 @@ starts and measures differently, **not** because anything regressed — the orig
 2.13 s on this harness too. Compare within a column, not across harnesses.
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank |
 
+Milestone 10 camera modes, measured by a temporary probe that placed the car around the arena, ran a
+second of camera frames per placement and asked Jolt — not the camera code — whether the resulting
+camera point was inside a body (removed afterwards). "Car seen" is the car's centre projected into
+the window:
+
+| Placement | Camera | Distance | In solid | Car | Ball |
+|---|---|---|---|---|---|
+| Kickoff, chase | (0.00, 3.76, 33.50) | 10.09 | no | seen | seen |
+| Kickoff, ball cam | (0.00, 4.76, 35.50) | 12.31 | no | seen | seen |
+| Ball behind the car, ball cam | (0.00, 4.76, -11.48) | 12.29 | no | seen | seen |
+| Ball 9 m up, ball cam | (0.00, 4.76, 21.50) | 12.31 | no | seen | seen |
+| Ball on top of the car, ball cam | (-1.72, 4.76, 11.37) | 12.31 | no | seen | seen |
+| Parked facing away from the +X wall | (26.07, 4.97, 0.00) | 6.49 | no | seen | seen |
+| Same, ball cam | (26.17, 6.34, 0.00) | 7.59 | no | seen | seen |
+| Inside the goal mouth | (0.00, 4.58, 43.44) | 6.88 | no | seen | seen |
+| In a corner, facing the middle | (24.04, 4.48, 37.04) | 7.04 | no | seen | seen |
+| Same, ball cam | (22.98, 5.88, 37.92) | 7.97 | no | seen | seen |
+| Up the +X ramp, facing the wall | (26.06, 8.55, 0.00) | 7.03 | no | seen | — |
+| Driving the +X wall at 8 m | (26.00, 11.40, 9.50) | 10.09 | no | seen | — |
+| Driving the ceiling at 13.8 m | (0.00, 14.20, 9.49) | 9.50 | no | seen | — |
+
+The first five rows are the point of the last eight: in open field the new clamps are inert and the
+camera sits exactly where Milestone 02 left it.
+
+| Moving check (25 m/s into the +X ramp and up the wall, 3 s) | Chase | Ball cam |
+|---|---|---|
+| Biggest camera move in one frame | 0.299 m | 0.876 m |
+| Biggest *change* in that, frame to frame | 0.035 m | 0.058 m |
+| Ever inside solid geometry | no | no |
+| Ever lost the car off screen | no | no |
+
+| Camera sensitivity | Frames to recover from an 8 m shove |
+|---|---|
+| 0.5 | 59 |
+| 1.0 | 29 |
+| 2.0 | 14 |
+
 Milestone 08 car selection, verified with the input-shim harness described at the end of this
 document (removed afterwards) plus screenshots of the scene:
 
@@ -229,6 +272,7 @@ document (removed afterwards) plus screenshots of the scene:
 | Scripted right, then down, then Enter | selection went SPORTS CAR → POLICE → COMPACT, exactly the grid arithmetic |
 | The pick reaches the match | the match then loaded `NormalCar2.evmodel`, and the screenshot shows that car |
 | Frames and labels track their car | yes, projected from each pedestal, so both rows and any window size line up |
+| Right click on a cell | scripted at the SUV cell (970, 450): the match then loaded `SUV.evmodel` |
 | Scene teardown | all six models unloaded, lit shader unloaded exactly once, exit 0 |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank |
 
@@ -238,7 +282,8 @@ document (removed afterwards) plus screenshots of the scene:
 Game/Source/
   Main.cpp, App.h/cpp          entry point, window, settings, scene switching, smoke test
   Scene.h/cpp                  camera + GameObjects + Jolt PhysicsSystem, fixed step loop
-  MainMenuScene.h/cpp          title, Play / Settings / Exit, credits and build string
+  MainMenuScene.h/cpp          title, Play / How to play / Settings / Exit, credits and build string
+  HowToPlayScene.h/cpp         the how-to-play screen: six panels of rules and controls
   CarSelectScene.h/cpp         the car picker: six cooked cars on a 2 x 3 grid of pedestals
   MatchScene.h/cpp             the gameplay scene, pause overlay, score/clock readout
   Match.h/cpp                  score, clock, kickoff/goal/full time state machine
@@ -256,7 +301,7 @@ Game/Source/
   GameObjects/ArenaObject.h/cpp floor, walls, ceiling, back walls with goal openings, edge ramps
   CarController.h              CarInput + abstract controller
   PlayerController.h/cpp       keyboard input
-  ChaseCamera.h/cpp            third person follow camera
+  ChaseCamera.h/cpp            third person follow camera, ball cam and the arena clamps
   PhysicsLayers.h/cpp          namespace physics: layers and Jolt filters
 Game/ThirdParty/   raylib, Jolt, glm, imgui     (cloned, git-ignored)
 Game/Assets/       Cars-Park/ (OBJ, FBX, Blends, License.txt, Preview.png)
@@ -279,10 +324,12 @@ make run CONFIG=Debug
 
 Controls so far: **WASD / arrows** drive and steer on the ground and pitch/yaw in the air,
 **Space** jumps (again for a double jump, or a flip if a direction is held), **Shift** boosts
-(held), **Q/E** air roll, **R** resets the car, **Esc** or **P** pauses.
+(held), **Q/E** air roll, **C** toggles chase cam and ball cam, **R** resets the car, **Esc** or
+**P** pauses.
 In menus: **up/down** or **W/S** move, **Enter**/**Space** activate, **left/right** change a value,
 and the mouse works too. In the car picker: **arrows** or **WASD** move around the grid, **Enter**
-or **Space** starts the match, **Esc** goes back to the main menu, and clicking a car picks it.
+or **Space** starts the match, **Esc** goes back to the main menu, left click picks a car and
+**right click on a car picks it and starts the match in one go**.
 
 `make clean` removes the build output. `make clean-thirdparty` additionally forces a raylib rebuild.
 The first build takes a few minutes (raylib + 153 Jolt translation units per config); after that it
@@ -644,6 +691,50 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - Light colours are constants in `Lighting.cpp` and set into the program once at load, since the
   light never moves. Milestone 13 can bind them to the ImGui panel.
 
+### Camera
+- **The ball cam is a direction, not a second camera.** It swaps the flat direction the camera sits
+  behind — the car's heading for chase, the line from the ball through the car for ball cam — and
+  slides the look point 30% of the way to the ball. Everything after that (smoothing, clamps, the
+  occlusion pull-in) is shared, so the two modes cannot drift apart.
+- **Ball cam gives way to the car's own heading over the last few metres** (`ballCamNearRange`, 7 m).
+  The car-to-ball direction spins wildly as the car arrives at the ball, which is exactly the moment
+  the player needs to see where the car is pointing. Without the blend the view whips round on
+  contact.
+- **`C` is read inside `ChaseCamera::Update`**, as CLAUDE.md 2.4 specifies. That is also why it does
+  nothing while paused: `MatchScene::Update` returns before the camera is updated.
+- **The occlusion ray starts at the car, not at the look point.** A physics body can never be inside
+  static geometry, so the car is always a valid ray origin; the look point sits `lookHeight` above the
+  car and is therefore *beyond the ceiling* whenever the car is driving on it, which would make every
+  cast report a hit at zero distance and collapse the camera onto the car.
+- **The margin belongs inside `FreeReach`, not at the call sites.** Subtracting it unconditionally —
+  including when nothing was hit — pulls the camera 0.6 m closer every frame, and because the clamped
+  position is what gets stored, it compounds: the camera settled 4 m from the car in open field.
+  Measured and fixed; the open-field rows in the table above are the regression test.
+- **When the view back is blocked the camera trades distance for height**, because up is the one
+  direction that is always open — every concave join in this arena curves away from the floor. The
+  distance lost is whatever the geometry takes, but the height is bought back on a *squared* curve, so
+  a wall a few metres behind the car barely lifts the view while a ramp right against it goes
+  overhead. Linear lift measured 6.09 m of height for a car parked 6 m from a wall, which read as a
+  top-down view in an ordinary situation.
+- **The lift has to drag the look point back to the car**, or ball cam keeps aiming a third of the way
+  to the ball while the camera climbs and the car drops out of the bottom of the frame. That was
+  measured: the corner-plus-ball-cam case lost the car until `desiredTarget` was blended back.
+- **The desired position is clamped under the ceiling *before* the occlusion test.** The unclamped
+  mark is `height` above the car, which is outside the arena whenever the car is on the ceiling, so
+  the test would read as fully blocked for the whole time the car spends up there and jam the camera
+  1.5 m away. Clamped first, the ceiling run keeps the normal 9.5 m trail.
+- **The pulled-in position is what gets stored**, so the camera eases back out as the obstruction
+  clears instead of snapping the frame the ray stops hitting.
+- **Only `physics::Arena` blocks the view.** The ball and the other car are on their own layers, so
+  something passing behind the car can never yank the camera in.
+- **`minDistance` (1.5 m) is a last resort and is the one clamp that can still put the camera in a
+  wall.** The lift is what normally keeps the pull-in from ever getting that short. Raising it back
+  towards the old 2.5 m re-introduces the clipping it was measured to cause on the ramp.
+- **`cameraSensitivity` scales the smoothing rates.** There is no mouse look for it to mean anything
+  else, and this is the one number that changes how the camera feels: 0.5 takes 59 frames to recover
+  from a shove, 2.0 takes 14. `MatchScene` copies it in every frame rather than at `Initialize`, so
+  changing it in the pause menu is felt as soon as play resumes.
+
 ### Car selection
 - **The pick lives in `GameSettings::playerCarModel`,** a model name string, even though it is not a
   row in the settings panel. That struct is the one thing every scene can already see, so it is what
@@ -679,7 +770,32 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **`Shutdown` unloads all six models**, and `StaticModelAsset::Unload` detaches the lit shader
   first — the same trap as everywhere else in this project.
 
+### How to play screen
+- **It is a scene, not an overlay on the main menu**, so it gets the whole window for six panels and
+  cannot fight the menu for the Esc key. It reaches `App` the same way every other screen does, via
+  `MenuAction::HowToPlay`.
+- **The text is data, not draw calls.** Two arrays of `Section` (a heading plus null-terminated
+  lines) are walked by one `DrawSection`, which returns the height it used so the column stacks
+  itself. Adding or removing a line cannot break the layout, which is the failure the settings panel
+  had before `PreferredHeight` was derived.
+- **Keep lines under about 45 characters.** That is what fits a 540-unit column at 720p with the
+  raylib default font; longer lines run out of the panel rather than wrapping. Continuation lines are
+  indented by hand, as in the boost section.
+- **Only ASCII.** The default font has no dashes or arrows beyond `-`, so em dashes render as boxes.
+
+### Car selection: right click
+- **Right click on a car is the whole choice in one action** — that car, and start the match — while
+  left click still only highlights, so the grid can be browsed with either button. Right clicking the
+  car that is already highlighted therefore behaves exactly like pressing START MATCH.
+- The click is collected in the same cell loop that does hover and left click, into `rightClicked`,
+  and applied after the buttons are drawn. It cannot be handled inside the loop, because `selected`
+  is what the start path reads and the buttons have not been drawn yet at that point.
+
 ### Menus
+- **`uistyle::Button` is the shared standalone button** used by the car picker and the how-to-play
+  screen. It was a file-static in `CarSelectScene.cpp` until the second screen needed one. It is
+  mouse-only on purpose: on both screens the keyboard is already driving something else (the car grid,
+  or nothing at all), and Enter/Esc are handled by the scene.
 - **`App` owns the single `GameSettings`** and hands each scene a pointer, which is what makes the
   settings shared between the main menu and the pause menu. The `SettingsMenu` *widget* is per scene
   (so each keeps its own cursor), but it edits the one shared struct.
@@ -731,8 +847,9 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - `.venv` does not exist yet; the Makefile falls back to `python3`, which is fine while the cooker
   has no dependencies. Create it before the cooker starts using Pillow/numpy:
   `python3 -m venv .venv && .venv/bin/pip install -r Tools/requirements.txt`.
-- The chase camera has no wall-occlusion handling yet (Milestone 10 / 6.2); it only clamps its own
-  height above the floor.
+- **The camera can still sit inside the goal recess**, behind the goal line, when the car is in its
+  own net. That is deliberate — it is where the view has to be — and the probe confirms it is not
+  inside solid geometry there.
 - **Rocket League also has 45-degree diagonal corner walls, which this arena does not.** The corners
   are rounded now, but the arena is still fundamentally a rectangle with rounded edges rather than an
   octagon. That is arena-shape work, not ramp work.
@@ -744,10 +861,9 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   the measured "biggest backward step 0.000 m"); keep it true for boost pads and any Milestone 14
   trim.
 - **Some settings are stored but not consumed yet**, because the systems that read them do not exist:
-  camera sensitivity (Milestone 10), bot enabled (Milestone 12), and
-  the master/SFX volumes (Milestone 15 — the audio device is not even initialised). Fullscreen,
-  resolution and the post-processing flag are the only ones with an effect today, and post-processing
-  is just a stored flag until Milestone 14.
+  bot enabled (Milestone 12) and the master/SFX volumes (Milestone 15 — the audio device is not even
+  initialised). Fullscreen, resolution, camera sensitivity and the post-processing flag are the ones
+  with an effect today, and post-processing is just a stored flag until Milestone 14.
 - **Settings live for the session only.** Nothing is written to disk; Milestone 13 introduces the
   config file, and that is the natural place to persist them. The picked car is in the same struct,
   so it is forgotten on exit along with everything else.
@@ -756,24 +872,19 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **All six previews are painted blue,** because the player is always on the blue team. If teams ever
   become selectable, `SetPaintColor` in `CarSelectScene::Initialize` is the one place to change.
 
-## Next steps — Milestone 10 (Camera Modes)
+## Next steps — Milestone 11 (HUD)
 
-1. Polish `ChaseCamera`: it currently only smooths position and target and clamps its own height.
-   Milestone 09 made the car fully aerial, so the camera now has to stay readable while the car is
-   10 m up and rotating on all three axes.
-   Note the camera passing through a wall is no longer *fatal* — the walls are glass, so the car
-   stays visible from outside — but pulling the camera in is still the better answer and belongs
-   here. Keep the glass either way; it also stops the far wall hiding play at the other end.
-2. Add the ball-cam toggle on **C**: keep the ball framed while still showing the car. The scene
-   already owns both objects, so `ChaseCamera::Update` just needs the ball position passed in.
-3. Wall occlusion is listed under 6.2 and is worth doing here rather than later: the arena is now
-   fully enclosed, so the camera can and will end up inside a wall.
-4. `GameSettings::cameraSensitivity` is stored but still unread — this is the milestone that should
-   consume it.
-5. The floor ramps are opaque and 5 m tall at the wall, so a camera sitting low outside the arena can
-   now be blocked by one where the glass wall alone used to let the car through. Pulling the camera
-   in (point 3) covers this; if it does not, the ramps can join the glass pass, but they are a
-   driving surface and should stay solid if at all possible.
+1. Move the score, the clock, the boost meter and the state banners out of `MatchScene` into
+   `HUD.h/cpp`. They are currently drawn by `DrawMatchStatus` and `DrawBoostMeter`, which were always
+   meant as placeholders — everything they draw already scales through `uistyle::Scale()`, so the move
+   is mostly relocation plus the pieces that are missing.
+2. What is missing: boost-pad state hints, a real goal celebration banner (there is a plain "GOAL!"
+   today) and a kickoff countdown treatment beyond the current number.
+3. The debug readouts in `MatchScene::Draw` — speed, GROUNDED/AIRBORNE, the camera mode and the
+   controls line — should either become part of the HUD or move behind `GAME_DEV_TOOLS`. They are not
+   shipping UI.
+4. Full time still just freezes the field with a FULL TIME banner and no rematch flow; the HUD is the
+   natural place to give it a proper end-of-match screen.
 
 The opponent car (Milestone 12) needs no new asset work: give the second `CarObject` a different
 `modelName` and the orange `teamColor` before `Initialize()` and it cooks, fits and paints itself.

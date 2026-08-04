@@ -36,23 +36,6 @@ static Vector3 CarPosition(int index)
     return Vector3{ COLUMN_X[index % CarSelectScene::COLUMNS], ROW_Y[index / CarSelectScene::COLUMNS], 0.0f };
 }
 
-// The two buttons along the bottom. Not a uistyle::MenuList: the keyboard
-// selection belongs to the grid, so these are mouse-only and Enter/Esc do the
-// same two things from anywhere on the screen.
-static bool Button(Rectangle bounds, const char *label, bool primary)
-{
-    const float scale = uistyle::Scale();
-    bool hovered = CheckCollisionPointRec(GetMousePosition(), bounds);
-
-    DrawRectangleRec(bounds, hovered ? uistyle::PanelHighlight : uistyle::Panel);
-    DrawRectangleLinesEx(bounds, 2.0f * scale, (hovered || primary) ? uistyle::Accent : uistyle::Border);
-    uistyle::DrawTextCentered(label, bounds.x + bounds.width * 0.5f,
-                              bounds.y + (bounds.height - uistyle::FontSize(21.0f)) * 0.5f, 21.0f,
-                              (hovered || primary) ? uistyle::Text : uistyle::TextDim);
-
-    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-}
-
 void CarSelectScene::Initialize()
 {
     // Above every car and tilted down, so both rows are seen from slightly above
@@ -141,6 +124,7 @@ void CarSelectScene::Draw()
     // laid out in screen space, so the frame and the label sit on their car at
     // any window size and in either row, which the camera sees from a different
     // angle.
+    int rightClicked = -1;
     for (int i = 0; i < CAR_COUNT; ++i)
     {
         Vector3 base = CarPosition(i);
@@ -159,6 +143,10 @@ void CarSelectScene::Draw()
             selected = i;
         if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
             selected = i;
+        // Right click is the whole choice in one go: that car, and start. Left
+        // click still just highlights, so the grid can be browsed either way.
+        if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
+            rightClicked = i;
 
         if (i == selected)
             DrawRectangleLinesEx(cell, 2.0f * scale, uistyle::Accent);
@@ -173,8 +161,14 @@ void CarSelectScene::Draw()
                               GetScreenHeight() - 96.0f * scale, buttonWidth, buttonHeight };
     Rectangle backButton = { centerX + buttonGap * 0.5f, startButton.y, buttonWidth, buttonHeight };
 
-    bool start = Button(startButton, "START MATCH", true);
-    bool back = Button(backButton, "BACK", false);
+    bool start = uistyle::Button(startButton, "START MATCH", true);
+    bool back = uistyle::Button(backButton, "BACK", false);
+
+    if (rightClicked >= 0)
+    {
+        selected = rightClicked;
+        start = true;
+    }
 
     if (start || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE))
     {
@@ -186,7 +180,7 @@ void CarSelectScene::Draw()
         pendingAction = MenuAction::MainMenu;
     }
 
-    uistyle::DrawTextCentered("Arrows or WASD choose - Enter starts the match - Esc goes back",
+    uistyle::DrawTextCentered("Arrows or WASD choose - Enter or right click a car starts the match - Esc goes back",
                               centerX, GetScreenHeight() - 36.0f * scale, 17.0f, uistyle::TextDim);
 }
 
