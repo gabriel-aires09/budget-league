@@ -38,7 +38,7 @@ bool App::Initialize(int argc, char **argv)
         }
     }
 
-    InitWindow(windowWidth, windowHeight, "Arcade Car Soccer");
+    InitWindow(windowWidth, windowHeight, "Budget League");
     if (!IsWindowReady())
         return false;
 
