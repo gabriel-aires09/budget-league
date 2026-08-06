@@ -25,7 +25,16 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 19 — Settings Screen (main-menu layout)**
 - [x] **Milestone 20 — Soundtrack (OST playlist)**
 
-Every milestone in CLAUDE.md is now done; what is left is the section 6 polish list.
+Final milestone (CLAUDE.md section 6), a subsection at a time:
+
+- [x] **6.1 — Handling and Feel**
+- [ ] **6.2 — Camera**
+- [ ] **6.3 — Feedback and Juice**
+- [ ] **6.4 — Bot**
+- [ ] **6.5 — Performance and Stability**
+
+Every milestone in CLAUDE.md is now done, and the section 6 polish list is under way: **6.1 Handling
+and Feel is finished** (see its own section below).
 
 Two pieces of work outside the milestone list are also done: the **asset pipeline** (FBX cooking plus
 the car models, CLAUDE.md 4.1) and the **arena ramps with wall and ceiling driving** (PROMPTS.md).
@@ -576,6 +585,73 @@ temporary probe that seeked each track to a second from its end, so a whole play
 | No audio device | the playlist is never even scanned - it is behind the same `ready` gate as the cues |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no errors in the log |
 
+Final Milestone 6.1 handling and feel, implemented on `fix/final-milestone` on 2026-08-06. Measured
+with a temporary harness that stepped the match loop directly - no rendering - and was removed
+afterwards. The README's polish list had all three items ticked already; measuring them showed two of
+the three were not actually true, which is the whole reason this pass exists.
+
+**Bumps were already right and nothing was changed for them.** A bump is a one-off angular kick, which
+is what a wheel-less box actually takes out of a glancing contact - the arena is smooth by design, so
+there is no lip to drive over. The car was kicked about its own forward axis at 25 m/s:
+
+| Roll kick | Worst lean | Back to level | Speed kept |
+|---|---|---|---|
+| 2 rad/s | 0.0 deg | 0.12 s | 32.0 m/s |
+| 4 rad/s | 4.4 deg | 0.12 s | 32.0 m/s |
+| 6 rad/s | 6.8 deg | 0.12 s | 32.0 m/s |
+| 8 rad/s | 8.9 deg | 0.12 s | 32.0 m/s |
+| 12 rad/s | 12.6 deg | 0.12 s | 32.0 m/s |
+
+The offset centre of mass and `tumbleDamping` between them mean even the hardest kick never gets near
+tipping the car, and none of them costs it any speed at all.
+
+**Flips did not work, and that is what was fixed.** Left to air control and the body's angular damping,
+a flip's spin decays at about 3 rad/s combined, so it stalled long before the rotation finished:
+
+| Flip | Half turn | Full turn | Lands upright |
+|---|---|---|---|
+| Forward, before | never | never | 2.54 s |
+| Forward, after | 0.37 s | 0.70 s | 2.23 s |
+| Backward, before | never | never | 1.25 s |
+| Backward, after | 0.38 s | 0.70 s | 2.04 s |
+| Side, before | 0.76 s | never | 0.99 s |
+| Side, after | 0.39 s | 0.70 s | 0.93 s |
+
+Traced through a forward flip after the fix, sampled every 0.1 s: the car sweeps the whole turn under
+the held spin, comes out at uprightness **+0.987 at 0.71 s**, holds exactly that for the entire 1.6 s
+descent from 6.6 m, and lands flat at 2.31 s.
+
+**The ball was left heavy but stopped being sluggish.** Only the rolling resistance moved; every hit
+number is untouched, which was the point.
+
+| Measurement | Before | After |
+|---|---|---|
+| Roll from 15 m/s | 25.4 m in 7.0 s | 31.6 m in 8.9 s |
+| Roll from 20 m/s | 35.6 m in 7.7 s | 43.7 m in 9.8 s |
+| Roll from 30 m/s | 58.2 m in 8.7 s | 69.7 m in 11.0 s |
+| Hit at 16.4 m/s | 19.6 m/s (1.19x), 13.6 m | unchanged |
+| Hit at 25.9 m/s | 29.8 m/s (1.15x), 34.2 m | unchanged |
+| Hit at 32.0 m/s | 37.8 m/s (1.18x), 50.3 m | unchanged |
+| Hit at 46.2 m/s, boosted | 52.4 m/s (1.13x), 80.2 m | unchanged |
+| Bounce apexes from 12 m | 5.61 / 3.16 / 2.11 / 1.66 m | unchanged |
+| Resting height | exactly `radius` (1.2500 m) | unchanged |
+
+**The kickoff reset now moves nothing at all.**
+
+| Check | Before | After |
+|---|---|---|
+| Car jumps returned by the reset | **no** - `jumpUsed` and `doubleJumpUsed` both stayed set | yes, both cleared |
+| Car drift over 2 s of idle play | 0.0100 m | **0.0000 m** |
+| Car peak speed over the same | 0.3839 m/s | **0.0000 m/s** |
+| Car resting height vs spawn | 0.3500 against a 0.3600 spawn | 0.3500 against a 0.3500 spawn |
+| Ball drift and peak speed | 0.0000 m, 0.0000 m/s | unchanged |
+| Car tilt | 0.00000 | unchanged |
+
+| Check | Result |
+|---|---|
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors in the log |
+| `flipDuration` on the F1 panel | yes, in `Car air` beside `flipImpulse` and `flipSpin`, mirrored onto the bot |
+
 ## Layout
 
 ```
@@ -690,6 +766,14 @@ is incremental.
   damping would also bleed speed off a ball in flight and make big hits feel weak. At the first
   guess of 0.35 a 20 m/s roll crossed 69 m of an 80 m field and took 16 s to stop; 1.2 gives 36 m
   in 7.7 s.
+- **That 1.2 was tuned against the 80 m field and Milestone 16 left it behind.** The field became
+  102.41 m long, so the same 20 m/s pass reached barely a third of the way down it and the ball read
+  as sluggish - the "heavy but never sluggish" item in CLAUDE.md 6.1. **0.85** puts the roll back at
+  the fraction of the field 1.2 was chosen for: 43.7 m instead of 35.6 m. Nothing else about the ball
+  moved, and that is deliberate - the hit transfer (1.13-1.19x), the bounce apexes and the resting
+  height all measure identically before and after, because none of them is a rolling number. Any
+  future change to the arena length should look at this value again; it is the one ball tunable that
+  is really a ratio to the size of the pitch.
 - **Ball restitution drives car-ball hits too**, because Jolt combines restitution with `max()` and
   the car's is only 0.05. So the one number controls both how lively the floor bounces are and how
   hard the ball comes off the car — they cannot be tuned separately without a contact listener.
@@ -731,6 +815,32 @@ is incremental.
   With the short probe used during the lockout the car is already 0.72 m up when it expires, past
   the 0.35 m the short probe can see, so grounded stays false. Verified: jump held for 4 s peaks at
   1.85 m, identical to before.
+- **A flip is a committed move, held for `flipDuration` rather than left to decay.** Setting the spin
+  once and handing the car back to air control does not work: `airDamping` (0.8/s) and the body's
+  `angularDamping` (2.2/s) together bleed about 3 rad/s, and measured, **no flip ever swept even half
+  a turn** - the forward and backward ones stalled part way round and dropped the car on its roof.
+  While `flipTimeRemaining` is running the angular velocity is re-set to `flipAxis * flipSpin` every
+  step and air control is skipped entirely, so `flipSpin * flipDuration` is exactly the angle swept:
+  9.0 x 0.70 is one turn.
+- **The spin is cancelled when the flip ends, not released.** This is the sharp edge in it. Letting
+  the timer expire and simply falling through to air control hands 9 rad/s back to a car that has
+  just come round to level, and it carries straight past upright: traced, the car ended a clean full
+  rotation at uprightness +0.999 and was at -0.9 a third of a second later, landing inverted every
+  time. Zeroing the angular velocity on the step the timer reaches zero is what makes the car come
+  out of a flip flat and stay flat all the way down.
+- **Landing clears `flipTimeRemaining`**, so a flip that puts a wheel back on the ground early ends
+  there rather than fighting the ground contact for the rest of its window.
+- **`CarObject::ResetTo` clears the car's transient state, not just its transform.** A reset that only
+  teleports leaves a player who spent both jumps before a goal **kicking off unable to jump at all**,
+  and carries a jump lockout or a half-finished flip through the countdown. `jumpHeldPrevious` is
+  deliberately *not* cleared: setting it false would make a jump key still held across the reset read
+  as a fresh press the instant play starts, and the car would jump on the kickoff whistle.
+- **The cars spawn at exactly `halfExtents.y`, not a hair above it.** The old 0.36 was described as
+  "half-height plus a hair so it does not visibly drop" - but a hair above the resting height *is* a
+  drop, and it is the only thing that ever moved at a kickoff: measured, 0.0100 m of fall peaking at
+  0.3839 m/s. `convexRadius` is inside the box in Jolt, so the resting height is the half extent
+  exactly, and spawning there makes two seconds of idle play after a reset move the car 0.0000 m. The
+  ball was already spawning at exactly `radius` and was already perfect.
 - **`CarInput::jump` is held, not an edge, and `CarObject` finds the rising edge itself.**
   `CarObject::Update` runs once per *fixed step* while `IsKeyPressed` stays true for a whole frame,
   so at 120 Hz an edge-triggered field would fire twice in one frame and eat the double jump
@@ -921,8 +1031,8 @@ is incremental.
   bodies and no risk of Jolt waking something. `Match::IsFrozen()` covers Kickoff and Finished;
   Celebration deliberately keeps simulating so the ball is seen going into the net.
 - Car and ball kickoff positions come from their own `spawnPosition` fields, so `Match::ResetField`
-  does not duplicate them. The car's spawn Y is 0.36 (its box half-height plus a hair) so it does
-  not visibly drop when the countdown ends.
+  does not duplicate them. The car's spawn Y is its box half extent exactly, so it does not drop at
+  all when the countdown ends - see the Milestone 6.1 note on that below.
 - **Physics runs at a fixed 120 Hz** with an accumulator (`Scene::StepPhysics`, 0.25 s clamp).
   `GameObject::Update` is called once per *fixed step*, right before the simulation runs — this
   matters because Jolt forces only persist for one step, so applying them per frame would be wrong.
@@ -1559,9 +1669,12 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 
 ## Next steps — the milestone list is finished
 
-Every milestone in CLAUDE.md section 5 is done, so what is left is the section 6 polish list, all of
-whose items are ticked in README.md, plus whatever the known-deviations list above still calls out.
-The four worth picking up first, in order of how much they would be felt:
+Every milestone in CLAUDE.md section 5 is done, and section 6 is being worked through a subsection at
+a time. **6.1 Handling and Feel is done**; 6.2 through 6.5 are next, and their README items should be
+treated the way 6.1's were - as claims to be measured rather than as work already finished, since two
+of 6.1's three ticked items turned out not to be true when a harness was pointed at them.
+
+Beyond section 6, the four worth picking up first, in order of how much they would be felt:
 
 1. **The bot never jumps** (see the bot decisions). It is the single biggest thing standing between
    the current opponent and one that feels like a player.

@@ -214,7 +214,11 @@ void CarObject::Update(float deltaTime)
             bodies.AddImpulse(bodyID, flipDirection * flipImpulse);
             // up x direction is the axis that rolls the car over that way: it
             // gives a nose-down pitch for a forward flip and a roll for a side one.
-            bodies.SetAngularVelocity(bodyID, up.Cross(flipDirection).Normalized() * flipSpin);
+            JPH::Vec3 axis = up.Cross(flipDirection).Normalized();
+            bodies.SetAngularVelocity(bodyID, axis * flipSpin);
+            // Held from here for flipDuration, so the flip actually finishes.
+            flipAxis = Vector3{ axis.GetX(), axis.GetY(), axis.GetZ() };
+            flipTimeRemaining = flipDuration;
         }
         else
         {
@@ -226,6 +230,24 @@ void CarObject::Update(float deltaTime)
 
     if (!grounded)
     {
+        // A flip is a committed move: hold its spin rather than letting air
+        // control and the body's angular damping bleed it away. Those two
+        // together decay about 3 rad/s, which stalled every flip well short of a
+        // full turn — measured, no flip ever swept even half of one.
+        if (flipTimeRemaining > 0.0f)
+        {
+            flipTimeRemaining = fmaxf(flipTimeRemaining - deltaTime, 0.0f);
+            // The rotation is over when the timer is, so the spin is cancelled
+            // rather than released: handing 9 rad/s back to a car that has just
+            // come round to level carried it straight past upright and landed it
+            // on its roof every time.
+            JPH::Vec3 spin = flipTimeRemaining > 0.0f
+                                 ? JPH::Vec3(flipAxis.x, flipAxis.y, flipAxis.z) * flipSpin
+                                 : JPH::Vec3::sZero();
+            bodies.SetAngularVelocity(bodyID, spin);
+            return;
+        }
+
         // Air control: drive the angular velocity towards the requested rate.
         // With no input the requested rate is zero and the response drops to
         // airDamping, so a flip still completes but the car settles for landing.
@@ -239,6 +261,9 @@ void CarObject::Update(float deltaTime)
         bodies.SetAngularVelocity(bodyID, angularVelocity + (desired - angularVelocity) * blend);
         return;
     }
+
+    // Landing ends a flip, whatever is left of it.
+    flipTimeRemaining = 0.0f;
 
     JPH::Vec3 angularVelocity = bodies.GetAngularVelocity(bodyID);
     float yawSpin = angularVelocity.Dot(up);
@@ -343,6 +368,19 @@ void CarObject::ResetTo(Vector3 position, float yawDegrees)
                                   JPH::Quat::sRotation(JPH::Vec3::sAxisY(), yawDegrees * DEG2RAD),
                                   JPH::EActivation::Activate);
     bodies.SetLinearAndAngularVelocity(bodyID, JPH::Vec3::sZero(), JPH::Vec3::sZero());
+
+    // The transform is only half of a reset: a car that spent both jumps before a
+    // goal was kicking off unable to jump at all, and a lockout or a half-finished
+    // flip carried straight through the countdown. jumpHeldPrevious is deliberately
+    // left alone, so a jump key still held across the reset is not read as a fresh
+    // press the moment play starts.
+    jumpUsed = false;
+    doubleJumpUsed = false;
+    jumpLockoutRemaining = 0.0f;
+    flipTimeRemaining = 0.0f;
+    boosting = false;
+    grounded = false;
+    uprightness = 1.0f;
 }
 
 float CarObject::GetForwardSpeed() const

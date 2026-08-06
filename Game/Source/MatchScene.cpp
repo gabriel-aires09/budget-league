@@ -33,7 +33,9 @@ void MatchScene::Initialize()
         goal->Initialize(*this);
     }
 
-    playerCar.spawnPosition = Vector3{ 0.0f, 0.36f, arena.length * 0.3f };
+    // Spawned at exactly the height the box rests at, not a hair above it: the
+    // old 0.36 was a 1 cm drop that every kickoff started with.
+    playerCar.spawnPosition = Vector3{ 0.0f, playerCar.halfExtents.y, arena.length * 0.3f };
     playerCar.modelName = settings->playerCarModel; // picked in CarSelectScene
     playerCar.controller = &playerController;
     playerCar.Initialize(*this);
@@ -45,7 +47,7 @@ void MatchScene::Initialize()
     {
         // SportsCar2 is the one cooked car the picker never offers, so the bot can
         // never turn up driving the same model as the player.
-        botCar.spawnPosition = Vector3{ 0.0f, 0.36f, -arena.length * 0.3f };
+        botCar.spawnPosition = Vector3{ 0.0f, botCar.halfExtents.y, -arena.length * 0.3f };
         botCar.spawnYawDegrees = 180.0f; // facing the middle, from the other end
         botCar.modelName = "SportsCar2";
         botCar.teamColor = uistyle::TeamOrange;

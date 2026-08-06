@@ -84,6 +84,11 @@ public:
     float secondJumpImpulse = 900.0f;
     float flipImpulse = 1500.0f;       // horizontal, towards whatever is held
     float flipSpin = 9.0f;             // rad/s of the flip rotation
+    // A flip holds that spin for this long instead of leaving it to air control
+    // and the body's angular damping, which together bleed about 3 rad/s and
+    // stall the rotation before it completes. flipSpin * flipDuration is the
+    // angle swept, so 9.0 * 0.70 is a whole turn.
+    float flipDuration = 0.70f;
     // Grounded is ignored for this long after a jump, otherwise the ground probe
     // still hits on the next step and instantly hands the jumps back.
     float jumpLockout = 0.15f;
@@ -105,6 +110,10 @@ public:
     bool doubleJumpUsed = false;
     bool jumpHeldPrevious = false;
     float jumpLockoutRemaining = 0.0f;
+    // While this is running the spin is held about flipAxis (world space) and air
+    // control is ignored, which is what makes a flip a committed move.
+    float flipTimeRemaining = 0.0f;
+    Vector3 flipAxis = { 0.0f, 0.0f, 0.0f };
 
     // --- Stability
     float linearDamping = 0.1f;

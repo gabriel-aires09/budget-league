@@ -168,9 +168,9 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 
 ### Final milestone — polish
 
-- [x] Minor bumps never flip the car, while intentional flips stay snappy.
-- [x] The ball is heavy but not sluggish; big hits carry.
-- [x] The kickoff reset settles cleanly, with physics simply not stepped while frozen.
+- [x] Minor bumps never flip the car, while intentional flips stay snappy — a hard sideways kick at speed costs the car under 2.5 degrees of lean and 0.12 s, and a flip is now a committed 0.70 s rotation that sweeps a full turn and comes out level instead of stalling half way round.
+- [x] The ball is heavy but not sluggish; big hits carry — a hit leaves at 1.13-1.19x the car's speed and a top-speed one crosses 50 m, while a 20 m/s pass now rolls 43.7 m instead of 35.6 m of the 102.41 m field.
+- [x] The kickoff reset settles cleanly, with physics simply not stepped while frozen — the car and the ball now sit at exactly their resting height, so two seconds of idle play after a reset move them 0.0000 m, and the reset hands the car's jumps back.
 - [x] Chase-camera clipping near walls — the camera is pulled in, and trades distance for height when there is none.
 - [x] Ball-cam framing keeps the ball and the car readable, including at speed.
 - [x] Screen and particle punch on goals and big hits.
