@@ -29,12 +29,12 @@ Final milestone (CLAUDE.md section 6), a subsection at a time:
 
 - [x] **6.1 — Handling and Feel**
 - [x] **6.2 — Camera**
-- [ ] **6.3 — Feedback and Juice**
+- [x] **6.3 — Feedback and Juice**
 - [ ] **6.4 — Bot**
 - [ ] **6.5 — Performance and Stability**
 
-Every milestone in CLAUDE.md is now done, and the section 6 polish list is under way: **6.1 Handling and Feel and 6.2 Camera
-are finished** (each has its own section below).
+Every milestone in CLAUDE.md is now done, and the section 6 polish list is under way: **6.1 Handling and Feel, 6.2 Camera and
+6.3 Feedback and Juice are finished** (each has its own section below).
 
 Two pieces of work outside the milestone list are also done: the **asset pipeline** (FBX cooking plus
 the car models, CLAUDE.md 4.1) and the **arena ramps with wall and ceiling driving** (PROMPTS.md).
@@ -778,6 +778,55 @@ at `depth - 2` made the deeper goal look worse purely because the car began furt
 |---|---|
 | Lattice or seam lines drawn across the mouth | none — see the note below |
 | Stands still clear of the deeper recess | yes, they derive from `goalDepth`; first tier now starts 2.8 m behind the net |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors or warnings in the log |
+
+Final Milestone 6.3 feedback and juice, implemented on `fix/final-milestone` on 2026-08-06. All three
+of its README items were ticked and **all three turned out to be unimplemented or half-implemented**.
+Measured with a temporary harness that forced each piece of feedback into view, screenshotted it and
+read the camera numerically (removed afterwards).
+
+**There was no screen punch at all.** Only the goal colour flash in `HUD.cpp` existed; the camera
+itself never moved on any event.
+
+| Event | Eye moved | Aim step per frame | Peak aim offset | Car off screen |
+|---|---|---|---|---|
+| Idle, before and after | 0.3235 m | 0.040 deg | 0.38 deg | 0 / 60 |
+| Big ball hit, **before** | 0.0003 m | 0.034 deg | — | 0 / 60 |
+| Big ball hit, **after** | 0.0003 m | **0.973 deg** | **0.97 deg** | 0 / 60 |
+| Goal, **before** | 0.0000 m | 0.034 deg | — | 0 / 60 |
+| Goal, **after** | **0.0000 m** | **2.503 deg** | **2.50 deg** | 0 / 60 |
+
+The "before" rows for a goal and for idle are identical to three decimals, which is the measurement
+that says the feature was simply absent.
+
+**The boost flame did not scale with anything.** `DrawBoostFlame`'s own comment claimed `strength`
+made a tapped boost look different from a held one, but the only thing ever passed was a flicker, so
+the cone was the same size at 0.15 s and at 1.5 s of hold — checked on screenshots as well as in the
+arithmetic.
+
+| Boost held | Intensity | Flame scale | Cone length | Trail per frame |
+|---|---|---|---|---|
+| Before, any hold | — | 1.00 | 2.30 m | 3 |
+| 0.05 s | 0.11 | 0.42 | **0.97 m** | 1 |
+| 0.15 s | 0.33 | 0.57 | 1.30 m | 2 |
+| 0.30 s | 0.67 | 0.78 | 1.80 m | 3 |
+| 0.45 s and beyond | 1.00 | 1.00 | **2.30 m** | 4 |
+
+**The boost pads told you ready or not-ready and nothing else.** Two different colours, but every pad
+on cooldown looked like every other one: a pad taken a moment ago and a pad about to come back were
+the same flat dark disc, so there was nothing to plan a run around. The lit disc now grows back with
+the charge, and a ready pad breathes.
+
+| Pad state | Before | After |
+|---|---|---|
+| Ready | flat bright disc | bright disc, gently pulsing |
+| Just taken (95% of cooldown left) | flat dark disc | dark seat, no light |
+| Nearly back (20% left) | **the same flat dark disc** | **dark seat with the light 80% grown back** |
+
+| Check | Result |
+|---|---|
+| Punch ever loses the car | no — 0 of 60 frames on a goal, a big hit and idle alike |
+| Punch ever moves the eye | no — 0.0000 m on a goal, by construction |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors or warnings in the log |
 
 ## Layout
@@ -1560,6 +1609,32 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   a Release screenshot.
 
 ### Effects and post-processing
+- **The screen punch rotates the aim and never moves the eye.** That is the whole reason it is safe:
+  Milestone 6.2's clipping guarantees are all statements about where the *eye* is, so a punch that
+  only moves the look-at point cannot put the camera through a wall however hard it is hit — measured
+  at 0.0000 m of eye movement on a goal. A positional shake would have had to be re-validated against
+  all fourteen 6.2 routines, and would have fought the pull-in every time it fired near a wall.
+- **The shake is two sine pairs at incommensurate rates, not random numbers.** It stays smooth at any
+  frame rate, it is reproducible between runs, and — the non-obvious one — it does not draw from
+  raylib's global random sequence, which the particle bursts and the audio cues share. Pulling from
+  it here would shift every random number they take.
+- **`ChaseCamera::Shake` takes the strongest pending punch rather than accumulating.** A scramble in
+  front of the net fires a big-hit punch several times a second; adding them would compound into
+  nausea, and the goal that follows has to still read as bigger than any of them.
+- **Strength is squared before it is applied and decays at 3.4/s**, so the punch lands hard and is out
+  of the way in about a third of a second. The goal is the only full-strength one in the game
+  (2.50 degrees of aim offset); a big hit reaches 0.97.
+- **The punch is cleared with the field on a kickoff**, next to `effects::Clear()` — the same reason
+  the particles are: everything has just been re-centred and nothing should carry over.
+- **`CarObject::boostHeldTime` is what makes the flame scale, and it is reset by `ResetTo`.** The
+  flame took a `strength` argument from the day it was written and the caller only ever passed a
+  flicker, so the documented behaviour never existed. Intensity ramps over `boostRampTime` (0.45 s)
+  and drives the cone, the ember count, their size and their life together, so a tap is a puff and a
+  held boost is a stream.
+- **The boost pad's lit disc grows back with the charge.** Ready versus not-ready was already two
+  colours; what was missing was *how far off* a pad was, which is the thing a player routes around.
+  The dark seat is always drawn underneath so the pad never vanishes from the floor, and the ready
+  pulse is what separates "full" from "nearly full" without introducing a third colour.
 - **`effects` is a dumb particle pool that decides nothing.** `MatchScene::UpdateEffects` watches the
   match and the ball and calls `Burst` on the changes it sees, exactly as it does for the HUD. Every
   effect therefore fires from a *change*, not from a state, which is why the goal burst does not
@@ -1847,10 +1922,10 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 ## Next steps — the milestone list is finished
 
 Every milestone in CLAUDE.md section 5 is done, and section 6 is being worked through a subsection at
-a time. **6.1 Handling and Feel and 6.2 Camera are done**; 6.3 through 6.5 are next, and their README items should be
-treated the way 6.1's and 6.2's were - as claims to be measured rather than as work already finished.
-Two of 6.1's three ticked items turned out not to be true when a harness was pointed at them, and so
-did both of 6.2's.
+a time. **6.1, 6.2 and 6.3 are done**; 6.4 and 6.5 are next, and their README items should be
+treated the way 6.1's, 6.2's and 6.3's were - as claims to be measured rather than as work already
+finished. Two of 6.1's three ticked items turned out not to be true when a harness was pointed at
+them, both of 6.2's did, and so did all three of 6.3's.
 
 Beyond section 6, the four worth picking up first, in order of how much they would be felt:
 

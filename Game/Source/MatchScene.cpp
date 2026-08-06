@@ -212,11 +212,13 @@ void MatchScene::UpdateEffects(float deltaTime)
             effects::Burst(ballPosition, outward, 90, 26.0f, 0.85f, team, 0.55f, 1.6f);
             effects::Burst(ballPosition, Vector3{ 0.0f, 1.0f, 0.0f }, 40, 18.0f, 1.0f,
                            Color{ 255, 255, 255, 255 }, 0.35f, 1.1f);
+            chaseCamera.Shake(1.0f); // the one full-strength punch in the game
             audio::Play(AudioCue::Goal);
         }
         else if (match.state == MatchState::Kickoff)
         {
             effects::Clear(); // the field was just re-centred; nothing should linger
+            chaseCamera.shakeStrength = 0.0f; // and neither should the goal punch
         }
         else if (match.state == MatchState::Playing)
         {
@@ -255,6 +257,10 @@ void MatchScene::UpdateEffects(float deltaTime)
         effects::Burst(ballPosition, Vector3{ 0.0f, 1.0f, 0.0f }, 8 + (int)(18.0f * punch),
                        6.0f + 10.0f * punch, 1.0f, Color{ 255, 236, 190, 255 },
                        0.18f + 0.16f * punch, 0.5f);
+        // The same punch the burst and the thump are scaled by, so all three read
+        // as one hit. Deliberately well short of the goal's: a scramble in front
+        // of the net is a lot of these in a row.
+        chaseCamera.Shake(0.18f + 0.42f * punch);
         // The harder the hit the louder and the deeper the thump.
         audio::Play(AudioCue::BallHit, 0.55f + 0.45f * punch, 1.15f - 0.3f * punch);
     }
@@ -293,15 +299,19 @@ void MatchScene::UpdateEffects(float deltaTime)
             car->jumpPending = false;
         }
 
-        // The trail: a couple of embers a frame while the boost is held, which is
-        // what makes a boosting car legible from across the arena.
+        // The trail: embers a frame while the boost is held, which is what makes a
+        // boosting car legible from across the arena. Both how many and how big
+        // ramp in with the hold, so a tap leaves a puff and a held boost a stream.
         if (car->boosting)
         {
+            const float intensity = car->BoostIntensity();
             Matrix rotation = car->GetBodyRotation();
             Vector3 exhaust = Vector3Add(car->GetBodyPosition(),
                                          Vector3Transform(Vector3{ 0.0f, 0.05f, car->halfExtents.z }, rotation));
-            effects::Burst(exhaust, Vector3Transform(Vector3{ 0.0f, 0.1f, 1.0f }, rotation), 3,
-                           4.0f, 0.5f, Color{ 255, 190, 90, 255 }, 0.28f, 0.55f);
+            effects::Burst(exhaust, Vector3Transform(Vector3{ 0.0f, 0.1f, 1.0f }, rotation),
+                           1 + (int)(3.0f * intensity), 3.0f + 2.5f * intensity, 0.5f,
+                           Color{ 255, 190, 90, 255 }, 0.16f + 0.14f * intensity,
+                           0.35f + 0.25f * intensity);
         }
     }
 }
@@ -404,9 +414,13 @@ void MatchScene::DrawEffects()
         if (car->boosting)
         {
             // Flickering, because a constant flame reads as a solid object stuck
-            // to the back of the car.
+            // to the back of the car, and scaled by how long the boost has been
+            // held. A tap gets about a third of the cone, a sustained burn all of
+            // it — before this the same full-size flame was drawn either way.
             float flicker = 0.85f + 0.15f * sinf((float)GetTime() * 42.0f);
-            effects::DrawBoostFlame(position, car->GetBodyRotation(), car->halfExtents.z, flicker);
+            float intensity = 0.35f + 0.65f * car->BoostIntensity();
+            effects::DrawBoostFlame(position, car->GetBodyRotation(), car->halfExtents.z,
+                                    flicker * intensity);
         }
     }
 

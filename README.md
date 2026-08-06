@@ -177,9 +177,9 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] The kickoff reset settles cleanly, with physics simply not stepped while frozen — the car and the ball now sit at exactly their resting height, so two seconds of idle play after a reset move them 0.0000 m, and the reset hands the car's jumps back.
 - [x] Chase-camera clipping near walls — the camera is pulled in, trades distance for height when there is none, and lifts along the surface the car is standing on rather than the world. Measured over fourteen driving routines: the eye is never inside the arena's collision and the car is never hidden behind it, where before it was for up to a quarter of the frames of a wall climb.
 - [x] Ball-cam framing keeps the ball and the car readable, including at speed — the side the camera sits on now swings round the car instead of sliding through it, so the car stays on screen for every frame of every routine and the worst single-frame camera move drops from 3.07 m to 0.53 m.
-- [x] Screen and particle punch on goals and big hits.
-- [x] Boost flame/trail — a flickering cone at the exhaust plus embers while the boost is held.
-- [x] Boost-pad glow reads ready vs cooldown.
+- [x] Screen and particle punch on goals and big hits — the view takes a short kick, 2.50 degrees on a goal and 0.97 on a big hit, scaled by how hard the ball was struck. It rotates the aim rather than moving the camera, so it can never push the view into a wall and never loses the car.
+- [x] Boost flame/trail intensity scales with boost use — a tapped boost gets a 0.97 m cone and one ember a frame, a held one the full 2.30 m and four, ramping over 0.45 s.
+- [x] Boost-pad glow reads ready vs cooldown — a ready pad breathes, and a recharging one fills its light back in as it goes, so a pad just taken and a pad about to return no longer look the same.
 - [x] Bot behaviour — it keeps its target on the flat floor, backs out when blocked and takes a reset if it is ever wedged for five seconds.
 - [x] Post-processing degrades gracefully — off in Settings costs nothing, and missing shaders log a warning and draw the scene unbloomed.
 - [x] No major errors in the log during a run.

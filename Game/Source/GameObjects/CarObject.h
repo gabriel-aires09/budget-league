@@ -5,6 +5,7 @@
 #include "CarController.h"
 #include "StaticModelAsset.h"
 
+#include <cmath>
 #include <string>
 
 // Rocket car: a single dynamic box driven by arcade forces plus a ground probe.
@@ -78,6 +79,16 @@ public:
     float boostForce = 6000.0f;
     float boostMaxSpeed = 46.0f;   // boost drives past the normal top speed
     bool boosting = false;         // for the HUD, and the flame in Milestone 13
+    // How long boost has been held without a break. The flame and the ember
+    // trail ramp in over boostRampTime, so a tap does not look like a sustained
+    // burn — which is what CLAUDE.md 6.3 asks for and what the flame did not do:
+    // it was drawn at one fixed size the whole time.
+    float boostHeldTime = 0.0f;
+    float boostRampTime = 0.45f;
+    float BoostIntensity() const
+    {
+        return boostRampTime > 0.0f ? fminf(boostHeldTime / boostRampTime, 1.0f) : 1.0f;
+    }
 
     // --- Jump, flip and air control
     float jumpImpulse = 1000.0f;       // N s along the car's own up axis

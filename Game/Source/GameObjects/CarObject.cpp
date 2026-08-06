@@ -176,6 +176,7 @@ void CarObject::Update(float deltaTime)
     // Boost is applied before the grounded gate on purpose: it is the one control
     // that has to keep working in the air, which is what Milestone 08 builds on.
     boosting = input.boost && boostAmount > 0.0f;
+    boostHeldTime = boosting ? boostHeldTime + deltaTime : 0.0f;
     if (boosting)
     {
         boostAmount = fmaxf(boostAmount - boostDrainRate * deltaTime, 0.0f);
@@ -380,6 +381,7 @@ void CarObject::ResetTo(Vector3 position, float yawDegrees)
     jumpLockoutRemaining = 0.0f;
     flipTimeRemaining = 0.0f;
     boosting = false;
+    boostHeldTime = 0.0f;
     grounded = false;
     uprightness = 1.0f;
 }

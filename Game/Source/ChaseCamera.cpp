@@ -79,6 +79,7 @@ void ChaseCamera::Initialize(Camera3D &camera, const CarObject &car)
     // outlive one, and a stale surface or ball-cam side would start it swinging.
     surfaceUp = Vector3{ 0.0f, 1.0f, 0.0f };
     ballCamActive = false;
+    shakeStrength = 0.0f;
     followDirection = FollowDirection(car, 0.0f, followDirection, flatForwardMinimum);
     Vector3 forward = followDirection;
 
@@ -91,6 +92,12 @@ void ChaseCamera::Initialize(Camera3D &camera, const CarObject &car)
     camera.up = Vector3{ 0.0f, 1.0f, 0.0f };
     camera.fovy = 60.0f;
     camera.projection = CAMERA_PERSPECTIVE;
+}
+
+void ChaseCamera::Shake(float strength)
+{
+    if (strength > shakeStrength)
+        shakeStrength = fminf(strength, 1.0f);
 }
 
 void ChaseCamera::Update(Camera3D &camera, const CarObject &car, Vector3 ballPosition, float deltaTime)
@@ -228,4 +235,35 @@ void ChaseCamera::Update(Camera3D &camera, const CarObject &car, Vector3 ballPos
 
     camera.position = position;
     camera.target = target;
+
+    // The punch, applied last and to the aim only. Two sine pairs at
+    // incommensurate rates rather than random numbers: it stays smooth at any
+    // frame rate, it is reproducible, and it does not pull from raylib's global
+    // random sequence, which the effects and the audio share.
+    if (shakeStrength > 0.0f)
+    {
+        shakeTime += deltaTime;
+        // Squared, so the punch lands hard and then gets out of the way.
+        const float amount = shakeStrength * shakeStrength * shakeAngle * DEG2RAD;
+        const float sideways = 0.6f * sinf(shakeTime * 41.0f) + 0.4f * sinf(shakeTime * 67.0f);
+        const float vertical = 0.6f * sinf(shakeTime * 53.0f) + 0.4f * sinf(shakeTime * 79.0f);
+
+        Vector3 aim = Vector3Subtract(target, position);
+        float reach = Vector3Length(aim);
+        if (reach > 0.001f)
+        {
+            Vector3 forward = Vector3Scale(aim, 1.0f / reach);
+            Vector3 right = Vector3CrossProduct(forward, Vector3{ 0.0f, 1.0f, 0.0f });
+            if (Vector3Length(right) > 0.001f)
+            {
+                right = Vector3Normalize(right);
+                Vector3 up = Vector3CrossProduct(right, forward);
+                camera.target = Vector3Add(target,
+                                           Vector3Add(Vector3Scale(right, reach * amount * sideways),
+                                                      Vector3Scale(up, reach * amount * vertical)));
+            }
+        }
+
+        shakeStrength = fmaxf(shakeStrength - shakeDecay * deltaTime, 0.0f);
+    }
 }

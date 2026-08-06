@@ -13,6 +13,9 @@ class ChaseCamera
 {
 public:
     void Initialize(Camera3D &camera, const CarObject &car);
+    // A punch on the view, 0 to 1. The strongest pending one wins rather than
+    // accumulating, so a goal during a scramble cannot stack into nausea.
+    void Shake(float strength);
     // The ball position is passed every frame, not only in ball cam, because the
     // mode can be toggled at any moment.
     void Update(Camera3D &camera, const CarObject &car, Vector3 ballPosition, float deltaTime);
@@ -70,6 +73,15 @@ public:
     // the eye out of surfaces has no floor at all, because one there is not a
     // floor but permission to sit on the far side of a wall.
     float minDistance = 1.5f;
+
+    // --- Screen punch
+    // The shake rotates the aim and never moves the eye, which is deliberate:
+    // the eye is what Milestone 6.2's clipping guarantees are about, so a punch
+    // cannot put the camera through a wall however hard it is hit.
+    float shakeAngle = 2.4f;   // degrees of aim wobble at full strength
+    float shakeDecay = 3.4f;   // strength lost per second
+    float shakeStrength = 0.0f;
+    float shakeTime = 0.0f;
 
     Vector3 position = {};
     Vector3 target = {};
