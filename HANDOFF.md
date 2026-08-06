@@ -731,6 +731,55 @@ measurable difference to anything, so `ballCamNearRange` stayed at 7 — one few
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors in the log |
 | Kickoff framing | unchanged on a screenshot, as the open-field rows predict |
 
+Fullscreen at launch and a bigger goal interior, on `fix/final-milestone` on 2026-08-06. Neither is a
+CLAUDE.md milestone; both were asked for directly.
+
+**The game now opens fullscreen.** `GameSettings::fullscreen` defaults to true and `App::Initialize`
+acts on it once, after `InitWindow`.
+
+- **The window is resized to the monitor before the toggle.** `ToggleFullscreen` keeps the current
+  window size as the fullscreen resolution, so without the `SetWindowSize` the game would fill the
+  screen with a stretched 1280x720 image. Verified: `fullscreen=1 size=2560x1080` on this monitor.
+- **It is `ToggleFullscreen`, not `ToggleBorderlessWindowed`.** `SettingsMenu::ApplyGraphics` compares
+  the setting against `IsWindowFullscreen()`, which only knows about the former; using the borderless
+  variant would leave the panel's Fullscreen row reading "Yes" over a window the API calls windowed,
+  and the first toggle would then fight it.
+- **The smoke test deliberately stays windowed.** It exists to render a fixed 1280x720 frame and write
+  it out, and its screenshots are compared across configurations — going fullscreen would make them
+  whatever size the machine running them happens to be. Verified: 0 fullscreen transitions under
+  `--smoke-test`, and the screenshots are still 1280x720.
+- `App::windowWidth/windowHeight` still exist and are still what a windowed launch gets, so turning
+  Fullscreen off in Settings lands on the same 1280x720 it always did.
+
+**The goal interiors were far too small to drive into**, and are now the Rocket League reference goal
+in the same 100 uu = 1 m the field already uses (Milestone 16): 1786 x 642.775 x 880 uu.
+
+| | Before | After |
+|---|---|---|
+| Interior, w x h x d | 14.00 x 5.00 x 4.00 m | **17.86 x 6.43 x 8.80 m** |
+| Depth in car lengths | 1.25 | **2.75** |
+| Depth against the car's 3.62 m rotation diameter | 1.10x — no usable margin | **2.43x** |
+| Driving in at speed, deepest point reached | 2.55 m past the line | **7.40 m** |
+| Car stayed flat on the way in | yes | yes |
+| Reversing back out | 0.64 s | 0.91 s |
+
+The rotation diameter is the row that explains the complaint: a 1.7 x 3.2 m box needs 3.62 m of
+clear space to turn on the spot, and the old recess was 4.00 m deep. Measured with a temporary
+harness that drove a car in and back out at both sizes (removed afterwards).
+
+Two things about that harness are worth keeping, because both cost a run. **A car cannot turn round
+on the spot in either goal, and that is the steering model rather than the goal**: steering authority
+ramps in with speed (`steerSpeedFloor`), so a stationary car nosed into the back of a net has no yaw
+rate at all — the same fact `BotController` handles by reversing. The escape test therefore has to
+reverse, as a player does. And **the two sizes have to be tested from the same depth**: starting each
+at `depth - 2` made the deeper goal look worse purely because the car began further in.
+
+| Check | Result |
+|---|---|
+| Lattice or seam lines drawn across the mouth | none — see the note below |
+| Stands still clear of the deeper recess | yes, they derive from `goalDepth`; first tier now starts 2.8 m behind the net |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors or warnings in the log |
+
 ## Layout
 
 ```
@@ -1084,8 +1133,13 @@ is incremental.
   bright line along the top of every ramp (`y = floorRampRadius`) plus faint vertical mullions every
   5 m up the flat part of each wall, matching the field grid spacing. Pushing the walls' alpha up
   would read too, but at the cost of the see-through the chase camera depends on — lines cost
-  nothing and keep both. The back-wall seam is split around the goal mouth, which works out
-  because `goalHeight` and `floorRampRadius` are both 5.0, so no mullion ever crosses the opening.
+  nothing and keep both. The back-wall seam **used** to work out for free
+  because `goalHeight` and `floorRampRadius` were both 5.0, so nothing ever crossed the opening. The
+  goal is taller than the ramp now, so `DrawGlassWalls` skips the mouth explicitly: any seam or
+  lattice segment that overlaps it in X while any part of it sits below `goalHeight` is left out, and
+  the seam is carried across the top of the mouth instead so the ramp line stays continuous. Glass
+  never writes depth, so being "behind" the opening would not have hidden them — they had to be not
+  drawn at all.
 - **The two trim strips along the base of the side walls were removed.** The floor ramp now occupies
   that space and they were left buried inside it.
 - **The field markings are drawn to the flat area, not to the field bounds.** Past the ramp toe they

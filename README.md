@@ -7,8 +7,8 @@ maths and [Dear ImGui](https://github.com/ocornut/imgui) for the in-engine tunin
 
 ## The game
 
-Pick one of six low-poly cars, then kick off in a 76.81 x 102.41 m glass-walled arena with a
-20.73 m ceiling. Drive, boost, jump,
+The game opens fullscreen. Pick one of six low-poly cars, then kick off in a 76.81 x 102.41 m
+glass-walled arena with a 20.73 m ceiling and Rocket League's own goal, 17.86 x 6.43 x 8.80 m. Drive, boost, jump,
 double-jump, flip and fly: every edge of the arena is ramped like Rocket League, so you can carry a
 wall and, with enough boost, cross the ceiling. Put the heavy-but-bouncy ball fully across the
 opponent's goal line to score. The match runs on a clock, a goal resets the field with a kickoff
@@ -106,6 +106,10 @@ raylib rebuild.
 
 Each configuration lands in `Build/<Config>/` next to an `assets/` folder of cooked models, textures
 and shaders, written by `Tools/AssetCooker.py` as part of the build.
+
+The game opens fullscreen at the monitor's own resolution; **Fullscreen** in Settings turns it back
+into a 1280x720 window. `--smoke-test` always runs windowed, so its screenshots are the same size on
+every machine.
 
 | Configuration | Debug symbols | ImGui tuning tools | Optimisation |
 |---|:---:|:---:|---|
