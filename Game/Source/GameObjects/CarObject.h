@@ -140,6 +140,10 @@ public:
     // -1 inverted relative to it. On the floor that is the world up, on a wall it
     // is the wall's normal, which is what lets the same test work everywhere.
     float uprightness = 1.0f;
+    // The surface that alignment is measured against: the normal under the car
+    // when grounded, world up otherwise. ChaseCamera offsets along it, so the
+    // view goes out from a wall instead of climbing it.
+    Vector3 surfaceNormal = { 0.0f, 1.0f, 0.0f };
 
     StaticModelAsset carModel;
     // Fitted in Initialize() so the model always matches the collision box.

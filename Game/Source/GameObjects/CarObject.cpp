@@ -117,7 +117,7 @@ void CarObject::Update(float deltaTime)
     // jumpLockout, so a probe reaching 0.75 m would still find the floor as the
     // lockout expired, hand the jumps straight back, and let the car jump forever
     // — the exact bug jumpLockout exists to stop.
-    JPH::Vec3 surfaceNormal = worldUp;
+    JPH::Vec3 groundNormal = worldUp;
     const bool stickyGround = grounded && jumpLockoutRemaining <= 0.0f;
     JPH::RRayCast groundRay(position, -up * (halfExtents.y + (stickyGround ? groundStickyProbe : groundProbe)));
     grounded = scene->physicsSystem.GetNarrowPhaseQuery().CastRay(groundRay, hit, broadPhaseFilter,
@@ -127,7 +127,7 @@ void CarObject::Update(float deltaTime)
         JPH::BodyLockRead surfaceLock(scene->physicsSystem.GetBodyLockInterface(), hit.mBodyID);
         if (surfaceLock.Succeeded())
         {
-            surfaceNormal = surfaceLock.GetBody().GetWorldSpaceSurfaceNormal(
+            groundNormal = surfaceLock.GetBody().GetWorldSpaceSurfaceNormal(
                 hit.mSubShapeID2, groundRay.GetPointOnRay(hit.mFraction));
         }
     }
@@ -146,8 +146,9 @@ void CarObject::Update(float deltaTime)
 
     // Standing on a surface, align to that surface; otherwise fall back to the
     // world, so a car being recovered off its roof still comes back level.
-    const JPH::Vec3 alignTo = grounded ? surfaceNormal : worldUp;
+    const JPH::Vec3 alignTo = grounded ? groundNormal : worldUp;
     uprightness = up.Dot(alignTo);
+    surfaceNormal = Vector3{ alignTo.GetX(), alignTo.GetY(), alignTo.GetZ() };
 
     // Self-righting torque, so a bad landing or a hard bump never leaves the car stuck.
     // The axis is normalised on purpose: its raw length is sin(tilt), which vanishes
@@ -284,9 +285,9 @@ void CarObject::Update(float deltaTime)
     // straight off. Scaled by how far the surface has tilted past level, which is
     // 0 on the floor (so ground handling is bit-for-bit what it was), half on a
     // wall, and full upside down — where it has to beat gravity to work at all.
-    float stickFraction = (1.0f - surfaceNormal.Dot(worldUp)) * 0.5f;
+    float stickFraction = (1.0f - groundNormal.Dot(worldUp)) * 0.5f;
     if (stickFraction > 0.0f)
-        bodies.AddForce(bodyID, -surfaceNormal * (surfaceStick * stickFraction * mass));
+        bodies.AddForce(bodyID, -groundNormal * (surfaceStick * stickFraction * mass));
 
     float forwardSpeed = velocity.Dot(forward);
 

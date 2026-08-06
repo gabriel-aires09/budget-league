@@ -171,8 +171,8 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] Minor bumps never flip the car, while intentional flips stay snappy — a hard sideways kick at speed costs the car under 2.5 degrees of lean and 0.12 s, and a flip is now a committed 0.70 s rotation that sweeps a full turn and comes out level instead of stalling half way round.
 - [x] The ball is heavy but not sluggish; big hits carry — a hit leaves at 1.13-1.19x the car's speed and a top-speed one crosses 50 m, while a 20 m/s pass now rolls 43.7 m instead of 35.6 m of the 102.41 m field.
 - [x] The kickoff reset settles cleanly, with physics simply not stepped while frozen — the car and the ball now sit at exactly their resting height, so two seconds of idle play after a reset move them 0.0000 m, and the reset hands the car's jumps back.
-- [x] Chase-camera clipping near walls — the camera is pulled in, and trades distance for height when there is none.
-- [x] Ball-cam framing keeps the ball and the car readable, including at speed.
+- [x] Chase-camera clipping near walls — the camera is pulled in, trades distance for height when there is none, and lifts along the surface the car is standing on rather than the world. Measured over fourteen driving routines: the eye is never inside the arena's collision and the car is never hidden behind it, where before it was for up to a quarter of the frames of a wall climb.
+- [x] Ball-cam framing keeps the ball and the car readable, including at speed — the side the camera sits on now swings round the car instead of sliding through it, so the car stays on screen for every frame of every routine and the worst single-frame camera move drops from 3.07 m to 0.53 m.
 - [x] Screen and particle punch on goals and big hits.
 - [x] Boost flame/trail — a flickering cone at the exhaust plus embers while the boost is held.
 - [x] Boost-pad glow reads ready vs cooldown.

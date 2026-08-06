@@ -28,13 +28,13 @@ Project state for whoever continues the work. Update this file whenever the proj
 Final milestone (CLAUDE.md section 6), a subsection at a time:
 
 - [x] **6.1 — Handling and Feel**
-- [ ] **6.2 — Camera**
+- [x] **6.2 — Camera**
 - [ ] **6.3 — Feedback and Juice**
 - [ ] **6.4 — Bot**
 - [ ] **6.5 — Performance and Stability**
 
-Every milestone in CLAUDE.md is now done, and the section 6 polish list is under way: **6.1 Handling
-and Feel is finished** (see its own section below).
+Every milestone in CLAUDE.md is now done, and the section 6 polish list is under way: **6.1 Handling and Feel and 6.2 Camera
+are finished** (each has its own section below).
 
 Two pieces of work outside the milestone list are also done: the **asset pipeline** (FBX cooking plus
 the car models, CLAUDE.md 4.1) and the **arena ramps with wall and ceiling driving** (PROMPTS.md).
@@ -651,6 +651,85 @@ number is untouched, which was the point.
 |---|---|
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors in the log |
 | `flipDuration` on the F1 panel | yes, in `Car air` beside `flipImpulse` and `flipSpin`, mirrored onto the bot |
+
+Final Milestone 6.2 camera, implemented on `fix/final-milestone` on 2026-08-06. Measured with a
+temporary harness that ran the **real** `ChaseCamera` over scripted driving and then judged the
+result by asking Jolt and the projection directly — never by asking the camera about itself
+(removed afterwards). Every routine reports: whether the eye was inside static geometry
+(`CollidePoint`), whether anything solid sat within a 0.25 m bubble of it (`CollideShape`), whether
+arena geometry stood between the eye and the car, whether the car / ball / attacked goal projected
+inside the window, the biggest camera move in a frame and the biggest change in that.
+
+Milestone 10 had already verified the camera at a set of *static* placements, which is why the
+defects below survived: they only appear while something is moving.
+
+**Clipping, before and after.** Zeros in every column are the after; the numbers are the before.
+
+| Routine | inSolid | nearClip | car hidden | car off screen | worst jump | worst jerk | min clearance |
+|---|---|---|---|---|---|---|---|
+| open field, straight | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 | 0.529 → 0.529 | 0.030 → 0.030 | 3.75 → 3.75 |
+| open field, hard turn | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 | 0.529 → 0.529 | 0.095 → 0.095 | 3.70 → 3.70 |
+| into the +X side wall | **33 → 0** | 73 → 0 | 33 → 0 | 58 → 0 | 1.406 → 0.735 | 0.984 → 0.574 | 0.00 → 3.45 |
+| into the -X side wall | **61 → 0** | 76 → 0 | 61 → 0 | 61 → 0 | 1.348 → 0.723 | 0.777 → 0.540 | 0.00 → 0.79 |
+| into the +Z back wall | **26 → 0** | 58 → 0 | 26 → 0 | 41 → 0 | 1.312 → 0.748 | 1.036 → 0.598 | 0.00 → 1.32 |
+| into the -Z back wall | **41 → 0** | 58 → 0 | 41 → 0 | 0 → 0 | 1.320 → 0.738 | 0.891 → 0.637 | 0.17 → 0.92 |
+| boosted up the +X wall | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 | 0.746 → 0.748 | 0.074 → 0.075 | 3.75 → 1.65 |
+| into each of the 4 corners | 0 → 0 | 43-68 → 0 | 0 → 0 | 0 → 0 | 1.53 → 0.85 | 1.02 → 0.36 | 0.00 → 0.61 |
+| into the +Z / -Z net | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 | 0.53 → 0.59 | 0.06 → 0.06 | 3.74 → 0.61 |
+| hugging the +X wall | **28 → 0** | 92 → 0 | 28 → 0 | 53 → 0 | 0.764 → 0.678 | 0.550 → 0.212 | 0.00 → 0.34 |
+
+The first two rows are the point of the other twelve: in open field every clamp is inert and the
+numbers are identical to the digit, so the flat-ground framing Milestone 02 tuned is untouched.
+
+**Ball cam, before and after.** Two routines were added while measuring, because the original "high
+ball" case turned out to be two different failures wearing one hat — a ball the car *trails* and a
+ball the car *overtakes* — and only splitting them showed that both failed for the same reason.
+
+| Routine | car off screen | longest run | ball off screen | worst jump | worst jerk |
+|---|---|---|---|---|---|
+| ball cam, slow chase | 0 → 0 | 0 → 0 | 0 → 0 | 0.533 → 0.622 | 0.034 → 0.041 |
+| ball cam, fast chase | 0 → 0 | 0 → 0 | 0 → 0 | 0.534 → 0.533 | 0.066 → 0.066 |
+| ball cam, boosted chase | 0 → 0 | 0 → 0 | **7 → 0** | **1.738 → 0.767** | **1.458 → 0.089** |
+| ball cam, high ball trailed | **21 → 0** | 12 → 0 | 2 → 0 | **3.067 → 0.534** | **2.533 → 0.066** |
+| ball cam, high ball overtaken | **33 → 0** | 20 → 0 | 6 → 66 | **3.035 → 0.534** | **2.535 → 0.059** |
+| ball cam, ball off to the side | 0 → 0 | 0 → 0 | **32 → 0** | 0.893 → 0.862 | 0.115 → 0.062 |
+| ball cam, arriving at the ball | 0 → 0 | 0 → 0 | 0 → 8 | **1.741 → 1.698** | **1.442 → 0.166** |
+| chase cam, same fast chase | 0 → 0 | 0 → 0 | 0 → 0 | 0.534 → 0.534 | 0.065 → 0.065 |
+
+**The car is now on screen for every frame of every routine in both tables**, and the worst
+single-frame camera move across the whole ball-cam set fell from 3.07 m to 0.53 m outside the one
+arrival case.
+
+The one row that went backwards is deliberate and is the trade the turn rate buys: driving *past*
+the ball at 32 m/s and continuing away from it now costs 66 frames with the ball out of shot,
+where before it cost 20 unbroken frames with the **car** out of shot while the view slid across at
+3 m per frame. Losing sight of a ball you have chosen to drive away from is ordinary; having the
+car ripped out from under you is not.
+
+The turn rate was swept rather than guessed:
+
+| `ballCamTurnRate` | car off screen, overtake | longest run | ball off, arriving | goal off, arriving |
+|---|---|---|---|---|
+| 1.5 | 0 | 0 | 73 | 106 |
+| 2.5 | 0 | 0 | 11 | 49 |
+| **4.0** | **0** | **0** | **8** | **28** |
+| 6.0 | 4 | 4 | 4 | 16 |
+| 9.0 | **38** | **36** | 0 | 6 |
+
+4.0 is the last value that never loses the car at all; by 9.0 the swing is throwing the view around
+again, which is the thing being fixed.
+
+Two candidate changes were measured and **rejected**, which is worth recording so they are not tried
+again. A `ballCamRangeStretch` that pulled the camera back as the car and ball separated made
+"ball off to the side" strictly worse (ball off screen 0 → 24-31) and did not fix the high ball at
+all (car off screen 35 → 23, still bad), so it was taken back out. Raising `ballCamNearRange` from
+7 to 12 fixed the boosted-chase snap on its own, but once the direction rotation went in it made no
+measurable difference to anything, so `ballCamNearRange` stayed at 7 — one fewer value moved.
+
+| Check | Result |
+|---|---|
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors in the log |
+| Kickoff framing | unchanged on a screenshot, as the open-field rows predict |
 
 ## Layout
 
@@ -1284,9 +1363,53 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   clears instead of snapping the frame the ray stops hitting.
 - **Only `physics::Arena` blocks the view.** The ball and the other car are on their own layers, so
   something passing behind the car can never yank the camera in.
-- **`minDistance` (1.5 m) is a last resort and is the one clamp that can still put the camera in a
-  wall.** The lift is what normally keeps the pull-in from ever getting that short. Raising it back
-  towards the old 2.5 m re-introduces the clipping it was measured to cause on the ramp.
+- **`minDistance` (1.5 m) used to be the one clamp that could still put the camera in a wall, and
+  Milestone 6.2 took that away from it.** It sat on the *final* clamp, where `clear < minDistance`
+  meant "sit at 1.5 m" whether or not there were 1.5 m to sit in — so along a blocked line it did
+  not floor the pull-in, it authorised the eye to cross a surface. Measured, that put the camera
+  inside the arena's own collision for **11-25% of the frames** of every wall-contact routine, with
+  the car hidden behind geometry for exactly the same frames. It now floors the *desired* position
+  instead, which is what it was always described as doing, and the final clamp has no floor at all:
+  the surface is the only thing that decides. Raising it back towards the old 2.5 m still
+  re-introduces the ramp clipping it was measured to cause, so leave it at 1.5.
+- **The final clamp keeps the full `wallMargin` when the gap can pay for it and half the gap when it
+  cannot** (`max(solid - wallMargin, solid * 0.5)`). Both branches are strictly inside the free
+  space, which is the property the old floor lacked; taking `solid - wallMargin` alone would go
+  negative whenever the surface was closer than the margin.
+- **`SolidReach` reports the raw distance plus a `blocked` flag rather than folding the margin in.**
+  Only one of its two callers wants the margin, and the original note still applies to that one:
+  subtracting it when nothing was hit creeps the camera in every frame and compounds, because the
+  clamped position is what gets stored.
+- **The camera lifts along the surface the car is standing on, not along the world.** `CarObject`
+  already computes that normal every step for its own driving (`alignTo`); 6.2 stores it as
+  `CarObject::surfaceNormal` and `ChaseCamera` smooths a copy of it into `surfaceUp`. On the flat
+  floor the two vectors are identical, so nothing about ordinary framing changes — verified, the
+  open-field rows match to the digit. On a wall it is what stops the camera climbing the wall
+  alongside the car: a car that stalls high on one sits in the ceiling fillet, and a world-up offset
+  drove the view straight into it, collapsing the trail to 0.37 m and holding the car off screen for
+  the rest of the run.
+- **`surfaceUp` is smoothed at 3/s, slower than the position at 7/s.** The normal under the car can
+  flick between facets on a ramp, and an unsmoothed lift would hand that straight to the framing.
+- **A car on a wall or the ceiling has no usable flat forward, and normalising what is left of one
+  is a bug, not a fallback.** `FollowDirection` flattened the car's nose to XZ and normalised
+  whatever remained; on a vertical wall that is a vector a couple of centimetres long whose
+  *direction* is numerical noise, and it swung the camera through a half circle between frames. It
+  now keeps the last usable direction below `flatForwardMinimum` (0.25). The old guard was 0.001,
+  which is far too small to catch this — by the time the vector is that short the direction has been
+  meaningless for a long while.
+- **Ball cam rotates the side it sits on rather than interpolating its position, and that is the
+  single biggest fix in 6.2.** The direction can genuinely reverse: the moment the car overtakes the
+  ball, the ball is behind it and the view belongs on the other side. Smoothing the camera's
+  *position* between those two sides draws a straight line, and that line runs through the car —
+  measured, the view crossed at 3.07 m a frame and the car was off screen for 20 unbroken frames.
+  Rotating the direction instead swings the camera round the car at its own distance and never
+  crosses it. It applies in ball cam only: chase mode's direction follows the car's heading, which
+  cannot reverse, so chase framing is left exactly as it was.
+- **`ballCamActive` seeds the rotation instead of smoothing it on the first frame in ball cam**, so
+  pressing `C` never starts a swing from a direction the camera was never actually at.
+- **The near-range handover is a smoothstep, not the raw ratio.** A linear weight changes the follow
+  direction fastest exactly as the ball crosses the car, which is the worst possible moment for it;
+  smoothstep is flat at both ends.
 - **`cameraSensitivity` scales the smoothing rates.** There is no mouse look for it to mean anything
   else, and this is the one number that changes how the camera feels: 0.5 takes 59 frames to recover
   from a shove, 2.0 takes 14. `MatchScene` copies it in every frame rather than at `Initialize`, so
@@ -1670,9 +1793,10 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 ## Next steps — the milestone list is finished
 
 Every milestone in CLAUDE.md section 5 is done, and section 6 is being worked through a subsection at
-a time. **6.1 Handling and Feel is done**; 6.2 through 6.5 are next, and their README items should be
-treated the way 6.1's were - as claims to be measured rather than as work already finished, since two
-of 6.1's three ticked items turned out not to be true when a harness was pointed at them.
+a time. **6.1 Handling and Feel and 6.2 Camera are done**; 6.3 through 6.5 are next, and their README items should be
+treated the way 6.1's and 6.2's were - as claims to be measured rather than as work already finished.
+Two of 6.1's three ticked items turned out not to be true when a harness was pointed at them, and so
+did both of 6.2's.
 
 Beyond section 6, the four worth picking up first, in order of how much they would be felt:
 
