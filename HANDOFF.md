@@ -30,11 +30,11 @@ Final milestone (CLAUDE.md section 6), a subsection at a time:
 - [x] **6.1 — Handling and Feel**
 - [x] **6.2 — Camera**
 - [x] **6.3 — Feedback and Juice**
-- [ ] **6.4 — Bot**
+- [x] **6.4 — Bot**
 - [ ] **6.5 — Performance and Stability**
 
-Every milestone in CLAUDE.md is now done, and the section 6 polish list is under way: **6.1 Handling and Feel, 6.2 Camera and
-6.3 Feedback and Juice are finished** (each has its own section below).
+Every milestone in CLAUDE.md is now done, and the section 6 polish list is under way: **6.1 Handling and Feel, 6.2 Camera,
+6.3 Feedback and Juice and 6.4 Bot are finished** (each has its own section below).
 
 Two pieces of work outside the milestone list are also done: the **asset pipeline** (FBX cooking plus
 the car models, CLAUDE.md 4.1) and the **arena ramps with wall and ceiling driving** (PROMPTS.md).
@@ -827,6 +827,74 @@ the charge, and a ready pad breathes.
 |---|---|
 | Punch ever loses the car | no — 0 of 60 frames on a goal, a big hit and idle alike |
 | Punch ever moves the eye | no — 0.0000 m on a goal, by construction |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors or warnings in the log |
+
+Final Milestone 6.4 bot, implemented on `fix/final-milestone` on 2026-08-06. Measured with a temporary
+harness that played whole matches with no rendering at all - the match state machine and the physics,
+stepped directly - and with a provoked test that deliberately wedged the bot (both removed
+afterwards). **Milestone 12's bot numbers were all stale**: the field, the ball's rolling damping and
+the goals have all changed since, so everything below was re-measured from scratch.
+
+**Getting stuck was already solved, and nothing was changed for it.** Eight deliberate wedges, ten
+seconds each:
+
+| Provocation | Free and driving in | Resets | Ended up |
+|---|---|---|---|
+| Nose into the +X wall | 0.37 s | 0 | 39 m away |
+| Nose into the -X wall | 0.33 s | 0 | 37 m away |
+| Nose into its own back wall | 0.12 s | 0 | 13 m away |
+| Nose into the +X-Z corner | 0.34 s | 0 | 68 m away |
+| Nose into the -X+Z corner | 0.34 s | 0 | 11 m away |
+| Deep inside its own net | 0.12 s | 0 | 12 m away |
+| Deep inside the far net | 0.32 s | 0 | 42 m away |
+| Upside down at midfield | 1.29 s | 0 | 6 m away |
+
+**The failure was that the bot only ever scored from the kickoff.** Every goal in every match -
+52 of 52 against an idle opponent, 54 of 54 against a goalie, 6 of 6 against a mirror of itself -
+landed within 6 s of the field going live, at an average of 3.1 to 3.3 s. In the mirror match that
+left **199 seconds of contested open play that produced three shots on target and no goals at all**.
+That is the "not trivial" half of CLAUDE.md 6.4 failing: survive the kickoff and the bot has nothing.
+
+The cause is that it always drove at the ball, including when the ball was already past it in its own
+half — which is also the over-commitment the milestone names. Two cars shoving the same ball from
+opposite sides move it nowhere: the ball was under 3 m/s for 35% of open play. **The car that is out
+of position backing off is what gives either of them a clean run at it.**
+
+The fix is one branch: in its own half, if the ball is already past it and further away than
+`recoverMinRange`, it drives to a point in front of its own goal instead of at the ball, and picks
+the attack straight back up as soon as it is goal-side again.
+
+**A mirror match cannot measure this and it was a mistake to try.** Two identical agents are a chaotic
+system: the same parameter measured 6-9, then 11-6, then 47-52 across runs that differed only in
+rounding. Everything below is instead **six decorrelated three-minute matches against a fixed
+opponent — the bot exactly as it was before this change** — with the kickoff nudged sideways per run
+so the matches are genuinely independent.
+
+| Bot under test | Goals | Of those, open play | Conceded | Goal difference | Shots | Worst stall | Resets |
+|---|---|---|---|---|---|---|---|
+| **Before** (always chases) | 3.2 | 1.0 | 4.3 | **-1.1** | 1.7 | 1.58 s | 0 |
+| **After** (recovers goal-side) | **6.8** | **2.0** | 6.0 | **+0.8** | 1.8 | **1.33 s** | 0 |
+
+It went from losing to the old bot to beating it, doubled its open-play goals, and got *less* prone
+to stalling while doing it. It is still beatable: it never jumps, never goes for an aerial, reads the
+ball 0.25 s ahead and keeps a boost reserve, all of which are unchanged.
+
+Both new numbers were swept against that same fixed opponent rather than guessed:
+
+| `defendStandOff` | Goals | Open play | Goal difference | Worst stall |
+|---|---|---|---|---|
+| 8 m | 5.5 | 1.2 | -1.2 | 1.93 s |
+| **12 m** | **6.8** | **2.0** | **+0.8** | **1.33 s** |
+| 18 m | 2.3 | 1.5 | -0.9 | 3.78 s |
+
+| `recoverMinRange` | Goals | Open play | Goal difference | Worst stall | Resets |
+|---|---|---|---|---|---|
+| 0 m (never contest) | 5.0 | 1.5 | 0.0 | 1.93 s | 0 |
+| **8 m** | **6.8** | **2.0** | **+0.8** | **1.33 s** | **0** |
+| 14 m | 4.7 | 1.5 | -0.5 | 5.11 s | 1 |
+
+| Check | Result |
+|---|---|
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors or warnings in the log |
 
 ## Layout
@@ -1800,6 +1868,30 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   makes it overshoot the ball.
 - **It never jumps.** Nothing in the milestone needs it, and a bot that flips has to recover from
   landing on its roof. It is the single biggest thing to add if it is ever wanted to be sharper.
+- **It gives up a chase it has already lost, and that is what stopped it being a kickoff-only bot.**
+  Before Milestone 6.4 it drove at the ball unconditionally, including when the ball was past it in
+  its own half — a chase it cannot win, run while its own net stands open. Measured, *every* goal it
+  ever scored came within 6 s of a kickoff and 199 s of contested open play produced three shots and
+  no goals. The recovery is one branch and it is a recovery, not a mode: the moment it is goal-side
+  again it attacks.
+- **`recoverMinRange` (8 m) is what keeps the recovery from being cowardice.** Inside it the bot plays
+  the ball whatever the geometry says, because it is close enough to contest and turning away is the
+  worse mistake. At 0 it never contests and the goal difference falls to zero; at 14 m it abandons
+  balls it could have reached and produced a 5.11 s stall and a reset — the only reset in the whole
+  sweep.
+- **A hysteresis margin on "goal side" was built, measured and removed.** The idea was to stop it
+  flip-flopping when the car and the ball are level. Every value tried made it worse (at 3 m the goal
+  difference went to -2.9 and open-play goals to 0.7), and its best value was zero, so it is not
+  shipped as a knob that does nothing.
+- **The bot must never be tuned against a mirror of itself.** Two identical agents are chaotic: the
+  same build measured 6-9, 11-6 and 47-52 across runs differing only in rounding. Every number in the
+  6.4 section comes from six decorrelated matches against a *fixed* opponent — the previous bot — with
+  the kickoff nudged sideways per run. Use that shape of experiment for any future bot work.
+- **The provoked wall test gets slower with the recovery, and that is the recovery working.** Nose
+  into a side wall with the ball deep in its own half now takes 1.95 s to get back up to speed rather
+  than 0.39 s, because the bot is turning towards its own goal instead of towards the ball. With the
+  ball up the pitch the same wedge still frees in 0.37 s, and in real matches the worst stall actually
+  *fell* from 1.58 s to 1.33 s. It is a different target, not a stall.
 
 ### Menus
 - **`uistyle::Button` is the shared standalone button** used by the car picker and the how-to-play
@@ -1922,7 +2014,7 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 ## Next steps — the milestone list is finished
 
 Every milestone in CLAUDE.md section 5 is done, and section 6 is being worked through a subsection at
-a time. **6.1, 6.2 and 6.3 are done**; 6.4 and 6.5 are next, and their README items should be
+a time. **6.1 through 6.4 are done**; 6.5 is next, and their README items should be
 treated the way 6.1's, 6.2's and 6.3's were - as claims to be measured rather than as work already
 finished. Two of 6.1's three ticked items turned out not to be true when a harness was pointed at
 them, both of 6.2's did, and so did all three of 6.3's.

@@ -180,7 +180,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] Screen and particle punch on goals and big hits — the view takes a short kick, 2.50 degrees on a goal and 0.97 on a big hit, scaled by how hard the ball was struck. It rotates the aim rather than moving the camera, so it can never push the view into a wall and never loses the car.
 - [x] Boost flame/trail intensity scales with boost use — a tapped boost gets a 0.97 m cone and one ember a frame, a held one the full 2.30 m and four, ramping over 0.45 s.
 - [x] Boost-pad glow reads ready vs cooldown — a ready pad breathes, and a recharging one fills its light back in as it goes, so a pad just taken and a pad about to return no longer look the same.
-- [x] Bot behaviour — it keeps its target on the flat floor, backs out when blocked and takes a reset if it is ever wedged for five seconds.
+- [x] Bot behaviour — it keeps its target on the flat floor, backs out when blocked and takes a reset if it is ever wedged for five seconds. Eight deliberate wedges (walls, corners, both nets, upside down) all free themselves in 0.12-1.29 s with no resets. It also stops chasing a ball that is already past it in its own half and recovers goal-side instead, which took it from scoring *only* from kickoffs to scoring in open play, and from losing to the previous bot to beating it.
 - [x] Post-processing degrades gracefully — off in Settings costs nothing, and missing shaders log a warning and draw the scene unbloomed.
 - [x] No major errors in the log during a run.
 
