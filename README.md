@@ -181,8 +181,9 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] Boost flame/trail intensity scales with boost use — a tapped boost gets a 0.97 m cone and one ember a frame, a held one the full 2.30 m and four, ramping over 0.45 s.
 - [x] Boost-pad glow reads ready vs cooldown — a ready pad breathes, and a recharging one fills its light back in as it goes, so a pad just taken and a pad about to return no longer look the same.
 - [x] Bot behaviour — it keeps its target on the flat floor, backs out when blocked and takes a reset if it is ever wedged for five seconds. Eight deliberate wedges (walls, corners, both nets, upside down) all free themselves in 0.12-1.29 s with no resets. It also stops chasing a ball that is already past it in its own half and recovers goal-side instead, which took it from scoring *only* from kickoffs to scoring in open play, and from losing to the previous bot to beating it.
-- [x] Post-processing degrades gracefully — off in Settings costs nothing, and missing shaders log a warning and draw the scene unbloomed.
-- [x] No major errors in the log during a run.
+- [x] Smooth frame rate — 0.62 ms a frame in Release at 2560 x 1080 with bloom on, and not one frame over 16.7 ms in any configuration measured. The cost is about 0.50 ms fixed plus 0.096 ms per megapixel, so it is nowhere near fill-bound. Measured on an RTX 3060, not a laptop.
+- [x] Post-processing degrades gracefully — off in Settings costs nothing, missing shaders log a warning and draw the scene unbloomed, and render targets that fail to allocate now do the same instead of rendering into an invalid framebuffer for the rest of the run.
+- [x] No major errors in the log during a run — a full match to the final whistle logs zero errors, zero warnings and zero asserts in Debug, Development and Release, with resident memory unchanged across the run.
 
 ## Layout
 

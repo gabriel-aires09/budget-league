@@ -19,6 +19,10 @@ namespace
     RenderTexture2D bloomB = {};
     int targetWidth = 0;
     int targetHeight = 0;
+    // The last size the driver refused. Remembered so a machine that cannot give
+    // these targets is asked once rather than three times a frame forever.
+    int failedWidth = 0;
+    int failedHeight = 0;
     bool capturing = false;
 
     // The bloom chain runs at a quarter of each axis. It is blurred anyway, so
@@ -51,11 +55,41 @@ namespace
             return false;
         if (width == targetWidth && height == targetHeight)
             return true;
+        // Already known not to work at this size. A different size is still worth
+        // trying, which is why the size is remembered rather than a plain flag.
+        if (width == failedWidth && height == failedHeight)
+            return false;
 
         ReleaseTargets();
         sceneTarget = LoadRenderTexture(width, height);
         bloomA = LoadRenderTexture(width / BLOOM_DIVISOR, height / BLOOM_DIVISOR);
         bloomB = LoadRenderTexture(width / BLOOM_DIVISOR, height / BLOOM_DIVISOR);
+
+        // A render texture can fail to allocate - a machine short of video memory,
+        // or a resolution past what the driver will give as a framebuffer - and
+        // raylib answers that with an id of 0 rather than by failing loudly. The
+        // check has to happen before targetWidth is set: recording the size of
+        // targets that were never created is what would make this stick, because
+        // every later frame would match the cache, skip the rebuild and render
+        // into an invalid framebuffer for the rest of the run.
+        if (!IsRenderTextureValid(sceneTarget) || !IsRenderTextureValid(bloomA) ||
+            !IsRenderTextureValid(bloomB))
+        {
+            TraceLog(LOG_WARNING, "POSTFX: could not allocate %d x %d bloom targets, "
+                                  "drawing without post-processing", width, height);
+            UnloadRenderTexture(sceneTarget);
+            UnloadRenderTexture(bloomA);
+            UnloadRenderTexture(bloomB);
+            targetWidth = 0;
+            targetHeight = 0;
+            // Recorded, so this is logged and attempted once for this size rather
+            // than every frame for the rest of the match. A resize to something
+            // the driver will give still gets its own try.
+            failedWidth = width;
+            failedHeight = height;
+            return false;
+        }
+
         targetWidth = width;
         targetHeight = height;
 
@@ -113,6 +147,8 @@ void postprocess::Load()
 void postprocess::Unload()
 {
     ReleaseTargets();
+    failedWidth = 0;
+    failedHeight = 0;
     if (!loaded)
         return;
 

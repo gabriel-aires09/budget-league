@@ -31,10 +31,11 @@ Final milestone (CLAUDE.md section 6), a subsection at a time:
 - [x] **6.2 — Camera**
 - [x] **6.3 — Feedback and Juice**
 - [x] **6.4 — Bot**
-- [ ] **6.5 — Performance and Stability**
+- [x] **6.5 — Performance and Stability**
 
-Every milestone in CLAUDE.md is now done, and the section 6 polish list is under way: **6.1 Handling and Feel, 6.2 Camera,
-6.3 Feedback and Juice and 6.4 Bot are finished** (each has its own section below).
+Every milestone in CLAUDE.md is now done, and the section 6 polish list is under way: **the whole of section 6 is finished** -
+6.1 Handling and Feel, 6.2 Camera, 6.3 Feedback and Juice, 6.4 Bot and 6.5 Performance and
+Stability, each with its own section below.
 
 Two pieces of work outside the milestone list are also done: the **asset pipeline** (FBX cooking plus
 the car models, CLAUDE.md 4.1) and the **arena ramps with wall and ceiling driving** (PROMPTS.md).
@@ -897,6 +898,88 @@ Both new numbers were swept against that same fixed opponent rather than guessed
 |---|---|
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors or warnings in the log |
 
+Final Milestone 6.5 performance and stability, implemented on `fix/final-milestone` on 2026-08-06.
+Measured with a temporary harness that timed whole frames with the frame rate cap lifted and timed
+each pass inside them (removed afterwards), plus fault injection on the post-processing and full
+matches run in all three configurations.
+
+**Read the hardware caveat before quoting any of these numbers.** They were taken on an **NVIDIA
+RTX 3060**, which is not the "common laptop" CLAUDE.md 6.5 asks about. What they establish is the
+shape of the cost, and that is the part that carries across machines.
+
+Release, uncapped, at the resolutions that matter:
+
+| Resolution | Bloom on | Bloom off | Frames over 16.7 ms |
+|---|---|---|---|
+| 1280 x 720 | 0.61 ms (1626 fps) | 0.49 ms (2033 fps) | 0 of 840 |
+| 1920 x 1080 | 0.60 ms (1677 fps) | 0.51 ms (1952 fps) | 0 of 840 |
+| 2560 x 1080 (the fullscreen default) | 0.62 ms (1613 fps) | 0.54 ms (1846 fps) | 0 of 840 |
+
+Bloom costs 0.08 to 0.12 ms, which agrees with the 0.1 ms Milestone 14 measured for it.
+
+**The game is not fill-bound**, which is the finding that matters for a weaker GPU. Pushing the
+resolution far past anything real:
+
+| Resolution | Megapixels | Mean frame |
+|---|---|---|
+| 1280 x 720 | 0.92 | 0.59 ms |
+| 2560 x 1440 | 3.69 | 0.85 ms |
+| 3840 x 2160 | 8.29 | 1.32 ms |
+| 5120 x 2880 | 14.75 | 1.91 ms |
+
+Sixteen times the pixels costs 3.2 times the frame, so the cost is about **0.50 ms fixed plus
+0.096 ms per megapixel** on this GPU. The fixed half is CPU submission, which barely varies with the
+GPU at all:
+
+| Pass | Submission cost per frame |
+|---|---|
+| 3D objects | 0.23 ms |
+| Glass walls and their lattice | 0.17 ms |
+| Bloom resolve | 0.04 ms |
+| HUD | 0.007 ms |
+| Effects | 0.006 ms |
+
+So on a machine with, say, twenty times less fill rate than this one, 1080p would be roughly
+0.45 ms of submission plus 4 ms of fill - still four times inside a 60 fps budget. That is an
+extrapolation from the slope above, not a measurement, and it is the honest limit of what this
+machine can say.
+
+**Post-processing degraded gracefully in one direction and badly in the other.** The missing-shader
+path was already right. The missing-*targets* path was not: `EnsureTargets` never checked whether
+`LoadRenderTexture` had actually succeeded.
+
+| Fault | Before | After |
+|---|---|---|
+| Bloom shaders missing | warns once, draws unbloomed, exit 0 | unchanged |
+| Render targets fail to allocate | **no check at all** | warns once, draws unbloomed, exit 0 |
+| Warnings logged over 300 frames of the target fault | **300** | **1** |
+| `LoadRenderTexture` calls per frame while failing | **3, forever** | 3 once, then none |
+
+Both faults were injected and run, not reasoned about: with the targets forced to fail the game
+writes its screenshot and exits 0 with a single warning, and the same with `Bright.fs` deleted.
+
+**A full match logs nothing.** Two rounds of this. First 20000 frames - 333 seconds of continuous
+play, 39 goals and therefore 39 celebrations, resets and kickoffs - in each configuration, Debug
+included, so with `JPH_ENABLE_ASSERTS` on. Then 32000 frames in Debug and Release, which is long
+enough to run the clock all the way down and reach the full time screen, since that transition is
+exactly where an end-of-match bug would live:
+
+| Run | Configuration | ERROR | WARNING | Asserts, aborts, segfaults | Exit |
+|---|---|---|---|---|---|
+| 333 s, mid-match | Debug | 0 | 0 | 0 | 0 |
+| 333 s, mid-match | Development | 0 | 0 | 0 | 0 |
+| 333 s, mid-match | Release | 0 | 0 | 0 | 0 |
+| To full time | Debug | 0 | 0 | 0 | 0 |
+| To full time | Release | 0 | 0 | 0 | 0 |
+
+The full time run finishes 0 - 54 with the FULL TIME panel, ORANGE WINS and both buttons drawn
+correctly, screenshotted. The scoreline is what an idle player concedes - the smoke test never
+presses a key - not a statement about the bot.
+
+Resident memory was sampled twice during those runs and did not move by a single kilobyte
+(Debug 209004 kB, Development 146356 kB, Release 144840 kB both times), which is what the fixed
+particle pool and the fixed ramp meshes should give.
+
 ## Layout
 
 ```
@@ -1732,6 +1815,16 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   nothing, so `MatchScene` needs no branch of its own.
 - **The bloom chain runs at a quarter of each axis.** It is blurred anyway, so the resolution buys
   nothing; measured, the whole chain costs about 0.1 ms a frame.
+- **A render target that fails to allocate has to be detected too, and the detection has to happen
+  before the size is cached.** `LoadRenderTexture` answers failure with an id of 0 rather than
+  loudly, and `EnsureTargets` recorded `targetWidth`/`targetHeight` regardless — so every later frame
+  would have matched the cache, skipped the rebuild and rendered into an invalid framebuffer for the
+  rest of the run. `IsRenderTextureValid` on all three targets is the check.
+- **The failed size is remembered, and that is not the same as a flag.** Without it the fallback
+  retried three `LoadRenderTexture` calls every single frame and logged its warning every single
+  frame: measured, **300 warnings in 300 frames**. Keying it on the size means a machine that cannot
+  give these targets is asked once, while a resize to something the driver *will* give still gets its
+  own attempt. Both post-processing faults were injected and run rather than reasoned about.
 - **Detecting missing bloom shaders needs the same two checks the lit shader needed** - raylib answers
   a missing file with its *default* shader, whose id is perfectly valid, so `IsShaderValid` alone
   silently passes. Compare against `rlGetShaderIdDefault()`.
