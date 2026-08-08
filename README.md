@@ -117,6 +117,24 @@ every machine.
 | Development | yes | yes | `-O2` |
 | Release | no | no | `-O3` |
 
+### Windows build
+
+Linux is the platform the game is developed and verified on, but the `Makefile` can also produce
+a Windows executable. Cross-compiling it from Linux needs `mingw-w64-gcc`:
+
+```sh
+make -C Game/ThirdParty/raylib/src clean      # only when switching toolchains
+make release TARGET_OS=Windows \
+     CXX=x86_64-w64-mingw32-g++ CC=x86_64-w64-mingw32-gcc AR=x86_64-w64-mingw32-ar
+```
+
+The result is `Build/Windows/Release/ArcadeCarSoccer.exe` with its `assets/` folder beside it —
+copy both together, and nothing else: the MinGW runtime is linked statically. Building natively on
+Windows works the same way without the toolchain variables, but needs MSYS2 or Git Bash, since the
+`Makefile` uses `find` and `rm -rf`. Use a `release`/`development`/`debug` goal rather than a bare
+`CONFIG=`, which the default goal overrides. Full notes, including macOS, are in
+[docs/CrossPlatformBuild.md](docs/CrossPlatformBuild.md).
+
 ### Soundtrack
 
 Six tracks in `Game/Assets/Sounds/` are copied into each build's `assets/Music/` and played as a
@@ -169,6 +187,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **18 — Main Menu Showcase** — the main menu is now a live showcase: the real arena behind it, a random one of the seven cooked cars parked on the pitch in a random team colour on a slow turntable, and the menu list down the left. Re-rolled every time the menu is entered.
 - [x] **19 — Settings Screen (main-menu layout)** — opened from the main menu the panel is centred on both axes with no game title above it, over the still-running showcase; opened from the pause menu it is unchanged. The one shared widget takes a background flag.
 - [x] **20 — Soundtrack (OST playlist)** — the six tracks in `Game/Assets/Sounds/` are copied into each build and streamed as a shuffled playlist: a new song starts whenever one ends, never the same one twice in a row, with its own Music volume slider.
+- [x] **21 — Cross-Platform Builds** — a `Makefile`-only change, with no game code touched: `TARGET_OS` picks the link line, the `.exe` suffix and raylib's platform. The Windows executable is built and verified by cross-compiling from Linux with `x86_64-w64-mingw32` and running its smoke test under Wine; it links the MinGW runtime statically, so only system DLLs are needed. macOS support is written but **not built** — there is no Mac in this project's environment. See [docs/CrossPlatformBuild.md](docs/CrossPlatformBuild.md).
 
 ### Final milestone — polish
 
@@ -192,7 +211,8 @@ Game/Source/       game code (scenes, GameObjects, systems)
 Game/ThirdParty/   raylib, Jolt, glm, imgui (cloned, git-ignored)
 Game/Assets/       Cars-Park car pack and the lit shader
 Tools/             AssetCooker.py, FbxReader.py
-Build/<Config>/    ArcadeCarSoccer + cooked assets
+Build/<Config>/    ArcadeCarSoccer + cooked assets (Linux)
+Build/Windows/…    the same, for a Windows build
 ```
 
 ## Credits

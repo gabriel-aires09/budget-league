@@ -8,9 +8,11 @@ to produce a separate runnable executable on each of the three platforms.
 > an explicit, scoped exception to them. Linux remains the platform the game is developed and
 > verified on.
 
-> **What is verified here.** The Linux column is backed by a working build. **The Windows and
-> macOS instructions have not been compiled or run** — there is no Windows or macOS machine in
-> this project's environment. Treat them as written-but-unverified until someone builds them.
+> **What is verified here.** The Makefile changes in section 2 are **implemented**. Linux and
+> the cross-compiled Windows executable are both backed by working builds — the Windows one
+> was cross-compiled with `x86_64-w64-mingw32` and its smoke test run under Wine (section 4).
+> **The macOS instructions have not been compiled or run** — there is no Mac in this project's
+> environment. Treat that column as written-but-unverified until someone builds it.
 
 ---
 
@@ -50,22 +52,24 @@ file named `.MP3` is matched correctly on a case-insensitive filesystem.
 
 ## 2. Makefile changes
 
-Six touch points. Line numbers are against `Makefile` as of commit `94afbc9`.
+Six touch points, all now in `Makefile`. Line numbers below are against commit `94afbc9`,
+before the change.
 
 ### Platform detection
 
-There is currently none. Add near the top, before the build-mode block:
+There was none. Added near the top, before the build-mode block:
 
 ```make
 ifeq ($(OS),Windows_NT)
-    PLATFORM := Windows
+    TARGET_OS ?= Windows
 else
-    PLATFORM := $(shell uname -s)   # Linux | Darwin
+    TARGET_OS ?= $(shell uname -s)   # Linux | Darwin
 endif
-ARCH := $(shell uname -m)           # x86_64 | arm64 | aarch64
+ARCH := $(shell uname -m)            # x86_64 | arm64 | aarch64
 ```
 
-Everything below keys off `PLATFORM` and `ARCH`.
+`TARGET_OS` is a `?=` rather than a `:=` precisely so a cross-compile can override it from the
+command line; everything below keys off it and off `ARCH`.
 
 ### The six changed lines
 
@@ -84,22 +88,55 @@ Taken from raylib 6.0's own `Makefile` (lines 631–656), which is the authorita
 what raylib itself needs:
 
 ```make
-ifeq ($(PLATFORM),Windows)
-    LDLIBS := $(RAYLIB_LIB) -static-libgcc -lopengl32 -lgdi32 -lwinmm
-else ifeq ($(PLATFORM),Darwin)
+ifeq ($(TARGET_OS),Windows)
+    LDLIBS := $(RAYLIB_LIB) -static -static-libgcc -static-libstdc++ \
+              -lopengl32 -lgdi32 -lwinmm
+else ifeq ($(TARGET_OS),Darwin)
     LDLIBS := $(RAYLIB_LIB) -framework OpenGL -framework Cocoa -framework IOKit \
                             -framework CoreAudio -framework CoreVideo
 else
-    LDLIBS := $(RAYLIB_LIB) -lGL -lc -lm -lpthread -ldl -lrt -lX11
+    LDLIBS := $(RAYLIB_LIB) -lGL -lm -lpthread -ldl -lrt -lX11
 endif
 ```
 
 Note macOS needs **no** `AudioToolbox` — raylib's own list does not include it.
 
-### What does *not* change
+`-static-libstdc++` and `-static` are not in raylib's list and are added here: the game is C++
+built with MinGW, so without them the executable would need `libstdc++-6.dll`,
+`libgcc_s_seh-1.dll` and `libwinpthread-1.dll` copied beside it. With them, `objdump -p` shows
+only system DLLs (`KERNEL32`, `USER32`, `GDI32`, `SHELL32`, `WINMM`, `OPENGL32` and the UCRT).
 
-The `$(RAYLIB_LIB)` rule needs no edit. raylib's Makefile detects `PLATFORM_OS` from `uname`
-by itself, so `make -C raylib/src PLATFORM=PLATFORM_DESKTOP` is correct on all three.
+### The `$(RAYLIB_LIB)` rule
+
+This *does* need an edit for cross-compiling, contrary to the first draft of this document.
+raylib detects `PLATFORM_OS` from `uname`, which on a Linux host cross-compiling for Windows
+gives the wrong answer, and it would otherwise build with the host compiler:
+
+```make
+	@$(MAKE) -C $(RAYLIB_DIR)/src \
+		PLATFORM=PLATFORM_DESKTOP PLATFORM_OS=$(RAYLIB_OS) CC=$(CC) AR=$(AR) \
+		RAYLIB_LIBTYPE=STATIC RAYLIB_BUILD_MODE=RELEASE \
+		RAYLIB_RELEASE_PATH=$(RAYLIB_OUT)
+```
+
+where `RAYLIB_OS` maps `TARGET_OS` onto raylib's own spelling (`WINDOWS` / `OSX` / `LINUX`).
+
+### Output directories
+
+`Build/<Config>/` and `Build/Intermediate/<Config>/` are shared by every target, so a native
+object and a cross object have the same path. Linux keeps the historical layout and everything
+else nests one level deeper:
+
+```make
+ifeq ($(TARGET_OS),Linux)
+    OUT_ROOT := $(ROOT)/Build
+else
+    OUT_ROOT := $(ROOT)/Build/$(TARGET_OS)
+endif
+```
+
+so the Windows build lands in `Build/Windows/Release/` and the Linux paths in README.md stay
+correct. `RAYLIB_OUT` moves under `OUT_ROOT` for the same reason.
 
 ---
 
@@ -114,9 +151,10 @@ and the `Build/<Config>/` layout needs no change.
 | Windows | **MSYS2 / MinGW-w64** (`mingw-w64-x86_64-gcc`, `make`) or Git Bash | The Makefile uses `find`, `mkdir -p` and `rm -rf`, so **`cmd.exe` and PowerShell will not work.** |
 | macOS | Xcode Command Line Tools (`xcode-select --install`), Python 3 | Ships GNU make 3.81, which is enough. Apple Silicon needs change #1 above. |
 
-**`libraylib.a` is not portable between platforms.** `Build/Intermediate/ThirdParty/` must be
-deleted and rebuilt on each OS, or the link will fail with unresolved or malformed symbols.
-`make clean-thirdparty` does this.
+**`libraylib.a` is not portable between platforms.** Each target now archives its own under
+`$(OUT_ROOT)/Intermediate/ThirdParty/`, so the three do not overwrite each other; but raylib's
+`.o` files live in its own source tree, so run `make -C Game/ThirdParty/raylib/src clean` when
+switching toolchains on one machine. `make clean-thirdparty` clears the current target's copy.
 
 Third-party sources are git-ignored (`Game/ThirdParty/`), so clone them per machine at the
 pinned versions listed in README.md before the first build.
@@ -125,26 +163,51 @@ pinned versions listed in README.md before the first build.
 
 ## 4. Path B — cross-compiling Windows from Linux
 
-Possible, and reasonable for this project since there is no platform code to worry about.
+This is the route that is actually verified. There is no platform code to worry about, so it
+is a straightforward toolchain swap.
 
 ```sh
 sudo pacman -S mingw-w64-gcc          # or: apt install g++-mingw-w64-x86-64
 
-make CONFIG=Release \
+# raylib keeps its objects in raylib/src, so clear a previous host build first.
+make -C Game/ThirdParty/raylib/src clean
+
+make release TARGET_OS=Windows \
      CXX=x86_64-w64-mingw32-g++ \
+     CC=x86_64-w64-mingw32-gcc \
      AR=x86_64-w64-mingw32-ar
 ```
 
-Two things must be handled or the build is wrong:
+`CC` matters as much as `CXX`: raylib is C, and it is `CC` that gets forwarded to its Makefile.
 
-1. **raylib must be rebuilt with the same cross-compiler.** Pass the same `CC`/`AR` down to
-   the `$(RAYLIB_LIB)` rule, and use a separate output directory from the native one.
-2. **`Build/<Config>/` collides.** A native Linux object and a Windows object have the same
-   path under the current layout. Change the intermediate and output directories to
-   `Build/<Platform>/<Config>/` before cross-compiling, or clean between builds.
+**Use the `release` / `development` / `debug` goal, not `CONFIG=Release` on its own.** With no
+goal the default is `default: development`, which re-invokes make with `CONFIG=Development` and
+silently discards the `CONFIG` on the command line.
+
+The `make -C raylib/src clean` is needed only when switching toolchains. raylib archives
+`libraylib.a` into the per-target `RAYLIB_OUT`, but its `.o` files stay in its own source tree,
+where a stale Linux object would otherwise be archived into the Windows library.
 
 The asset cooker runs on the host as normal — the cooked formats are plain binary and
-platform-independent.
+platform-independent, and `Build/Windows/<Config>/assets/` is written by the same build event.
+
+### Verified result
+
+| Check | Result |
+|---|---|
+| `make release TARGET_OS=Windows …` | exit 0, no warnings from `Game/Source` |
+| `file ArcadeCarSoccer.exe` | `PE32+ executable for MS Windows, x86-64` |
+| `objdump -p` imports | system DLLs only — no MinGW runtime to ship |
+| `wine ./ArcadeCarSoccer.exe --smoke-test 60 --screenshot SmokeTest.png` | exit 0, non-blank screenshot of the arena at kickoff |
+| Linux `make all` after the change | unchanged, smoke test still exit 0 |
+
+Wine is a proxy for Windows, not Windows. It exercises the executable, the cooked assets, the
+OpenGL 3.3 path and the audio device, but a real machine is still the last word — particularly
+for fullscreen and multi-monitor behaviour (section 7).
+
+The `-Wstringop-overflow` warnings the Windows build emits come from Jolt's atomics through
+MinGW's libstdc++ headers at `-O3`, not from game code, which builds clean under `-Wall
+-Wextra` on both platforms.
 
 ---
 

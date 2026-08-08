@@ -1,8 +1,5 @@
-# Build output
-Build/Debug/
-Build/Development/
-Build/Release/
-Build/Intermediate/
+# Build output (Build/<Config>/ on Linux, Build/<TargetOS>/<Config>/ elsewhere)
+Build/
 
 # External libraries (cloned, see HANDOFF.md)
 Game/ThirdParty/
