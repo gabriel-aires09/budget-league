@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="300" alt="Budget League Logo" src="Game/Assets/Icon/budget-league-logo.png>
+  <img width="300" alt="Budget League Logo" src="Game/Assets/Icon/budget-league-logo.png">
 </p>
 
 # Budget League
