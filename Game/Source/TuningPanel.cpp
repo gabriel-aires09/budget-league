@@ -63,6 +63,7 @@ void TuningPanel::Initialize(MatchScene &scene)
     entries.push_back({ "Car air", "flipImpulse", &car.flipImpulse, &bot.flipImpulse, 200.0f, 3500.0f });
     entries.push_back({ "Car air", "flipSpin", &car.flipSpin, &bot.flipSpin, 2.0f, 20.0f });
     entries.push_back({ "Car air", "flipDuration", &car.flipDuration, &bot.flipDuration, 0.1f, 1.5f });
+    entries.push_back({ "Car air", "flipHitImpulse", &car.flipHitImpulse, &bot.flipHitImpulse, 0.0f, 1500.0f });
     entries.push_back({ "Car air", "airControlRate", &car.airControlRate, &bot.airControlRate, 1.0f, 15.0f });
     entries.push_back({ "Car air", "uprightTorque", &car.uprightTorque, &bot.uprightTorque, 1000.0f, 15000.0f });
 

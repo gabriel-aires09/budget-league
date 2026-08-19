@@ -21,18 +21,36 @@
 // normalising a 0.01 m long vector hands back a direction that swings through a
 // half circle between frames, which is what used to throw the camera into the
 // wall it was climbing.
+//
+// A car turning over is the other way the nose stops meaning anything, and it is
+// not a short direction — it is a long one pointing exactly the wrong way. Half
+// way through a forward flip the car is upside down, its nose points back down
+// the pitch, and the camera used to follow it there: measured, the view swung the
+// full 180 degrees round to the front of the car and back again on every flip.
+// `referenceUp` is the up the camera is working in — world up on the floor, the
+// ceiling's own up when driving upside down on it — so the test is "has the car
+// rolled away from the surface the camera is framing against", not "is the car
+// upside down in the world", and driving the ceiling is unaffected.
 static Vector3 FollowDirection(const CarObject &car, float velocityBlend, Vector3 previous,
-                               float flatMinimum)
+                               float flatMinimum, Vector3 referenceUp)
 {
-    Vector3 forward = Vector3Transform(Vector3{ 0.0f, 0.0f, -1.0f }, car.GetBodyRotation());
+    Matrix rotation = car.GetBodyRotation();
+    Vector3 forward = Vector3Transform(Vector3{ 0.0f, 0.0f, -1.0f }, rotation);
     forward.y = 0.0f;
-    forward = Vector3Length(forward) < flatMinimum ? previous : Vector3Normalize(forward);
+    Vector3 carUp = Vector3Transform(Vector3{ 0.0f, 1.0f, 0.0f }, rotation);
+    bool usable = Vector3Length(forward) >= flatMinimum &&
+                  Vector3DotProduct(carUp, referenceUp) > 0.0f;
+    forward = usable ? Vector3Normalize(forward) : previous;
     if (Vector3Length(forward) < 0.001f)
         forward = Vector3{ 0.0f, 0.0f, -1.0f };
 
+    // Travel still steers the camera while the car is over, which is what keeps a
+    // flip from freezing the view: the test is against the direction actually in
+    // use rather than the car's own nose, so a car flying forwards upside down
+    // reads as going forwards. Reversing still fails it, exactly as before.
     JPH::Vec3 joltVelocity = car.scene->physicsSystem.GetBodyInterface().GetLinearVelocity(car.bodyID);
     Vector3 velocity = { joltVelocity.GetX(), 0.0f, joltVelocity.GetZ() };
-    if (Vector3Length(velocity) > 4.0f && car.GetForwardSpeed() > 0.0f)
+    if (Vector3Length(velocity) > 4.0f && Vector3DotProduct(velocity, forward) > 0.0f)
         forward = Vector3Normalize(Vector3Lerp(forward, Vector3Normalize(velocity), velocityBlend));
 
     return forward;
@@ -80,7 +98,7 @@ void ChaseCamera::Initialize(Camera3D &camera, const CarObject &car)
     surfaceUp = Vector3{ 0.0f, 1.0f, 0.0f };
     ballCamActive = false;
     shakeStrength = 0.0f;
-    followDirection = FollowDirection(car, 0.0f, followDirection, flatForwardMinimum);
+    followDirection = FollowDirection(car, 0.0f, followDirection, flatForwardMinimum, surfaceUp);
     Vector3 forward = followDirection;
 
     position = Vector3Add(Vector3Subtract(carPosition, Vector3Scale(forward, distance)),
@@ -108,7 +126,8 @@ void ChaseCamera::Update(Camera3D &camera, const CarObject &car, Vector3 ballPos
     Vector3 carPosition = car.GetBodyPosition();
     // Remembered, because it is the fallback when the car's own nose stops being
     // a usable horizontal direction.
-    followDirection = FollowDirection(car, velocityBlend, followDirection, flatForwardMinimum);
+    followDirection = FollowDirection(car, velocityBlend, followDirection, flatForwardMinimum,
+                                     surfaceUp);
     Vector3 forward = followDirection;
     // The camera lifts along the surface the car is standing on, not along the
     // world. On the floor the two are the same vector, so flat-ground framing is

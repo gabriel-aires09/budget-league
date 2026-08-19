@@ -1,5 +1,6 @@
 #include "CarObject.h"
 
+#include "BallObject.h"
 #include "Lighting.h"
 #include "Scene.h"
 
@@ -221,6 +222,25 @@ void CarObject::Update(float deltaTime)
             // Held from here for flipDuration, so the flip actually finishes.
             flipAxis = Vector3{ axis.GetX(), axis.GetY(), axis.GetZ() };
             flipTimeRemaining = flipDuration;
+            // Read after the impulse, so a flip fired while climbing a wall keeps
+            // whatever lift that impulse gave it.
+            flipVerticalCap = bodies.GetLinearVelocity(bodyID).GetY();
+            // Whether there is anything down there to scrape. The body swings
+            // halfExtents.z below its centre of mass as it comes over, and it
+            // falls for the rest of the flip on top of that, so a car length of
+            // clear air below is the point past which a flip cannot reach the
+            // floor at all. nearGround is no use here: it stops 1.65 m down, and
+            // a jump only ever lifts the car 1.84 m, so a flip at the top of a
+            // jump read as a clean aerial and was launched like every other one.
+            JPH::RRayCast flipRay(position, JPH::Vec3(0.0f, -halfExtents.z * 2.0f, 0.0f));
+            flipCapped = scene->physicsSystem.GetNarrowPhaseQuery().CastRay(
+                flipRay, hit, broadPhaseFilter, objectFilter, selfFilter);
+            flipHitUsed = false;
+            flipHitWindow = flipDuration + flipHitGrace;
+            // The same lockout the first jump takes: the car is on its way off
+            // the surface, and the probe still reaching it must not be read as
+            // a landing (see the flip hold below).
+            jumpLockoutRemaining = jumpLockout;
         }
         else
         {
@@ -230,26 +250,98 @@ void CarObject::Update(float deltaTime)
         jumpPending = true;
     }
 
+    // The big hit: a flip that connects with the ball adds to what the collision
+    // gave it. Read as a jump in the ball's speed, the same way MatchScene reads a
+    // hit for the effects, and applied along the direction the ball has just been
+    // sent — so it lands on the step after contact and amplifies a hit that has
+    // already happened.
+    //
+    // It is deliberately not an impulse on approach. That was tried first and is
+    // much worse: the ball is shoved out of the car's way before the two ever
+    // meet, and the flip that should have been the hardest shot in the game left
+    // the ball at 8.5 m/s and 20 m, against 26.2 m/s and 52 m for the same flip
+    // with no bonus at all.
+    if (ball != nullptr)
+    {
+        float ballSpeed = ball->GetSpeed();
+        if (flipHitWindow > 0.0f)
+        {
+            flipHitWindow = fmaxf(flipHitWindow - deltaTime, 0.0f);
+            // The proximity test is what says the hit was this car's and not the
+            // other one's, and it is measured against the box rather than a
+            // radius around it: the body is 3.2 m long and 1.7 m wide, so a
+            // sphere big enough to cover the nose would claim hits a metre clear
+            // of the flank.
+            Vector3 ballCenter = ball->GetBodyPosition();
+            JPH::Vec3 toBall = JPH::Vec3(ballCenter.x, ballCenter.y, ballCenter.z) -
+                               JPH::Vec3(position.GetX(), position.GetY(), position.GetZ());
+            JPH::Vec3 local = rotation.Conjugated() * toBall;
+            JPH::Vec3 box(halfExtents.x, halfExtents.y, halfExtents.z);
+            JPH::Vec3 nearest = JPH::Vec3::sMax(JPH::Vec3::sMin(local, box), -box);
+            bool touching = (local - nearest).Length() < ball->radius + flipHitReach;
+
+            if (!flipHitUsed && touching && ballSpeed - ballSpeedPrevious > flipHitThreshold)
+            {
+                JPH::Vec3 sent = bodies.GetLinearVelocity(ball->bodyID);
+                if (sent.LengthSq() > 1.0e-6f)
+                {
+                    bodies.AddImpulse(ball->bodyID, sent.Normalized() * flipHitImpulse);
+                    flipHitUsed = true;
+                    ballSpeed = ball->GetSpeed();
+                }
+            }
+        }
+        ballSpeedPrevious = ballSpeed;
+    }
+
+    // A flip is a committed move: hold its spin rather than letting air control
+    // and the body's angular damping bleed it away. Those two together decay
+    // about 3 rad/s, which stalled every flip well short of a full turn —
+    // measured, no flip ever swept even half of one.
+    //
+    // Tested before the grounded gate, and not inside it, because a flip fired a
+    // few hundredths of a second after the jump still reads as grounded: the
+    // probe reaches 0.7 m below the car, which it has not cleared yet. Inside
+    // the gate that flip was cancelled by the landing reset on the very step it
+    // fired, leaving the car with a raw 12 rad/s spin and no cap on it — the
+    // floor then threw it 4.4 m up and it stayed airborne 3.75 s, tumbling.
+    // Hence the lockout: while it runs, the probe is not a landing.
+    if (flipTimeRemaining > 0.0f && (!grounded || jumpLockoutRemaining > 0.0f))
+    {
+        flipTimeRemaining = fmaxf(flipTimeRemaining - deltaTime, 0.0f);
+
+        // A flip fired straight after a jump starts about half a metre up, and
+        // the body is 3.2 m long: as it comes over, its nose or tail sweeps well
+        // below that and Jolt resolves the overlap by throwing the car clear.
+        // Measured, a forward flip left the ground at 4.4 m/s and was climbing
+        // at 9.9 m/s a tenth of a second later — 6 m up and over two seconds in
+        // the air, which is the floating the flip was reported for. So a flip is
+        // ballistic: the climb may only fall away with gravity, never be added
+        // to by the floor it is rotating through. Speed along the ground is left
+        // alone — holding that as well only drove the nose deeper into the
+        // floor, and the car was thrown 7 m up the moment the flip released it.
+        // flipCapped is why a flip high in the air keeps its climb, and it is
+        // read rather than re-measured: a car that leaves probe range mid
+        // rotation and drops back into it slips a launch through the gap.
+        flipVerticalCap += scene->physicsSystem.GetGravity().GetY() * deltaTime;
+        JPH::Vec3 flipVelocity = bodies.GetLinearVelocity(bodyID);
+        if (flipCapped && flipVelocity.GetY() > flipVerticalCap)
+            bodies.SetLinearVelocity(bodyID, JPH::Vec3(flipVelocity.GetX(), flipVerticalCap,
+                                                       flipVelocity.GetZ()));
+
+        // The rotation is over when the timer is, so the spin is cancelled
+        // rather than released: handing 12 rad/s back to a car that has just
+        // come round to level carried it straight past upright and landed it on
+        // its roof every time.
+        JPH::Vec3 spin = flipTimeRemaining > 0.0f
+                             ? JPH::Vec3(flipAxis.x, flipAxis.y, flipAxis.z) * flipSpin
+                             : JPH::Vec3::sZero();
+        bodies.SetAngularVelocity(bodyID, spin);
+        return;
+    }
+
     if (!grounded)
     {
-        // A flip is a committed move: hold its spin rather than letting air
-        // control and the body's angular damping bleed it away. Those two
-        // together decay about 3 rad/s, which stalled every flip well short of a
-        // full turn — measured, no flip ever swept even half of one.
-        if (flipTimeRemaining > 0.0f)
-        {
-            flipTimeRemaining = fmaxf(flipTimeRemaining - deltaTime, 0.0f);
-            // The rotation is over when the timer is, so the spin is cancelled
-            // rather than released: handing 9 rad/s back to a car that has just
-            // come round to level carried it straight past upright and landed it
-            // on its roof every time.
-            JPH::Vec3 spin = flipTimeRemaining > 0.0f
-                                 ? JPH::Vec3(flipAxis.x, flipAxis.y, flipAxis.z) * flipSpin
-                                 : JPH::Vec3::sZero();
-            bodies.SetAngularVelocity(bodyID, spin);
-            return;
-        }
-
         // Air control: drive the angular velocity towards the requested rate.
         // With no input the requested rate is zero and the response drops to
         // airDamping, so a flip still completes but the car settles for landing.
@@ -380,6 +472,8 @@ void CarObject::ResetTo(Vector3 position, float yawDegrees)
     doubleJumpUsed = false;
     jumpLockoutRemaining = 0.0f;
     flipTimeRemaining = 0.0f;
+    flipHitWindow = 0.0f;
+    flipHitUsed = false;
     boosting = false;
     boostHeldTime = 0.0f;
     grounded = false;

@@ -36,7 +36,7 @@ which turns the match into solo practice with both goals still scoring.
 |---|---|
 | **W / S** or **Up / Down** | Accelerate / brake and reverse |
 | **A / D** or **Left / Right** | Steer |
-| **Space** | Jump — press again in the air for a double jump, or a flip if a direction is held |
+| **Space** | Jump — press again in the air for a double jump, or a flip if a direction is held. A flip that reaches the ball is the hardest shot in the game |
 | **Shift** (hold) | Boost |
 | **W / A / S / D** (airborne) | Pitch and yaw |
 | **Q / E** (airborne) | Air roll |
@@ -191,7 +191,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 
 ### Final milestone — polish
 
-- [x] Minor bumps never flip the car, while intentional flips stay snappy — a hard sideways kick at speed costs the car under 2.5 degrees of lean and 0.12 s, and a flip is now a committed 0.70 s rotation that sweeps a full turn and comes out level instead of stalling half way round.
+- [x] Minor bumps never flip the car, while intentional flips stay snappy — a hard sideways kick at speed costs the car under 2.5 degrees of lean and 0.12 s, and a flip is now a committed 0.52 s rotation that sweeps a full turn, comes out level and is back on the ground about a second after it leaves it.
 - [x] The ball is heavy but not sluggish; big hits carry — a hit leaves at 1.13-1.19x the car's speed and a top-speed one crosses 50 m, while a 20 m/s pass now rolls 43.7 m instead of 35.6 m of the 102.41 m field.
 - [x] The kickoff reset settles cleanly, with physics simply not stepped while frozen — the car and the ball now sit at exactly their resting height, so two seconds of idle play after a reset move them 0.0000 m, and the reset hands the car's jumps back.
 - [x] Chase-camera clipping near walls — the camera is pulled in, trades distance for height when there is none, and lifts along the surface the car is standing on rather than the world. Measured over fourteen driving routines: the eye is never inside the arena's collision and the car is never hidden behind it, where before it was for up to a quarter of the frames of a wall climb.
