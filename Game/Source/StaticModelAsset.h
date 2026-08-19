@@ -6,13 +6,6 @@
 #include <string>
 #include <vector>
 
-namespace assets
-{
-    // Cooked assets sit next to the executable, so the game runs from any
-    // working directory. Takes a path relative to that assets folder.
-    std::string Path(const std::string &relative);
-}
-
 // One cooked .evmodel: a raylib Model plus the bookkeeping needed to repaint
 // the car panels in a team colour (CLAUDE.md 4.1). The cooker writes one mesh
 // per material, so a repaint is just a diffuse colour per material.

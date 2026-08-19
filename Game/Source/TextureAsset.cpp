@@ -1,6 +1,6 @@
 #include "TextureAsset.h"
 
-#include "StaticModelAsset.h" // assets::Path, so there is one scheme for both
+#include "AssetPack.h"
 
 #include <cstring>
 
@@ -85,9 +85,9 @@ namespace
 
 bool LoadCookedImage(const std::string &name, Image &image)
 {
-    std::string path = assets::Path("Textures/" + name + ".evtex");
+    std::string path = "Textures/" + name + ".evtex";
     int size = 0;
-    unsigned char *data = LoadFileData(path.c_str(), &size);
+    unsigned char *data = assets::LoadData(path, &size);
     if (data == nullptr)
     {
         TraceLog(LOG_WARNING, "TEXTURE: could not read %s", path.c_str());
@@ -100,7 +100,7 @@ bool LoadCookedImage(const std::string &name, Image &image)
     if (size < HEADER_BYTES || memcmp(data, TEXTURE_MAGIC, sizeof(TEXTURE_MAGIC)) != 0)
     {
         TraceLog(LOG_WARNING, "TEXTURE: %s is not an evtex file", path.c_str());
-        UnloadFileData(data);
+        assets::UnloadData(data);
         return false;
     }
     memcpy(header, data + 8, sizeof(header));
@@ -111,7 +111,7 @@ bool LoadCookedImage(const std::string &name, Image &image)
     if (width <= 0 || height <= 0 || header[2] != 4 || payload != size - HEADER_BYTES)
     {
         TraceLog(LOG_WARNING, "TEXTURE: %s has a bad header", path.c_str());
-        UnloadFileData(data);
+        assets::UnloadData(data);
         return false;
     }
 
@@ -119,7 +119,7 @@ bool LoadCookedImage(const std::string &name, Image &image)
     // frees it: a std::vector here would be freed twice or not at all.
     Pixel *pixels = (Pixel *)RL_MALLOC((size_t)width * (size_t)height * sizeof(Pixel));
     bool decoded = pixels != nullptr && DecodeQoi(data + HEADER_BYTES, payload, width * height, pixels);
-    UnloadFileData(data);
+    assets::UnloadData(data);
     if (!decoded)
     {
         RL_FREE(pixels);

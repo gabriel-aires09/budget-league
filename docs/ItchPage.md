@@ -78,7 +78,7 @@ Menus take the arrow keys or WASD, Enter or Space to confirm, Esc to go back —
 
 ### How to run
 
-**Linux** — unzip, then run the executable. Keep the `assets` folder next to it.
+**Linux** — unzip, then run the executable. Keep `assets.pak` next to it.
 
 ```sh
 chmod +x BudgetLeague
@@ -87,7 +87,7 @@ chmod +x BudgetLeague
 
 Needs a working OpenGL driver and X11 — nothing else is installed.
 
-**Windows** — unzip and run `BudgetLeague.exe`, with its `assets` folder beside it. No runtime to
+**Windows** — unzip and run `BudgetLeague.exe`, with `assets.pak` beside it. No runtime to
 install; everything is linked statically.
 
 The game opens fullscreen at your monitor's own resolution. Settings turns it back into a 1280×720
@@ -117,6 +117,6 @@ Car models from the Cars-Park low-poly pack. Everything else built for this proj
   project's environment. Do **not** tick the macOS platform box or upload a Mac build until one has
   actually been produced and smoke-tested on hardware.
 - Upload the **Release** configuration only, and always zip the executable **together with its
-  `assets/` folder** — the game falls back to box stand-ins and silence without it.
+  `assets.pak`** — the game falls back to box stand-ins and silence without it.
 - Suggested screenshots: the title screen, the main-menu car showcase, the car picker grid, a boosted
   wall drive, and a goal with the celebration banner up.

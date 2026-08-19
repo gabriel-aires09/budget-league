@@ -129,8 +129,17 @@ The first build takes a few minutes (raylib plus 153 Jolt translation units per 
 that it is incremental. `make clean` removes the build output, `make clean-thirdparty` also forces a
 raylib rebuild.
 
-Each configuration lands in `Build/<Config>/` next to an `assets/` folder of cooked models, textures
-and shaders, written by `Tools/AssetCooker.py` as part of the build.
+Each configuration lands in `Build/<Config>/` as **the executable and `assets.pak`, and nothing
+else** — that is the whole of what ships. The archive holds every cooked asset in one file:
+`Tools/AssetCooker.py` cooks them, `Tools/PakWriter.py` packs them and `Game/Source/AssetPack.cpp`
+reads them. Entries are DEFLATE-compressed when that pays and stored as they are when it does not, so
+34.2 MB of assets travel as a 32.7 MB archive — the models fall to a fifth of their size, while the
+MP3s and the QOI textures are already compressed and are left alone.
+
+The cooked files themselves are an intermediate, in `Build/Intermediate/<Config>/assets/`, which is
+what keeps the cook incremental. The engine still reads a loose `assets/` folder next to the
+executable if one is there and there is no archive — copy that intermediate folder across to work
+that way — and with neither it runs on box stand-ins rather than failing.
 
 The game opens fullscreen at the monitor's own resolution; **Fullscreen** in Settings turns it back
 into a 1280x720 window. `--smoke-test` always runs windowed, so its screenshots are the same size on
@@ -153,7 +162,7 @@ make release TARGET_OS=Windows \
      CXX=x86_64-w64-mingw32-g++ CC=x86_64-w64-mingw32-gcc AR=x86_64-w64-mingw32-ar
 ```
 
-The result is `Build/Windows/Release/BudgetLeague.exe` with its `assets/` folder beside it —
+The result is `Build/Windows/Release/BudgetLeague.exe` with its `assets.pak` beside it —
 copy both together, and nothing else: the MinGW runtime is linked statically. Building natively on
 Windows works the same way without the toolchain variables, but needs MSYS2 or Git Bash, since the
 `Makefile` uses `find` and `rm -rf`. Use a `release`/`development`/`debug` goal rather than a bare
@@ -236,8 +245,9 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 Game/Source/       game code (scenes, GameObjects, systems)
 Game/ThirdParty/   raylib, Jolt, glm, imgui (cloned, git-ignored)
 Game/Assets/       Cars-Park car pack and the lit shader
-Tools/             AssetCooker.py, FbxReader.py
-Build/<Config>/    BudgetLeague + cooked assets (Linux)
+Tools/             AssetCooker.py, FbxReader.py, PakWriter.py, MakeIcon.py
+Build/<Config>/    BudgetLeague + assets.pak — what ships (Linux)
+Build/Intermediate/  objects, and the cooked assets the archive is built from
 Build/Windows/…    the same, for a Windows build
 ```
 

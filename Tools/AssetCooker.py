@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from FbxReader import ReadMeshes, FbxError
+from PakWriter import PackFolder
 
 MODEL_MAGIC = b"EVMDMSH1"
 TEXTURE_MAGIC = b"EVTXQOI1"
@@ -241,6 +242,8 @@ def main():
     parser.add_argument("--assets", required=True, type=Path, help="source assets folder")
     parser.add_argument("--output", required=True, type=Path, help="cooked assets folder")
     parser.add_argument("--force", action="store_true", help="ignore timestamps and cook everything")
+    parser.add_argument("--pak", type=Path, default=None,
+                        help="also write every cooked asset into this .pak archive")
     args = parser.parse_args()
 
     if not args.assets.is_dir():
@@ -313,6 +316,20 @@ def main():
     if failed:
         return 1
     print("[cook] %s -> %s" % ("%d asset(s) cooked" % cooked if cooked else "up to date", args.output))
+
+    # The archive is written from the cooked folder rather than from the sources,
+    # so it holds exactly what the loose build holds and the incremental cooking
+    # above is untouched. Rewritten whenever anything was cooked, and when it is
+    # missing, so a build can never leave a stale one beside the executable.
+    if args.pak is not None and (cooked > 0 or not args.pak.exists()):
+        entries, size = PackFolder(args.output, args.pak)
+        if entries == 0:
+            print("[pak] nothing to pack from %s" % args.output)
+        else:
+            loose = sum(f.stat().st_size for f in args.output.rglob("*") if f.is_file())
+            print("[pak] %d asset(s), %.1f MB -> %s (%.1f MB)"
+                  % (entries, loose / (1024.0 * 1024.0), args.pak.name, size / (1024.0 * 1024.0)))
+
     return 0
 
 
