@@ -188,6 +188,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **19 — Settings Screen (main-menu layout)** — opened from the main menu the panel is centred on both axes with no game title above it, over the still-running showcase; opened from the pause menu it is unchanged. The one shared widget takes a background flag.
 - [x] **20 — Soundtrack (OST playlist)** — the six tracks in `Game/Assets/Sounds/` are copied into each build and streamed as a shuffled playlist: a new song starts whenever one ends, never the same one twice in a row, with its own Music volume slider.
 - [x] **21 — Cross-Platform Builds** — a `Makefile`-only change, with no game code touched: `TARGET_OS` picks the link line, the `.exe` suffix and raylib's platform. The Windows executable is built and verified by cross-compiling from Linux with `x86_64-w64-mingw32` and running its smoke test under Wine; it links the MinGW runtime statically, so only system DLLs are needed. macOS support is written but **not built** — there is no Mac in this project's environment. See [docs/CrossPlatformBuild.md](docs/CrossPlatformBuild.md).
+- [ ] **22 — Gamepad Support** — spec written in `CLAUDE.md`, not implemented yet: the Rocket League button layout as the default mapping, analogue throttle and steering through a new `gamepad` input module, gamepad navigation in the shared menu widgets, and a Controls section in Settings (dead zone, vibration). The button layout table itself is still to be filled in.
 
 ### Final milestone — polish
 

@@ -25,6 +25,7 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 19 — Settings Screen (main-menu layout)**
 - [x] **Milestone 20 — Soundtrack (OST playlist)**
 - [x] **Milestone 21 — Cross-Platform Builds** (Windows done and verified by cross-compile; macOS written but unbuilt — no Mac here)
+- [ ] **Milestone 22 — Gamepad Support** (spec only; the 22.1 button-layout table is reserved and still to be supplied)
 
 Final milestone (CLAUDE.md section 6), a subsection at a time:
 
@@ -2308,9 +2309,14 @@ anyone tries to "fix" it a second time.
 - **All six previews are painted blue,** because the player is always on the blue team. If teams ever
   become selectable, `SetPaintColor` in `CarSelectScene::Initialize` is the one place to change.
 
-## Next steps — the milestone list is finished
+## Next steps — Milestone 22 is open, the rest of the list is finished
 
-Every milestone in CLAUDE.md section 5 is done, and section 6 is being worked through a subsection at
+**Milestone 22 — Gamepad Support** was added to CLAUDE.md section 5 on 2026-08-18 (branch
+`feat/gamepad`) and is spec only: no code has been written. It is blocked on its own **section 22.1**,
+which is a reserved placeholder — the Rocket League button layout table has still to be supplied, and
+`GamepadInput.cpp` is meant to match it exactly, so wait for it before mapping any button.
+
+Milestones 01-21 in CLAUDE.md section 5 are done, and section 6 is being worked through a subsection at
 a time. **6.1 through 6.4 are done**; 6.5 is next, and their README items should be
 treated the way 6.1's, 6.2's and 6.3's were - as claims to be measured rather than as work already
 finished. Two of 6.1's three ticked items turned out not to be true when a harness was pointed at
