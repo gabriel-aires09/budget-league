@@ -25,7 +25,7 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 19 — Settings Screen (main-menu layout)**
 - [x] **Milestone 20 — Soundtrack (OST playlist)**
 - [x] **Milestone 21 — Cross-Platform Builds** (Windows done and verified by cross-compile; macOS written but unbuilt — no Mac here)
-- [ ] **Milestone 22 — Gamepad Support** (spec only; the 22.1 button-layout table is reserved and still to be supplied)
+- [x] **Milestone 22 — Gamepad Support** (built against the 22.1 layout table; **no controller exists in this environment**, so the pad's own buttons are unverified on hardware — see the section below for exactly what was and was not proven)
 
 Final milestone (CLAUDE.md section 6), a subsection at a time:
 
@@ -981,6 +981,89 @@ presses a key - not a statement about the bot.
 Resident memory was sampled twice during those runs and did not move by a single kilobyte
 (Debug 209004 kB, Development 146356 kB, Release 144840 kB both times), which is what the fixed
 particle pool and the fixed ramp meshes should give.
+
+## Milestone 22 — Gamepad Support
+
+One new module and a wire-up; no gameplay or rendering was touched.
+
+- **`GamepadInput.h/cpp`** (namespace `gamepad`) — the only file that knows raylib's gamepad ids, the
+  layout, the dead zone and the trigger curve. Everything else asks in game terms: `Throttle()`,
+  `Jump()`, `MenuConfirm()`, `Rumble()`.
+- **`PlayerController`** merges the pad into `CarInput` beside the keyboard.
+- **`UserInterface::MenuList`** gained the pad once, so every menu got it at once.
+- **`MatchScene`** (pause, rumble), **`ChaseCamera`** (ball cam), **`CarSelectScene`**,
+  **`HowToPlayScene`**, **`MainMenuScene`**, **`HUD`** (full time) each picked up their one button.
+- **`SettingsMenu`** gained a **Controls** section: gamepad on/off, stick dead zone, vibration, held
+  in `GameSettings` beside everything else and shared by both menu contexts.
+- **`App::Run`** calls `gamepad::Update(settings)` once per frame, before the scene.
+
+### The layout, as built
+
+| Action | Button |
+|---|---|
+| Accelerate / reverse | RT / **LT** |
+| Steer | Left stick |
+| Jump, double jump, flip | A |
+| Boost | B |
+| Ball cam | Y |
+| Pitch and yaw (airborne) | Left stick |
+| Air roll (airborne) | X held, the stick rolls instead of yawing |
+| Reset car | RB |
+| Pause | Start |
+| Menu move / change value | Left stick or D-pad |
+| Menu confirm / cancel | A / B |
+
+**One deliberate departure from the table in CLAUDE.md 22.1:** that table lists **RT** for both
+Accelerate and Reverse, which cannot be right — one trigger cannot be both. Reverse is on **LT**, as
+in Rocket League itself. If the table meant something else, `GamepadInput.cpp` is the only file to
+change.
+
+### What was verified, and what could not be
+
+There is **no controller on this machine**, so nothing that needs a button pressed has been run. What
+was proven, by a temporary harness that called the real module and drew the real screens (removed
+afterwards):
+
+| Check | Result |
+|---|---|
+| Radial dead zone: inside is zero, full is full, half past the zone is half | ok |
+| A diagonal push keeps a magnitude of 1 and does not clip to the square corner | ok |
+| Trigger curve, signed convention: rest 0.00, half 0.47, full 1.00 | ok |
+| Trigger curve, unsigned convention: rest 0.00, half 0.47, full 1.00 | ok |
+| An unpolled axis (frame zero) is **zero throttle**, not half | ok — see below |
+| An idle pad contributes nothing: no throttle, steer, air control, buttons or menu input | ok |
+| `PlayerController` with no keys held and a pad enabled is all zero | ok |
+| Settings switch off makes the pad unavailable | ok |
+| `Rumble` with no pad is a silent no-op | ok |
+| Settings panel with the new Controls section: 678 px of a 720 px window, all rows inside | ok, screenshotted |
+| How-to-play sheet in both languages, lines inside their panels | ok, screenshotted both |
+| Debug / Development / Release build with no game-code warnings, smoke tests exit 0 | ok |
+
+**Still unproven, and it needs a real pad:** that the buttons are mapped where a player expects them,
+that the analogue feel is right, that vibration fires, and that unplugging mid-match leaves the car
+drivable (the code path is there — an absent pad is simply not found and every value stays at its
+zero — but it has not been watched happen).
+
+### Two things worth knowing before touching this
+
+- **A trigger reads 0 before raylib has polled the pad, and 0 through the signed remap is half
+  throttle.** raylib's axis array starts zeroed and is filled in `EndDrawing`, so the first frame
+  would have driven the car off on its own. `Trigger()` therefore only uses the -1..1 remap once it
+  has seen that trigger resting at a real negative value, and otherwise reads the raw number as
+  already 0..1 — which is both what an unpolled axis wants and what a driver that reports triggers
+  unsigned wants. This was not theoretical: the harness caught it on the first run.
+- **This machine enumerates its keyboard as a six-axis gamepad** (`RDMCTMZT CIDOO QK75 System
+  Control`), so `IsGamepadAvailable(0)` is true here with no controller attached. Do not read "a pad
+  is available" here as "a controller is plugged in".
+- **`gamepad::Update` therefore reads every pad that is present, not the first one — and that is a
+  fix, not a nicety.** The first version took the lowest present index, which on this machine is that
+  keyboard device, and a real controller plugged in behind it produced **no response at all**:
+  reported by the user, and the reason the module now merges. `IsGamepadAvailable` is only
+  `glfwJoystickPresent`, so "present" means any joystick. Merging is safe because a joystick GLFW has
+  no gamepad mapping for gets an all-zero state from `glfwGetGamepadState` — buttons clear, sticks at
+  zero, triggers forced to their resting -1 — so it contributes nothing to the strongest-wins merge.
+  This is not local multiplayer, which is still out of scope: it is one player and a machine that
+  lies about its hardware. The pad that last did something is the one that gets rumbled.
 
 ## Layout
 
@@ -2076,6 +2159,27 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   than 0.39 s, because the bot is turning towards its own goal instead of towards the ball. With the
   ball up the pitch the same wedge still frees in 0.37 s, and in real matches the worst stall actually
   *fell* from 1.58 s to 1.33 s. It is a different target, not a stall.
+
+### Gamepad
+- **The pad is merged into the keyboard's `CarInput`, never chosen between.** Whichever source is
+  pushing hardest wins each analogue field and the booleans are or-ed, so both devices stay live at
+  once and there is no mode to be in or to switch. With no pad connected the merge block reads zeros
+  and changes nothing, which is why keyboard play is untouched by all of this.
+- **Air control comes off the left stick, not off the throttle.** The keyboard derives pitch from W/S
+  because they are the same keys; on a pad the throttle is a trigger, and a trigger cannot pitch the
+  nose up. The inversion is kept: pushing the stick forward puts the nose down, as W does.
+- **Everything is sampled once per frame by `gamepad::Update`, and every query is a read of what it
+  stored.** Edges — a button going down, a stick leaving the centre — can only be found by comparing
+  against the previous frame, and a settings row that asks `MenuRight()` while another row asks it
+  too must get the same answer. `PlayerController::Poll` runs at 120 Hz, twice per frame, and reads
+  the same stored values both times.
+- **The stick is a set of four buttons to a menu, with no auto-repeat.** It counts as pressed when it
+  leaves the centre past 0.55 and re-arms when it comes back, so holding it does not run down a list.
+- **The dead zone is radial, not per axis.** A per-axis zone squares off the circle the stick moves
+  in, so a diagonal push clips to the corner and reads as full deflection on both axes.
+- **Keyboard activity is detected with `IsKeyDown` over the game's own keys, never `GetKeyPressed`.**
+  That call pops raylib's queue, and the title screen is reading the same queue to leave itself
+  (Milestone 17): draining it here would strand the player on the title card.
 
 ### Menus
 - **`uistyle::Button` is the shared standalone button** used by the car picker and the how-to-play

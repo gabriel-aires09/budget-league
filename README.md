@@ -45,6 +45,28 @@ which turns the match into solo practice with both goals still scoring.
 | **Esc** or **P** | Pause |
 | **F1** | Tuning panel (Debug and Development builds only) — freezes the match while open |
 
+### Driving with a gamepad
+
+The Rocket League layout, Xbox names. The pad and the keyboard are live at the
+same time — there is no mode to switch — and throttle and steering are analogue,
+so a half-pressed trigger is half throttle.
+
+| Input | Action |
+|---|---|
+| **RT** / **LT** | Accelerate / reverse |
+| **Left stick** | Steer |
+| **A** | Jump, again for a double jump or a flip |
+| **B** (hold) | Boost |
+| **Left stick** (airborne) | Pitch and yaw |
+| **X** + left stick (airborne) | Air roll |
+| **Y** | Toggle chase cam / ball cam |
+| **RB** | Reset the car to its spawn |
+| **Start** | Pause |
+
+In menus: the left stick or the D-pad moves and changes values, **A** confirms
+and **B** goes back. Settings → Controls has the gamepad on/off switch, the stick
+dead zone and a vibration toggle.
+
 ### Menus
 
 | Input | Action |
@@ -54,6 +76,8 @@ which turns the match into solo practice with both goals still scoring.
 | **Enter** / **Space** | Activate |
 | **Esc** | Close the settings panel / go back |
 | Mouse | Hover to select, click to activate |
+| **A** / **B** (gamepad) | Activate / go back |
+| Left stick or D-pad | Move between rows, change a value |
 | Any key / mouse / gamepad button | Leave the title screen |
 
 ### Full time
@@ -61,6 +85,7 @@ which turns the match into solo practice with both goals still scoring.
 | Input | Action |
 |---|---|
 | **Enter** | Rematch |
+| **A** / **B** (gamepad) | Rematch / main menu |
 | Mouse | REMATCH or MAIN MENU |
 | **Esc** or **P** | Pause menu, to leave any other way |
 
@@ -188,7 +213,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **19 — Settings Screen (main-menu layout)** — opened from the main menu the panel is centred on both axes with no game title above it, over the still-running showcase; opened from the pause menu it is unchanged. The one shared widget takes a background flag.
 - [x] **20 — Soundtrack (OST playlist)** — the six tracks in `Game/Assets/Sounds/` are copied into each build and streamed as a shuffled playlist: a new song starts whenever one ends, never the same one twice in a row, with its own Music volume slider.
 - [x] **21 — Cross-Platform Builds** — a `Makefile`-only change, with no game code touched: `TARGET_OS` picks the link line, the `.exe` suffix and raylib's platform. The Windows executable is built and verified by cross-compiling from Linux with `x86_64-w64-mingw32` and running its smoke test under Wine; it links the MinGW runtime statically, so only system DLLs are needed. macOS support is written but **not built** — there is no Mac in this project's environment. See [docs/CrossPlatformBuild.md](docs/CrossPlatformBuild.md).
-- [ ] **22 — Gamepad Support** — spec written in `CLAUDE.md`, not implemented yet: the Rocket League button layout as the default mapping, analogue throttle and steering through a new `gamepad` input module, gamepad navigation in the shared menu widgets, and a Controls section in Settings (dead zone, vibration). The button layout table itself is still to be filled in.
+- [x] **22 — Gamepad Support** — the whole game is playable on a controller, title screen to goal celebration, without touching the keyboard. One new module, `GamepadInput.h/cpp`, owns raylib's ids, the Rocket League mapping, a radial dead zone and the trigger curve, and hands the rest of the game `Throttle()`, `Jump()`, `MenuConfirm()` and friends. Throttle and steering are analogue; the pad merges into `CarInput` beside the keyboard, strongest source per field, so both stay live with no mode. Settings gained a Controls section (gamepad on/off, dead zone, vibration), the pad rumbles on hits, impacts and goals, and the how-to-play sheet and the car picker's hint switch to button names once the pad is the device in use.
 
 ### Final milestone — polish
 

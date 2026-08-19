@@ -24,6 +24,12 @@ struct GameSettings
     int matchDurationMinutes = 5;
     bool botEnabled = true;
 
+    // Controls
+    bool gamepadEnabled = true;
+    // Radial, on both sticks. 0.15 is the usual resting slop of an Xbox pad.
+    float stickDeadZone = 0.15f;
+    bool vibrationEnabled = true;
+
     // Audio
     int masterVolume = 80;
     int sfxVolume = 80;

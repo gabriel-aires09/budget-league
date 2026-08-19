@@ -1,6 +1,7 @@
 #include "UserInterface.h"
 
 #include "AudioSystem.h"
+#include "GamepadInput.h"
 
 namespace uistyle
 {
@@ -119,9 +120,9 @@ namespace uistyle
             return;
 
         int previous = selected;
-        if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S))
+        if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S) || gamepad::MenuDown())
             selected = (selected + 1) % itemCount;
-        if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W))
+        if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) || gamepad::MenuUp())
             selected = (selected + itemCount - 1) % itemCount;
         if (selected != previous)
             audio::Play(AudioCue::UiHover);
@@ -134,7 +135,7 @@ namespace uistyle
         bool clicked = CheckCollisionPointRec(GetMousePosition(), bounds) &&
                        IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
         bool activated = selected && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) ||
-                                      IsKeyPressed(KEY_SPACE));
+                                      IsKeyPressed(KEY_SPACE) || gamepad::MenuConfirm());
         if (clicked || activated)
             audio::Play(AudioCue::UiClick);
         return clicked || activated;
@@ -161,13 +162,13 @@ namespace uistyle
             return 0;
 
         int delta = 0;
-        if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D))
+        if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || gamepad::MenuRight())
             delta = 1;
-        else if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A))
+        else if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A) || gamepad::MenuLeft())
             delta = -1;
         // Clicking or pressing enter cycles forward.
         else if ((CheckCollisionPointRec(GetMousePosition(), bounds) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) ||
-                 IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))
+                 IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || gamepad::MenuConfirm())
             delta = 1;
 
         if (delta != 0)

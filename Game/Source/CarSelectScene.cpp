@@ -1,4 +1,5 @@
 #include "CarSelectScene.h"
+#include "GamepadInput.h"
 
 #include <raymath.h>
 
@@ -69,7 +70,7 @@ void CarSelectScene::Update(float deltaTime)
 {
     spinDegrees = fmodf(spinDegrees + SPIN_RATE * deltaTime, 360.0f);
 
-    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE))
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) || gamepad::MenuCancel())
         pendingAction = MenuAction::MainMenu;
 }
 
@@ -83,11 +84,12 @@ void CarSelectScene::Draw()
     // Grid navigation. With only two rows, up and down are the same move.
     int column = selected % COLUMNS;
     int row = selected / COLUMNS;
-    if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D))
+    if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || gamepad::MenuRight())
         column = (column + 1) % COLUMNS;
-    if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A))
+    if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A) || gamepad::MenuLeft())
         column = (column + COLUMNS - 1) % COLUMNS;
-    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W))
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) ||
+        gamepad::MenuDown() || gamepad::MenuUp())
         row = 1 - row;
     selected = row * COLUMNS + column;
 
@@ -170,7 +172,8 @@ void CarSelectScene::Draw()
         start = true;
     }
 
-    if (start || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE))
+    if (start || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE) ||
+        gamepad::MenuConfirm())
     {
         settings->playerCarModel = CARS[selected].model;
         pendingAction = MenuAction::StartMatch;
@@ -180,8 +183,11 @@ void CarSelectScene::Draw()
         pendingAction = MenuAction::MainMenu;
     }
 
-    uistyle::DrawTextCentered("Arrows or WASD choose - Enter or right click a car starts the match - Esc goes back",
-                              centerX, GetScreenHeight() - 36.0f * scale, 17.0f, uistyle::TextDim);
+    uistyle::DrawTextCentered(
+        gamepad::LastDeviceWasGamepad()
+            ? "Left stick or D-pad choose - A starts the match - B goes back"
+            : "Arrows or WASD choose - Enter or right click a car starts the match - Esc goes back",
+        centerX, GetScreenHeight() - 36.0f * scale, 17.0f, uistyle::TextDim);
 }
 
 void CarSelectScene::Shutdown()

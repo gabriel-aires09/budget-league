@@ -8,8 +8,8 @@ static const float ROW_HEIGHT = 32.0f;
 static const float ROW_GAP = 4.0f;
 static const float PADDING = 26.0f;
 static const float BOTTOM_PAD = 22.0f;
-static const int ROW_COUNT = 10;    // 9 values plus Back
-static const int SECTION_COUNT = 3; // Graphics, Gameplay, Audio
+static const int ROW_COUNT = 13;    // 12 values plus Back
+static const int SECTION_COUNT = 4; // Graphics, Gameplay, Controls, Audio
 
 static const int RESOLUTIONS[][2] = { { 0, 0 }, { 1280, 720 }, { 1600, 900 }, { 1920, 1080 } };
 static const int RESOLUTION_COUNT = 4;
@@ -109,6 +109,27 @@ bool SettingsMenu::Draw(GameSettings &settings, Rectangle area, SettingsBackgrou
     delta = menu.ValueItem(row, "Bot opponent", settings.botEnabled ? "Enabled" : "Solo practice", index++);
     if (delta != 0)
         settings.botEnabled = !settings.botEnabled;
+    row.y += (ROW_HEIGHT + ROW_GAP) * scale;
+
+    uistyle::DrawTextAt("CONTROLS", row.x, row.y + 4.0f * scale, 16.0f, uistyle::Accent);
+    row.y += SECTION_GAP * scale;
+
+    delta = menu.ValueItem(row, "Gamepad", settings.gamepadEnabled ? "Enabled" : "Off", index++);
+    if (delta != 0)
+        settings.gamepadEnabled = !settings.gamepadEnabled;
+    row.y += (ROW_HEIGHT + ROW_GAP) * scale;
+
+    // Shown as a percentage because that is what a dead zone reads as, but held
+    // as the 0..1 fraction gamepad::Update wants.
+    delta = menu.ValueItem(row, "Stick dead zone",
+                           TextFormat("%i%%", (int)(settings.stickDeadZone * 100.0f + 0.5f)), index++);
+    if (delta != 0)
+        settings.stickDeadZone = Clamp((int)(settings.stickDeadZone * 100.0f + 0.5f) + delta * 5, 0, 40) / 100.0f;
+    row.y += (ROW_HEIGHT + ROW_GAP) * scale;
+
+    delta = menu.ValueItem(row, "Vibration", settings.vibrationEnabled ? "On" : "Off", index++);
+    if (delta != 0)
+        settings.vibrationEnabled = !settings.vibrationEnabled;
     row.y += (ROW_HEIGHT + ROW_GAP) * scale;
 
     uistyle::DrawTextAt("AUDIO", row.x, row.y + 4.0f * scale, 16.0f, uistyle::Accent);

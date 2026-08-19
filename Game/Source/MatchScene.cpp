@@ -1,6 +1,7 @@
 #include "MatchScene.h"
 
 #include "AudioSystem.h"
+#include "GamepadInput.h"
 #include "PostProcess.h"
 
 #include <raymath.h>
@@ -167,7 +168,7 @@ void MatchScene::Update(float deltaTime)
     }
 #endif
 
-    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P))
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P) || gamepad::Pause())
     {
         if (settingsOpen)
             settingsOpen = false;
@@ -215,6 +216,7 @@ void MatchScene::UpdateEffects(float deltaTime)
             effects::Burst(ballPosition, Vector3{ 0.0f, 1.0f, 0.0f }, 40, 18.0f, 1.0f,
                            Color{ 255, 255, 255, 255 }, 0.35f, 1.1f);
             chaseCamera.Shake(1.0f); // the one full-strength punch in the game
+            gamepad::Rumble(1.0f, 0.45f); // and the one full-strength rumble
             audio::Play(AudioCue::Goal);
         }
         else if (match.state == MatchState::Kickoff)
@@ -263,6 +265,8 @@ void MatchScene::UpdateEffects(float deltaTime)
         // as one hit. Deliberately well short of the goal's: a scramble in front
         // of the net is a lot of these in a row.
         chaseCamera.Shake(0.18f + 0.42f * punch);
+        // The pad is given the same punch, so a hit is felt as well as seen.
+        gamepad::Rumble(0.25f + 0.5f * punch, 0.1f + 0.12f * punch);
         // The harder the hit the louder and the deeper the thump.
         audio::Play(AudioCue::BallHit, 0.55f + 0.45f * punch, 1.15f - 0.3f * punch);
     }
@@ -274,8 +278,11 @@ void MatchScene::UpdateEffects(float deltaTime)
     float carSpeed = Vector3Length(playerCar.GetBodyVelocity());
     float lost = previousCarSpeed - carSpeed;
     if (lost > 5.0f && match.state != MatchState::Kickoff)
+    {
         audio::Play(AudioCue::Impact, fminf(0.35f + lost / 25.0f, 1.0f),
                     0.9f + GetRandomValue(0, 200) / 1000.0f); // varied, so repeats do not read as one sample
+        gamepad::Rumble(fminf(0.2f + lost / 30.0f, 0.8f), 0.12f);
+    }
     previousCarSpeed = carSpeed;
 
     // Boost only ever goes up by a pad, so the pickup needs no event of its own.

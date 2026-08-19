@@ -2,6 +2,7 @@
 
 #include "AudioSystem.h"
 #include "CarSelectScene.h"
+#include "GamepadInput.h"
 #include "HowToPlayScene.h"
 #include "Lighting.h"
 #include "ImGuiRaylib.h"
@@ -107,6 +108,10 @@ void App::Run()
         // Before the scene, so its panels can call ImGui while they draw.
         imgui::BeginFrame(GetFrameTime());
 #endif
+        // Before the scene, because everything it reads is stored by this one
+        // call: the pad's edges cannot be found twice in a frame.
+        gamepad::Update(settings);
+
         // Read every frame rather than at Initialize, so both volume sliders are
         // heard as they move, exactly like the camera sensitivity.
         audio::SetVolumes(settings.masterVolume, settings.sfxVolume, settings.musicVolume);

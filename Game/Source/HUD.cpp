@@ -1,4 +1,5 @@
 #include "HUD.h"
+#include "GamepadInput.h"
 
 #include "UserInterface.h"
 
@@ -196,9 +197,9 @@ MenuAction hud::DrawFullTime(const Match &match)
 
     // Enter repeats the match, as on the other screens where the primary action
     // is also on the keyboard. Esc is not read here: it belongs to the pause menu.
-    if (rematch || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))
+    if (rematch || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || gamepad::MenuConfirm())
         return MenuAction::StartMatch;
-    if (mainMenu)
+    if (mainMenu || gamepad::MenuCancel())
         return MenuAction::MainMenu;
 
     return MenuAction::None;
