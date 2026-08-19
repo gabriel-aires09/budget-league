@@ -153,7 +153,7 @@ make release TARGET_OS=Windows \
      CXX=x86_64-w64-mingw32-g++ CC=x86_64-w64-mingw32-gcc AR=x86_64-w64-mingw32-ar
 ```
 
-The result is `Build/Windows/Release/ArcadeCarSoccer.exe` with its `assets/` folder beside it —
+The result is `Build/Windows/Release/BudgetLeague.exe` with its `assets/` folder beside it —
 copy both together, and nothing else: the MinGW runtime is linked statically. Building natively on
 Windows works the same way without the toolchain variables, but needs MSYS2 or Git Bash, since the
 `Makefile` uses `find` and `rm -rf`. Use a `release`/`development`/`debug` goal rather than a bare
@@ -173,13 +173,13 @@ them in code.
 ```sh
 make run CONFIG=Development
 # or directly
-./Build/Release/ArcadeCarSoccer
+./Build/Release/BudgetLeague
 ```
 
 Headless-ish validation — render N frames, write a screenshot and exit:
 
 ```sh
-./Build/Release/ArcadeCarSoccer --smoke-test 60 --screenshot SmokeTest.png
+./Build/Release/BudgetLeague --smoke-test 60 --screenshot SmokeTest.png
 ```
 
 The asset cooker needs **Pillow** to cook textures. Either have it on the system `python3`, or create
@@ -237,7 +237,7 @@ Game/Source/       game code (scenes, GameObjects, systems)
 Game/ThirdParty/   raylib, Jolt, glm, imgui (cloned, git-ignored)
 Game/Assets/       Cars-Park car pack and the lit shader
 Tools/             AssetCooker.py, FbxReader.py
-Build/<Config>/    ArcadeCarSoccer + cooked assets (Linux)
+Build/<Config>/    BudgetLeague + cooked assets (Linux)
 Build/Windows/…    the same, for a Windows build
 ```
 

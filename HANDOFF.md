@@ -1065,6 +1065,51 @@ zero — but it has not been watched happen).
   This is not local multiplayer, which is still out of scope: it is one player and a machine that
   lies about its hardware. The pad that last did something is the one that gets rumbled.
 
+## The window icon, the executable icon and the name
+
+Asked for after Milestone 22: an icon on the window and on the executable, and the game called
+**Budget League** rather than ArcadeCarSoccer.
+
+- **Window icon** — `App::Initialize` decodes the cooked logo and hands raylib three sizes (16, 32,
+  64) through `SetWindowIcons`, which is what a desktop wants: one for the title bar, one for the
+  task bar, one for the switcher. `TextureAsset` grew `LoadCookedImage`, the same `.evtex` decode it
+  already had but stopping at the pixels instead of uploading them, and `TextureAsset::Load` now goes
+  through it — one decoder, two callers. A missing cooked logo is not fatal: the window keeps the
+  default icon, like every other missing asset in this game.
+- **Executable icon** — Windows only, because it is the only platform here that can carry one: it is
+  a PE resource. `Tools/MakeIcon.py` cooks `budget-league-logo.png` into a seven-size `.ico`,
+  `Game/Source/BudgetLeague.rc` names it along with a version block, and the Makefile compiles that
+  with `windres` into an object linked with the game — all of it inside `ifeq ($(TARGET_OS),Windows)`,
+  so the Linux and macOS builds never see it. The `.ico` is generated into the intermediate folder
+  and is not checked in.
+  - **ELF cannot hold an icon at all**, so on Linux the window icon is the whole of it. What a file
+    manager or a launcher shows for a Linux build comes from a `.desktop` entry, which is an
+    installation matter rather than a build one and was not added.
+- **The executable is now `BudgetLeague`** (`BudgetLeague.exe` on Windows). **Not "Budget League"
+  with a space:** make splits targets and prerequisites on whitespace, so a path with a space in it
+  cannot be a build target. The window title was already "Budget League" and did not change.
+
+| Check | Result |
+|---|---|
+| Cooked logo decodes to pixels | 512x512, `PIXELFORMAT_UNCOMPRESSED_R8G8B8A8`, real artwork (centre pixel 16 135 238) |
+| Resized to 16, 32 and 64 | all three fine |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank |
+| Windows cross build | links, and the PE carries `ICON`, `GROUP_ICON` and `VERSION` resources — checked by walking its resource directory |
+| GLFW backend in use | X11, which supports window icons. **Native Wayland does not**, and GLFW says so rather than failing; the game is unaffected either way |
+| `make run`, the smoke test, the docs | all updated to the new name |
+
+**The Windows Release build no longer opens a terminal beside the game.** MinGW links against the
+console subsystem by default, so double-clicking the shipped `.exe` opened a terminal and filled it
+with raylib's start-up log — a development tool turning up in a shipped build. Release on Windows now
+links with `-mwindows`, which is the GUI subsystem; Debug and Development keep their console, which
+is where that log is wanted. Verified by reading the PE optional header: Release reports subsystem
+**2 (GUI)** and Development **3 (console)**, and the Release build still runs under Wine, exits 0 and
+writes a non-blank screenshot. Nothing on Linux or macOS is touched — the flag is inside the Windows
+branch of `LDFLAGS_MODE`.
+
+`CLAUDE.md` still names `./ArcadeCarSoccer` in the Milestone 21 verification line. That file is the
+spec and belongs to the project owner, so it was left alone.
+
 ## Layout
 
 ```
@@ -1106,7 +1151,7 @@ Game/Assets/       Cars-Park/ (OBJ, FBX, Blends, License.txt, Preview.png)
                    Icon/ (budget-league-logo.png), Textures/ (three unused arena PNGs)
                    Shaders/ (Lit.vs, Lit.fs, Bright.fs, Blur.fs)
 Tools/             AssetCooker.py, FbxReader.py, requirements.txt
-Build/<Config>/    ArcadeCarSoccer + assets/Models/*.evmodel + assets/Textures/*.evtex
+Build/<Config>/    BudgetLeague + assets/Models/*.evmodel + assets/Textures/*.evtex
                    + assets/Shaders/*
 ```
 
@@ -1116,10 +1161,10 @@ Build/<Config>/    ArcadeCarSoccer + assets/Models/*.evmodel + assets/Textures/*
 make                 # Development (default)
 make debug           # or: make development / make release / make all
 make run CONFIG=Debug
-./Build/Release/ArcadeCarSoccer
+./Build/Release/BudgetLeague
 
 # headless-ish validation: run N frames, write a screenshot, exit
-./Build/Release/ArcadeCarSoccer --smoke-test 60 --screenshot SmokeTest.png
+./Build/Release/BudgetLeague --smoke-test 60 --screenshot SmokeTest.png
 ```
 
 Controls so far: **WASD / arrows** drive and steer on the ground and pitch/yaw in the air,
@@ -1142,7 +1187,7 @@ To cross-compile the Windows executable from Linux (Milestone 21; full notes in
 make -C Game/ThirdParty/raylib/src clean      # only when switching toolchains
 make release TARGET_OS=Windows \
      CXX=x86_64-w64-mingw32-g++ CC=x86_64-w64-mingw32-gcc AR=x86_64-w64-mingw32-ar
-# -> Build/Windows/Release/ArcadeCarSoccer.exe + assets/
+# -> Build/Windows/Release/BudgetLeague.exe + assets/
 ```
 
 Use the `release`/`development`/`debug` goal, not a bare `CONFIG=Release` — the default goal

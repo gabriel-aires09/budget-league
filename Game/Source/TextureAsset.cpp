@@ -3,7 +3,6 @@
 #include "StaticModelAsset.h" // assets::Path, so there is one scheme for both
 
 #include <cstring>
-#include <vector>
 
 namespace
 {
@@ -84,10 +83,8 @@ namespace
     }
 }
 
-bool TextureAsset::Load(const std::string &name)
+bool LoadCookedImage(const std::string &name, Image &image)
 {
-    Unload();
-
     std::string path = assets::Path("Textures/" + name + ".evtex");
     int size = 0;
     unsigned char *data = LoadFileData(path.c_str(), &size);
@@ -118,34 +115,47 @@ bool TextureAsset::Load(const std::string &name)
         return false;
     }
 
-    std::vector<Pixel> pixels((size_t)width * (size_t)height);
-    bool decoded = DecodeQoi(data + HEADER_BYTES, payload, width * height, pixels.data());
+    // Allocated the way raylib allocates an Image, because UnloadImage is what
+    // frees it: a std::vector here would be freed twice or not at all.
+    Pixel *pixels = (Pixel *)RL_MALLOC((size_t)width * (size_t)height * sizeof(Pixel));
+    bool decoded = pixels != nullptr && DecodeQoi(data + HEADER_BYTES, payload, width * height, pixels);
     UnloadFileData(data);
     if (!decoded)
     {
+        RL_FREE(pixels);
         TraceLog(LOG_WARNING, "TEXTURE: %s is truncated or corrupt", path.c_str());
         return false;
     }
 
-    // The pixels go straight to the GPU; nothing keeps a copy in RAM, so the
-    // Image is not unloaded (it does not own the vector's memory).
-    Image image = {};
-    image.data = pixels.data();
+    image = Image{};
+    image.data = pixels;
     image.width = width;
     image.height = height;
     image.mipmaps = 1;
     image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+    return true;
+}
+
+bool TextureAsset::Load(const std::string &name)
+{
+    Unload();
+
+    Image image = {};
+    if (!LoadCookedImage(name, image))
+        return false;
+
     texture = LoadTextureFromImage(image);
+    UnloadImage(image); // nothing keeps a copy in RAM once it is on the GPU
     if (!IsTextureValid(texture))
     {
-        TraceLog(LOG_WARNING, "TEXTURE: %s could not be uploaded", path.c_str());
+        TraceLog(LOG_WARNING, "TEXTURE: %s could not be uploaded", name.c_str());
         return false;
     }
 
     // The logo is drawn scaled to the window, so it is always resampled.
     SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
     loaded = true;
-    TraceLog(LOG_INFO, "TEXTURE: loaded %s (%ix%i)", path.c_str(), width, height);
+    TraceLog(LOG_INFO, "TEXTURE: loaded %s (%ix%i)", name.c_str(), texture.width, texture.height);
     return true;
 }
 
