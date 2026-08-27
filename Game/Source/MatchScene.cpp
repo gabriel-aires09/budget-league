@@ -1,5 +1,6 @@
 #include "MatchScene.h"
 
+#include "AudioSystem.h"
 #include "PostProcess.h"
 
 #include <raymath.h>
@@ -83,6 +84,9 @@ void MatchScene::Initialize()
     chaseCamera.maxHeight = arena.wallHeight - 0.8f;
     chaseCamera.Initialize(camera, playerCar);
 
+    // Seeded, or the first frame reads a full tank as a pad pickup.
+    previousBoostAmount = playerCar.boostAmount;
+
     match.AddCar(playerCar);
     if (botActive)
         match.AddCar(botCar);
@@ -153,7 +157,10 @@ void MatchScene::Update(float deltaTime)
     // Frozen while the panel is up, so nothing below runs - not the pause key
     // either, which ImGui may be using for a text field.
     if (tuningPanel.open)
+    {
+        audio::SetBoost(false); // the one cue that is held, so it has to be released
         return;
+    }
 #endif
 
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P))
@@ -165,7 +172,10 @@ void MatchScene::Update(float deltaTime)
     }
 
     if (paused)
+    {
+        audio::SetBoost(false);
         return;
+    }
 
     match.Update(deltaTime);
 
@@ -200,12 +210,37 @@ void MatchScene::UpdateEffects(float deltaTime)
             effects::Burst(ballPosition, outward, 90, 26.0f, 0.85f, team, 0.55f, 1.6f);
             effects::Burst(ballPosition, Vector3{ 0.0f, 1.0f, 0.0f }, 40, 18.0f, 1.0f,
                            Color{ 255, 255, 255, 255 }, 0.35f, 1.1f);
+            audio::Play(AudioCue::Goal);
         }
         else if (match.state == MatchState::Kickoff)
         {
             effects::Clear(); // the field was just re-centred; nothing should linger
         }
+        else if (match.state == MatchState::Playing)
+        {
+            audio::Play(AudioCue::CountdownGo); // the countdown just released the field
+        }
+        else if (match.state == MatchState::Finished)
+        {
+            audio::Play(AudioCue::MatchEnd);
+        }
         previousState = match.state;
+    }
+
+    // One tick per whole second left of the countdown, from the same timer the
+    // HUD draws its digit from.
+    if (match.state == MatchState::Kickoff)
+    {
+        int digit = (int)ceilf(match.stateTimer);
+        if (digit != previousCountdownDigit)
+        {
+            audio::Play(AudioCue::CountdownTick);
+            previousCountdownDigit = digit;
+        }
+    }
+    else
+    {
+        previousCountdownDigit = -1; // re-armed for the countdown after a goal
     }
 
     // A hit is a jump in the ball's speed. Reading it here rather than from a
@@ -218,8 +253,27 @@ void MatchScene::UpdateEffects(float deltaTime)
         effects::Burst(ballPosition, Vector3{ 0.0f, 1.0f, 0.0f }, 8 + (int)(18.0f * punch),
                        6.0f + 10.0f * punch, 1.0f, Color{ 255, 236, 190, 255 },
                        0.18f + 0.16f * punch, 0.5f);
+        // The harder the hit the louder and the deeper the thump.
+        audio::Play(AudioCue::BallHit, 0.55f + 0.45f * punch, 1.15f - 0.3f * punch);
     }
     previousBallSpeed = ballSpeed;
+
+    // A wall or the other car, read the same way the ball hit is: a jump in the
+    // player's speed, here downwards. Braking never gets near this in one frame
+    // (about 0.65 m/s at 60 Hz), so only a real collision reaches it.
+    float carSpeed = Vector3Length(playerCar.GetBodyVelocity());
+    float lost = previousCarSpeed - carSpeed;
+    if (lost > 5.0f && match.state != MatchState::Kickoff)
+        audio::Play(AudioCue::Impact, fminf(0.35f + lost / 25.0f, 1.0f),
+                    0.9f + GetRandomValue(0, 200) / 1000.0f); // varied, so repeats do not read as one sample
+    previousCarSpeed = carSpeed;
+
+    // Boost only ever goes up by a pad, so the pickup needs no event of its own.
+    if (playerCar.boostAmount > previousBoostAmount + 0.01f)
+        audio::Play(AudioCue::BoostPad);
+    previousBoostAmount = playerCar.boostAmount;
+
+    audio::SetBoost(playerCar.boosting);
 
     for (CarObject *car : { &playerCar, botActive ? &botCar : &playerCar })
     {
@@ -230,6 +284,10 @@ void MatchScene::UpdateEffects(float deltaTime)
             under.y -= car->halfExtents.y;
             effects::Burst(under, Vector3{ 0.0f, -0.2f, 0.0f }, 10, 4.5f, 1.0f,
                            Color{ 190, 210, 240, 255 }, 0.16f, 0.35f);
+            // Pitched down for the second jump, which is what tells a flip from
+            // a jump without a second flag on the car.
+            if (car == &playerCar)
+                audio::Play(AudioCue::Jump, 1.0f, car->doubleJumpUsed ? 0.8f : 1.0f);
             car->jumpPending = false;
         }
 
@@ -356,6 +414,7 @@ void MatchScene::DrawEffects()
 
 void MatchScene::Shutdown()
 {
+    audio::SetBoost(false); // nothing else releases it when the scene goes away
     effects::Unload();
 
     JPH::BodyInterface &bodies = physicsSystem.GetBodyInterface();

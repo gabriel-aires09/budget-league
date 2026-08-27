@@ -146,7 +146,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **12 — Bot Opponent (or Solo Practice)** — an orange bot that drives at the ball from the side its shot comes from, boosts down the long approaches and frees itself when it gets blocked. 6-1 against a player who never moves. Switchable off for solo practice.
 - [x] **13 — Tuning Panels (Debug/Development)** — **F1** opens a Dear ImGui panel over the match with live sliders for gravity, the ball, car handling, boost and camera smoothing, and a Save button writing `Tuning.cfg` next to the executable, which the next match loads. Release contains none of it.
 - [x] **14 — Visual Polish and Effects** — contact shadows, a boost flame and ember trail, a ball highlight, particle bursts on goals, big hits and jumps, a goal screen flash, blocky stands and light rigs outside the glass, and toggleable bloom that costs about 0.1 ms a frame.
-- [ ] **15 — Audio** — not started; the audio device is not initialised and the volume settings are stored but unused.
+- [x] **15 — Audio** — ten procedural cues generated at startup from one synthesis table (no sound files): UI hover and click, jump, car-ball hit, wall/car impact, boost pad, countdown ticks, kickoff go, goal and full time, plus a boost roar held on a running audio stream. Master and SFX volumes are live from the settings panel.
 - [x] **16 — Arena Field Dimensions** — the arena now follows the supplied Rocket League reference at 76.81 m wide, 102.41 m goal-to-goal and 20.73 m floor-to-ceiling.
 - [ ] **17 — Car and Ball Dimensions** — not started; current gameplay dimensions remain unchanged.
 
