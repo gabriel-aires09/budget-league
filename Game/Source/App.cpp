@@ -8,6 +8,7 @@
 #include "MainMenuScene.h"
 #include "PostProcess.h"
 #include "MatchScene.h"
+#include "TitleScene.h"
 #include "UserInterface.h"
 
 #include <raylib.h>
@@ -58,10 +59,11 @@ bool App::Initialize(int argc, char **argv)
 #endif
 
     // The smoke test goes straight to the match, which is what needs validating.
+    // Everything else boots on the title screen: TitleScene -> MainMenuScene.
     if (smokeTest)
         SetScene(new MatchScene());
     else
-        SetScene(new MainMenuScene());
+        SetScene(new TitleScene());
 
     return true;
 }

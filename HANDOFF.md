@@ -20,17 +20,26 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 14 — Visual Polish and Effects**
 - [x] **Milestone 15 — Audio**
 - [x] **Milestone 16 — Arena Field Dimensions**
-- [ ] **Milestone 17 — Car and Ball Dimensions** — the next one
+- [x] **Milestone 17 — Title Screen ("Press Any Button")**
+- [x] **Milestone 18 — Main Menu Showcase**
+- [x] **Milestone 19 — Settings Screen (main-menu layout)**
+
+Every milestone in CLAUDE.md is now done; what is left is the section 6 polish list.
 
 Two pieces of work outside the milestone list are also done: the **asset pipeline** (FBX cooking plus
 the car models, CLAUDE.md 4.1) and the **arena ramps with wall and ceiling driving** (PROMPTS.md).
 
 Milestone 08 was inserted into CLAUDE.md after 09 was already built, which is why it was finished out
 of order. Everything from the old Milestone 08 onwards shifted up by one; this document uses the new
-numbering throughout. The current list ends with Milestone 16 — Arena Field Dimensions and Milestone
-17 — Car and Ball Dimensions.
+numbering throughout. **CLAUDE.md was also rewritten on 2026-08-04:** the old Milestone 17 (car and
+ball dimensions) was dropped and replaced by Milestone 17 — Title Screen and Milestone 18 — Main Menu
+Showcase, which is where the list now ends.
 
-The game opens on a main menu (Play / How to play / Settings / Exit). How to play is its own screen
+The game opens on a title screen: the cooked logo over a live view of the real arena, with the ball
+resting on the pitch beside the far goal and a pulsing "press any button to start". Any key, mouse
+button or gamepad button goes to the main menu, which is a showcase of the same kind: the arena
+behind it, one of the seven cooked cars parked on the pitch in a random team colour turning slowly,
+and the list (Play / How to play / Settings / Exit) down the left. How to play is its own screen
 of rules and controls. Play opens the car picker — six of the
 seven cooked cars on a 2 x 3 grid of pedestals, spinning slowly in the team colour — and starting
 from there opens a real match: an enclosed
@@ -483,13 +492,79 @@ ba71bd4 -- GoalObject.h GoalObject.cpp` restores it exactly, and the diff betwee
   The reference image is of the unlit-face end. Both were verified against the shader arithmetic
   rather than by eye.
 
+Milestone 17 title screen, implemented on `feat/new-menu` on 2026-08-04. It brought the texture half
+of the asset pipeline with it: nothing had ever been cooked as a texture before, so `.evtex`,
+`TextureAsset` and the cooker's PNG step are all new here.
+
+The format first. A temporary probe decoded every cooked `.evtex` back in Python and compared it
+against the source PNG (removed afterwards):
+
+| Texture | Cooked size | Payload | Of raw RGBA | Lossless | Cook time |
+|---|---|---|---|---|---|
+| budget-league-logo | 512 x 512 | 222 KB | 22% | yes, byte for byte | 0.11 s |
+| metal-grid-wall | 512 x 512 | 210 KB | 21% | yes | 0.11 s |
+| stylized-grass-lowpoly | 512 x 512 | 361 KB | 35% | yes | 0.14 s |
+| stylized-stone | 512 x 512 | 334 KB | 33% | yes | 0.13 s |
+
+Then the screen itself, from screenshots and a temporary probe that logged the ball and the camera
+every 100 frames (also removed):
+
+| Check | Result |
+|---|---|
+| Boot flow | launch opens `TitleScene`; the smoke test still goes straight to the match |
+| The mark | the cooked badge on the left and BUDGET over LEAGUE on its right, centred as one block, as on the reference |
+| Prompt | pulses between 0.65 and 1.0 alpha, clear of both the ball and the goal |
+| Live 3D | the real arena, both nets and the ball, lit and bloomed exactly as the match is |
+| Composition | orange goal left of centre, ball resting bottom right with its contact shadow |
+| Idle | the camera yaws 2.5 degrees either side over 24 s; measured drifting 10.2 → 8.5 → 11.9 |
+| No gameplay | ball at (16.0000, 1.2500, -40.0000) for 13.35 s, unchanged to four decimals |
+| Fade in | the screen is dark at 0.2 s and clear by 0.6 s |
+| Any button | forcing a press at 1.0 s lands in the main menu, drawn correctly |
+| 1280x720 / 1920x1080 / 960x540 | logo, prompt and credits stay centred and inside the window |
+| Missing `assets/Textures` | logs `TEXTURE: could not read ...`, draws the name alone centred, keeps running |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no warnings or errors in the log |
+
+Milestone 18 main menu showcase, implemented on `feat/new-menu` on 2026-08-04, verified from
+screenshots and a temporary probe that logged each pick and built the scene twice in one process
+(both removed afterwards):
+
+| Check | Result |
+|---|---|
+| Live 3D behind the menu | the real arena and both nets, with one cooked car parked at the centre spot |
+| Angle | 3/4 front, camera low at 1.9 m and off to the left, so the car fills the right of the frame |
+| Turntable | 12 degrees a second, the only thing in the scene that moves |
+| Random pick | `Cop` blue then `SUV` orange from two entries in one process; `SportsCar2`, `Taxi`, `NormalCar1` and `NormalCar2` all seen across runs |
+| Re-roll on re-entry | yes - the pick is in `Initialize`, and entering the menu is what runs it |
+| Menu | Play / How to play / Settings / Exit down the left, keyboard and mouse, accent bar on the selected row |
+| Weekly Challenges panel | not built, as CLAUDE.md requires |
+| Settings | opens centred over the showcase, closes back to the list |
+| Credits and build string | bottom left, as in the base menu |
+| 1280x720 / 1920x1080 / 960x540 | the column, the title and the credits all hold their place |
+| Missing `assets/Models` | falls back to the box stand-in in the team colour, no crash |
+| Teardown across two menu scenes | Debug: no Jolt assert, exactly three shader programs unloaded at exit (lit, Bright, Blur) |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no warnings or errors in the log |
+
+Milestone 19 settings screen, implemented on `feat/new-menu` on 2026-08-04, verified from screenshots
+of both contexts (temporary probes that forced each one open, removed afterwards):
+
+| Check | From the main menu | From the pause menu |
+|---|---|---|
+| Game title above the panel | gone | never had one |
+| Panel position | centred on both axes | unchanged, 105 units from the top |
+| Behind the panel | the showcase, arena and car still visible | the paused match under the pause overlay |
+| Dimming | the module lays down 0.35 of its own | none of its own; the scene already dims 0.65 |
+| 1280x720 / 1920x1080 / 960x540 | centred at all three | unchanged |
+| Rows, sections and Back | the same widget, so identical in both | identical |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no warnings or errors in the log | |
+
 ## Layout
 
 ```
 Game/Source/
   Main.cpp, App.h/cpp          entry point, window, settings, scene switching, smoke test
   Scene.h/cpp                  camera + GameObjects + Jolt PhysicsSystem, fixed step loop
-  MainMenuScene.h/cpp          title, Play / How to play / Settings / Exit, credits and build string
+  TitleScene.h/cpp             the launch screen: logo and prompt over the live arena
+  MainMenuScene.h/cpp          the showcase menu: arena and a turntabling car behind the list
   HowToPlayScene.h/cpp         the how-to-play screen: six panels of rules and controls
   CarSelectScene.h/cpp         the car picker: six cooked cars on a 2 x 3 grid of pedestals
   MatchScene.h/cpp             the gameplay scene and the pause overlay
@@ -506,6 +581,7 @@ Game/Source/
   SettingsMenu.h/cpp           settings panel reused by both menus
   GameObject.h/cpp             base object, body transform helpers
   StaticModelAsset.h/cpp       .evmodel loader + assets::Path, team repaint
+  TextureAsset.h/cpp           .evtex loader: the QOI decoder and the upload
   Lighting.h/cpp               namespace lighting: the one lit shader, Apply/Detach
   GameObjects/CarObject.h/cpp  arcade car (single box body + cooked car model)
   GameObjects/BallObject.h/cpp the ball (single dynamic sphere)
@@ -519,10 +595,11 @@ Game/Source/
   PhysicsLayers.h/cpp          namespace physics: layers and Jolt filters
 Game/ThirdParty/   raylib, Jolt, glm, imgui     (cloned, git-ignored)
 Game/Assets/       Cars-Park/ (OBJ, FBX, Blends, License.txt, Preview.png)
+                   Icon/ (budget-league-logo.png), Textures/ (three unused arena PNGs)
                    Shaders/ (Lit.vs, Lit.fs, Bright.fs, Blur.fs)
 Tools/             AssetCooker.py, FbxReader.py, requirements.txt
-Build/<Config>/    ArcadeCarSoccer + assets/Models/*.evmodel + assets/Shaders/*
-README.md          player-facing readme: about the game, stack, controls
+Build/<Config>/    ArcadeCarSoccer + assets/Models/*.evmodel + assets/Textures/*.evtex
+                   + assets/Shaders/*
 ```
 
 ## How to build and run
@@ -831,7 +908,7 @@ is incremental.
   `GameObject::Update` is called once per *fixed step*, right before the simulation runs — this
   matters because Jolt forces only persist for one step, so applying them per frame would be wrong.
 - **Field scale:** 76.81 m (X) x 102.41 m (Z) x 20.73 m (Y), with a 1.7 x 0.7 x 3.2 m car and
-  32 m/s non-boosted top speed. Car and ball dimensions remain Milestone 17 work.
+  32 m/s non-boosted top speed.
 - **Forward is local −Z**, right is +X, up is +Y — the OpenGL/raylib convention, shared with Jolt.
   Positive yaw turns left, so steering negates it.
 - The car spawns at `(0, 0.45, 15)` facing the middle of the field.
@@ -878,6 +955,106 @@ is incremental.
   working directory. `TextureAsset` should reuse it rather than adding a second scheme.
 - **The cooked model is optional.** If `assets/Models` is missing, `CarObject` falls back to the old
   box; the game still runs from an uncooked build instead of crashing.
+
+### Main menu showcase
+- **The showcase car is a `StaticModelAsset` drawn directly, not a `CarObject`.** A `CarObject` would
+  want a `PhysicsSystem`, a body and a controller for a prop that only turns on the spot. This is the
+  same reasoning - and very nearly the same code - as the car picker's six previews.
+- **The scene still calls `InitializePhysics`, because `ArenaObject` builds a body**, and physics is
+  never stepped. It is the title screen's arrangement exactly: the bodies exist so the arena has its
+  `pieces` list and the contact shadow has something to ray cast against.
+- **All seven cooked cars are in the showcase pool, `SportsCar2` included.** The six-car restriction
+  is the picker's (CLAUDE.md Milestone 08 says to use six of the seven); a showcase has no reason to
+  hide one, and it is the one car the player can never otherwise see up close.
+- **The pick is in `Initialize`, which is what "re-rolled every time the menu is re-entered" means
+  here**: `App::SetScene` builds a fresh `MainMenuScene` every time, so there is no separate re-roll
+  to write. Verified by building the scene twice in one process - `Cop` blue, then `SUV` orange.
+- **Nothing re-seeds the random sequence**, so two launches inside the same second can show the same
+  car: raylib seeds from the clock in `InitWindow`. Within a session it always differs.
+- **The menu rows moved left but the widget did not change.** `uistyle::MenuList` lays out from the
+  rectangle it is handed, so the column is a change to where `Draw` puts `row` - which is what
+  CLAUDE.md means by wiring the pieces that already exist rather than building new UI.
+- **"How to play" stays on the list.** CLAUDE.md Milestone 18 names Play, Settings and Exit, and what
+  it explicitly rules out is the reference's online/shop/pass/garage/profile entries and its Weekly
+  Challenges panel. Dropping the row would strand the how-to-play screen with no way in, so it was
+  kept; delete it only together with `HowToPlayScene`.
+- **The credits and build string were commented out in this file and are drawn again**, bottom left,
+  because the milestone asks for them.
+- **The settings panel stays centred rather than moving into the column.** It is the shared widget at
+  its own preferred size, and while it is open it is what the screen is about - the same treatment it
+  gets in the pause menu.
+
+### Settings screen
+- **The panel is one widget with a background flag, not two panels.** `SettingsBackground` says what
+  the panel is being drawn over, and that is genuinely the only difference between its two homes:
+  the pause menu has already darkened the whole screen, the main menu has not.
+- **The flag decides who dims.** In `Showcase` the module lays down 0.35 itself, so the panel is the
+  focal element while the arena and the car still read behind it; in `Dimmed` it draws nothing extra,
+  because `MatchScene` has already drawn its 0.65 pause overlay and a second one would stack.
+- **The main-menu panel is centred from `PreferredWidth/PreferredHeight`**, which are derived from the
+  layout constants, so adding a settings row keeps it centred instead of pushing it off the bottom.
+- **The game title moved inside the else branch rather than being deleted.** It is the menu's header,
+  not the screen's, so it comes back the moment the panel closes.
+
+### Title screen and the texture pipeline
+- **The title is a real scene showing the real arena, not a picture of one.** It builds
+  `ArenaObject`, both `GoalObject`s and `BallObject` exactly as the match does, so it can never show
+  a stadium the game no longer looks like. It also gets the lit shader and the bloom for free,
+  because both are global.
+- **Physics is never stepped, and that is what "no gameplay happens on the title" means in code.**
+  The bodies exist only so the arena builds its `pieces` list and the ball has a transform; with no
+  `StepPhysics` call, gravity never runs. Measured: the ball sat at exactly its spawn position for
+  13 s, to four decimals.
+- **Both goals are built even though only one is in shot.** The opening in the back wall is a hole,
+  and without a net behind it the middle of the frame is a black rectangle. It is the same ten lines
+  `MatchScene::Initialize` runs; they are repeated rather than shared, because the alternative was a
+  new abstraction over two call sites.
+- **The camera stands still and only yaws.** A camera that orbits has to be kept out of the walls,
+  which is the whole problem `ChaseCamera` exists to solve; a fixed point that sweeps 2.5 degrees
+  either side over 24 s reads as alive and cannot collide with anything.
+- **The composition is the reference shot's, and it is the reason for every number in the file.**
+  The goal sits left of centre and the ball bottom right specifically so the centred logo and the
+  prompt land on empty pitch and empty wall. Move `CAMERA_POSITION`, `LOOK_AT` or `BALL_SPOT` and all
+  three overlap again - that was the state of the first four attempts.
+- **Any button is three sources, and `GetKeyPressed` must be read exactly once**, because it pops the
+  key queue. `GetGamepadButtonPressed` returns `GAMEPAD_BUTTON_UNKNOWN` when nothing is down, not
+  -1, so comparing against it is correct. The press is ignored during the fade in, so a key still
+  held from launching the game does not skip the screen before it is visible.
+- **`DrawShadowedText` moved from `HUD.cpp` into `uistyle`.** Every line the title draws sits over
+  the pitch rather than over a panel, which is exactly the case that helper exists for. Same story as
+  `uistyle::Button`, which was a file-static in `CarSelectScene.cpp` until a second screen needed it.
+- **The mark is the badge and the name side by side**, as on the reference: the shield on the left,
+  BUDGET over LEAGUE to its right, the pair centred as one block. Everything is measured from the
+  name (`NAME_SIZE` through `uistyle::FontSize`), so the badge follows the text and the whole mark
+  scales with the rest of the UI; with no logo the badge is simply zero wide and the name centres by
+  itself, which is also the missing-texture fallback.
+- **The badge is drawn at 1.85x the name block, not the reference's 1.5.** The shield fills only 82%
+  of its own image - measured on the alpha channel - and the rest is the glow margin. That margin is
+  also what spaces the badge off the name, so there is no gap of its own.
+- **The name is `DrawShadowedText`, not `uistyle::DrawTitle`.** DrawTitle centres one line and draws
+  the accent underline under it, which is the menu treatment; the reference mark is two left-aligned
+  lines with no rule, over an arena that can be any brightness.
+- **The logo goes through the cooked texture pipeline** (CLAUDE.md 3.2), which did not exist before:
+  `.evtex` is the magic `EVTXQOI1`, width, height, channels and payload length, then a QOI chunk
+  stream. raylib reads PNG natively, so loading the source file directly would have been one line -
+  but the format is what CLAUDE.md 2.6 and 3.2 specify, and it is what any other UI texture will use.
+- **The stream carries neither QOI's own 14 byte header nor its end marker.** The header would
+  duplicate the size that is already in the `.evtex` header, and the decoder stops at the pixel count
+  rather than at a marker. Both encoder and decoder must agree on that: they are `EncodeQoi` in
+  `Tools/AssetCooker.py` and `DecodeQoi` in `TextureAsset.cpp`, and the round trip is what proves it.
+- **QOI was verified by decoding the cooked files back in Python and comparing them to the source
+  PNGs**, not by looking at the screen. All four are byte for byte identical (see the table above);
+  a subtly wrong `QOI_OP_LUMA` would still have looked plausible in a screenshot.
+- **Textures are capped at 512 px** (CLAUDE.md 3.2), so the 1024 px logo is resized at cook time.
+  Nothing in the game draws it larger than about a third of the window height.
+- **The pixels are handed to the GPU and dropped.** `LoadTextureFromImage` copies, so the decode
+  buffer is a `std::vector` that goes out of scope - there is deliberately no `Image` kept and no
+  `UnloadImage` call to match.
+- **The cooker skips `Cars-Park`** when looking for PNGs: the pack ships a preview thumbnail of
+  itself, and the models are what that folder is for.
+- **The cooker now needs Pillow**, which is the first real Python dependency the build has had. A
+  missing one fails the texture step loudly rather than silently shipping no logo; models and shaders
+  are unaffected.
 
 ### Lighting
 Pulled forward from Milestone 14 because without it every material rendered as one flat colour and
@@ -1306,6 +1483,10 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   with the panel as one window in it, not two keys.
 - **The tuning panel does not expose the audio either.** The cue table is a table of constants, so
   every sound is a rebuild away. It is the obvious second addition to the panel after the bot.
+- **The three PNGs in `Game/Assets/Textures/` are cooked but nothing loads them.** They are the arena
+  textures from the reverted texture experiment (commit `a4ada93`); the cooker takes every PNG under
+  `Game/Assets/`, so they now ship as `.evtex` in every build. Harmless, about 900 KB, and they are
+  the obvious test material if a surface is ever textured.
 - **There is no music and no engine sound.** CLAUDE.md's Milestone 15 asks for a specific list of
   cues and both are outside it; the boost roar is the only continuous sound in the game.
 - **The tuning panel does not expose the bot.** CLAUDE.md lists exactly what the panel should carry
@@ -1332,19 +1513,21 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **All six previews are painted blue,** because the player is always on the blue team. If teams ever
   become selectable, `SetPaintColor` in `CarSelectScene::Initialize` is the one place to change.
 
-## Next steps — Milestone 17 (Car and Ball Dimensions)
+## Next steps — the milestone list is finished
 
-1. CLAUDE.md asks for the Rocket League reference sizes: a **1.83 m** ball, and a car **1.18 m long,
-   0.84 m wide and 0.36 m high**. Today the ball's `radius` is 1.25 m (so 2.5 m across) and the car's
-   `halfExtents` are 0.85 x 0.35 x 1.6 (so 1.7 x 0.7 x 3.2 m) — the car is nearly three times the
-   reference length, which is the number to look at first.
-2. Nothing else in the game hardcodes either size: the car model is fitted to `halfExtents` at
-   runtime, the ball's spawn height and its contact shadow both come off `radius`, and the goal test
-   takes the radius as an argument. The arena is already at reference scale from Milestone 16.
-3. It is a handling change, not just a number. The car's mass, `centerOfMassOffsetY` and the two
-   ground probes are all in metres against the current box, and the note above on the ball leaving
-   the floor at ~24 degrees is pure geometry between the box top and the ball's centre — both move.
-   Re-measure Milestones 04, 05 and 09 afterwards with the harnesses those rows came from.
+Every milestone in CLAUDE.md section 5 is done, so what is left is the section 6 polish list, all of
+whose items are ticked in README.md, plus whatever the known-deviations list above still calls out.
+The four worth picking up first, in order of how much they would be felt:
+
+1. **The bot never jumps** (see the bot decisions). It is the single biggest thing standing between
+   the current opponent and one that feels like a player.
+2. **Nothing is written to disk except `Tuning.cfg`.** Settings, the picked car and the volumes are
+   all forgotten on exit; that config file is the natural place to persist them, and it already has a
+   loader.
+3. **The tuning panel covers neither the bot nor the audio**, which are the two hardest parts of the
+   game to judge by reading numbers.
+4. **The arena is a rounded rectangle, not an octagon.** Rocket League's 45 degree corner walls are
+   arena-shape work that `AddFillet` and `AddCorner` were built general enough to take.
 
 ### Verifying without a keyboard
 There is no `xdotool`/`wtype` here, so every milestone so far was verified with a temporary harness

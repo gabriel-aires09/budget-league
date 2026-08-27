@@ -355,7 +355,8 @@ void MatchScene::Draw()
     {
         Rectangle area = { centerX - SettingsMenu::PreferredWidth() * 0.5f, 105.0f * scale,
                            SettingsMenu::PreferredWidth(), SettingsMenu::PreferredHeight() };
-        settingsOpen = settingsMenu.Draw(*settings, area);
+        // Unchanged: the pause overlay has already dimmed the match behind it.
+        settingsOpen = settingsMenu.Draw(*settings, area, SettingsBackground::Dimmed);
         return;
     }
 

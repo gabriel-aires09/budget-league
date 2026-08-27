@@ -20,7 +20,10 @@ Priority is fun over realism: the car is a single box body driven by arcade forc
 simulated suspension, so acceleration is strong, cornering is drift-friendly and the car rights
 itself after a tumble.
 
-The main menu carries a **How to play** screen with the rules and the full control list.
+The game opens on a title screen — the badge and wordmark with a "press any button" prompt, over a live view of the
+arena — and any key, mouse button or gamepad button takes you to the main menu, which is itself a
+showcase: a random car turntabling on the pitch with the menu down the left. It carries a
+**How to play** screen with the rules and the full control list.
 
 An orange bot opponent chases the ball and shoots at your goal. It can be switched off in Settings,
 which turns the match into solo practice with both goals still scoring.
@@ -51,6 +54,7 @@ which turns the match into solo practice with both goals still scoring.
 | **Enter** / **Space** | Activate |
 | **Esc** | Close the settings panel / go back |
 | Mouse | Hover to select, click to activate |
+| Any key / mouse / gamepad button | Leave the title screen |
 
 ### Full time
 
@@ -100,8 +104,8 @@ The first build takes a few minutes (raylib plus 153 Jolt translation units per 
 that it is incremental. `make clean` removes the build output, `make clean-thirdparty` also forces a
 raylib rebuild.
 
-Each configuration lands in `Build/<Config>/` next to an `assets/` folder of cooked models and
-shaders, written by `Tools/AssetCooker.py` as part of the build.
+Each configuration lands in `Build/<Config>/` next to an `assets/` folder of cooked models, textures
+and shaders, written by `Tools/AssetCooker.py` as part of the build.
 
 | Configuration | Debug symbols | ImGui tuning tools | Optimisation |
 |---|:---:|:---:|---|
@@ -123,9 +127,10 @@ Headless-ish validation — render N frames, write a screenshot and exit:
 ./Build/Release/ArcadeCarSoccer --smoke-test 60 --screenshot SmokeTest.png
 ```
 
-The Python tools need no dependencies today; when the cooker starts using Pillow/numpy, create the
-environment with `python3 -m venv .venv && .venv/bin/pip install -r Tools/requirements.txt` and the
-Makefile will pick it up automatically.
+The asset cooker needs **Pillow** to cook textures. Either have it on the system `python3`, or create
+the environment with `python3 -m venv .venv && .venv/bin/pip install -r Tools/requirements.txt` — the
+Makefile picks the venv up automatically when it exists. Without it the texture step fails the build
+and says so; the models and shaders are unaffected.
 
 ## Milestones
 
@@ -148,7 +153,9 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **14 — Visual Polish and Effects** — contact shadows, a boost flame and ember trail, a ball highlight, particle bursts on goals, big hits and jumps, a goal screen flash, blocky stands and light rigs outside the glass, and toggleable bloom that costs about 0.1 ms a frame.
 - [x] **15 — Audio** — ten procedural cues generated at startup from one synthesis table (no sound files): UI hover and click, jump, car-ball hit, wall/car impact, boost pad, countdown ticks, kickoff go, goal and full time, plus a boost roar held on a running audio stream. Master and SFX volumes are live from the settings panel.
 - [x] **16 — Arena Field Dimensions** — the arena now follows the supplied Rocket League reference at 76.81 m wide, 102.41 m goal-to-goal and 20.73 m floor-to-ceiling.
-- [ ] **17 — Car and Ball Dimensions** — not started; current gameplay dimensions remain unchanged.
+- [x] **17 — Title Screen ("Press Any Button")** — the game now boots on a title card over a live view of the real arena: the cooked badge beside the BUDGET LEAGUE wordmark, a pulsing prompt, and the ball resting on the pitch beside the far goal. Any key, mouse button or gamepad button goes to the main menu.
+- [x] **18 — Main Menu Showcase** — the main menu is now a live showcase: the real arena behind it, a random one of the seven cooked cars parked on the pitch in a random team colour on a slow turntable, and the menu list down the left. Re-rolled every time the menu is entered.
+- [x] **19 — Settings Screen (main-menu layout)** — opened from the main menu the panel is centred on both axes with no game title above it, over the still-running showcase; opened from the pause menu it is unchanged. The one shared widget takes a background flag.
 
 ### Final milestone — polish
 

@@ -341,7 +341,8 @@ Improve the current arena field dimensions. I want a arena simulation from rocke
 The **first scene shown at launch**, before the main menu. A lightweight title card
 over a **live 3D view of the arena** — this is a title screen, not a marketing landing
 page. Reuses the existing arena, ball, lighting, and `uistyle` (section 2.3); imports
-no new assets except the game logo. For game logo, use `Game/Assets/Icon/budget-league-logo.png`. And for references to creation/title screen rocket-league like use `img/press-key-menu.png`
+no new assets except the game logo. For game logo, use `Game/Assets/Icon/budget-league-logo.png`. 
+And for references to creation/title screen rocket-league like use `img/press-key-menu.png`
 
 **Boot flow:** `TitleScene` → `MainMenuScene` → `MatchScene`. Pressing any key, mouse
 button, or gamepad button leaves the title and goes to the main menu.
@@ -373,7 +374,8 @@ Expands the main-menu portion of the Main Menu milestone. The first screen after
 launch is a **car showcase inside the arena**, with the menu overlaid — **reusing the
 existing MainMenuScene, the `uistyle` UI (section 2.3), the arena, and the Cars-pack
 (section 4)**. Do not build new UI or import new assets for this: only wire the
-pieces already in the game (raylib) into the showcase layout.
+pieces already in the game (raylib) into the showcase layout.Use `img/menu-rocket-league.png` 
+as reference. **Do not create the weekly challenges menu from the original image**
 
 **Background — live 3D showcase (not a static image):**
 - Render the real arena behind the menu (reuse the arena + lighting already built for
@@ -404,6 +406,22 @@ included — no right-side challenges/quests panel at all.
   Play starts a match, Settings opens the shared settings menu, Exit quits; there is no
   Weekly Challenges panel; re-entering the menu re-rolls the car; layout resizes
   correctly on common laptop screens.
+
+## Milestone 19 - Settings Screen — layout tweak (main-menu context)
+When Settings is opened from the main menu, **remove the game-title header**
+("BUDGET LEAGUE") — the Settings panel is the only focal element. **Center the panel
+on screen** (horizontally and vertically). Keep the **live 3D showcase** (arena +
+turntabling car from the main menu) rendering **behind** the panel: the settings panel
+draws as an overlay on top of that scene, not over a flat dark background. The panel
+keeps the existing `uistyle` (border, section labels, Back button highlight).
+
+Scope: this is the **main-menu** Settings only. When the same modular SettingsMenu is
+opened from the **pause menu** during a match, it keeps drawing over the paused match
+as before (no showcase) — the module just takes a "background mode" flag.
+
+→ verify: opening Settings from the main menu shows no game title, a centered panel,
+  and the arena+car still visible behind it; pause-menu Settings is unchanged; the
+  panel stays centered on window resize.
 
 ---
 
