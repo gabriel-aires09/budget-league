@@ -204,6 +204,55 @@ void ArenaObject::AddCorner(float sideX, float sideZ)
     }
 }
 
+// Everything outside the glass: three tiers of blocky stands down each side and
+// behind each goal, and a ring of light rigs above the roof line. None of it is
+// solid, so none of it can catch a car or a ball, and none of it is in the
+// compound shape the camera's occlusion ray tests against either.
+void ArenaObject::AddStadium()
+{
+    const float halfWidth = width * 0.5f;
+    const float halfLength = length * 0.5f;
+    const Color STAND_COLOR = { 30, 38, 58, 255 };
+    const Color STAND_TRIM = { 46, 60, 92, 255 };
+    const Color LIGHT_COLOR = { 226, 240, 255, 255 };
+
+    // Tiers step up and outward, so the stands read as raked seating rather than
+    // as a wall standing next to a wall.
+    for (int tier = 0; tier < 3; ++tier)
+    {
+        float out = 4.0f + tier * 5.0f;
+        float top = 4.0f + tier * 4.5f;
+        Color color = tier % 2 == 0 ? STAND_COLOR : STAND_TRIM;
+
+        for (float side = -1.0f; side <= 1.0f; side += 2.0f)
+        {
+            Piece bank = { { side * (halfWidth + out), top * 0.5f, 0.0f },
+                           { 2.4f, top * 0.5f, halfLength + out }, color, true };
+            bank.solid = false;
+            pieces.push_back(bank);
+
+            Piece end = { { 0.0f, top * 0.5f, side * (halfLength + out) },
+                          { halfWidth + out, top * 0.5f, 2.4f }, color, true };
+            end.solid = false;
+            pieces.push_back(end);
+        }
+    }
+
+    // Light rigs above the roof line, in from the stands so they hang over the
+    // pitch. They are drawn unlit-bright rather than being real lights: the one
+    // directional light in Lighting.cpp is still what shades the scene.
+    for (float side = -1.0f; side <= 1.0f; side += 2.0f)
+    {
+        for (int i = -2; i <= 2; ++i)
+        {
+            Piece rig = { { side * (halfWidth - 2.0f), wallHeight + 3.5f, i * (halfLength * 0.4f) },
+                          { 1.6f, 0.35f, 3.2f }, LIGHT_COLOR, true };
+            rig.solid = false;
+            pieces.push_back(rig);
+        }
+    }
+}
+
 void ArenaObject::Initialize(Scene &owner)
 {
     scene = &owner;
@@ -299,10 +348,15 @@ void ArenaObject::Initialize(Scene &owner)
             AddCorner(sideX, sideZ);
     }
 
+    AddStadium();
+
     JPH::StaticCompoundShapeSettings compound;
     compound.SetEmbedded();
     for (const Piece &piece : pieces)
     {
+        if (!piece.solid)
+            continue;
+
         JPH::BoxShapeSettings boxSettings(JPH::Vec3(piece.halfExtents.x, piece.halfExtents.y,
                                                     piece.halfExtents.z));
         boxSettings.SetEmbedded();

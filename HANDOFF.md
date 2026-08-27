@@ -17,8 +17,8 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 11 — HUD**
 - [x] **Milestone 12 — Bot Opponent (or Solo Practice)**
 - [x] **Milestone 13 — Tuning Panels (Debug/Development)**
-- [ ] **Milestone 14 — Visual Polish and Effects** — the next one; lighting is done, pulled forward, shadows, bloom and effects are not
-- [ ] **Milestone 15 — Audio**
+- [x] **Milestone 14 — Visual Polish and Effects**
+- [ ] **Milestone 15 — Audio** — the next one
 - [ ] **Milestone 16 — UI Polish (raygui)**
 
 Two pieces of work outside the milestone list are also done: the **asset pipeline** (FBX cooking plus
@@ -330,6 +330,25 @@ of the panel:
 | Release build | `Tuning (F1)` appears 0 times in the binary; Development, 1 |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no errors in the log |
 
+Milestone 14 effects, verified from screenshots of each effect forced into view by a temporary probe
+(removed afterwards) plus a frame-cost measurement with the frame rate cap lifted:
+
+| Check | Result |
+|---|---|
+| Contact shadows | under both cars and the ball, softening and widening with height |
+| Boost flame | flickering cone at the exhaust, following the car through its roll and pitch |
+| Boost trail | embers behind a boosting car, which is what actually reads from a chase camera |
+| Goal burst | 90 team-coloured plus 40 white cubes thrown out of the net |
+| Goal screen flash | team colour over the whole screen, gone in a third of a second |
+| Big-hit burst | fires on a jump in the ball's speed over 7 m/s, sized by how big the jump was |
+| Jump puff | at the wheels, on both the first and the second jump |
+| Stadium | three tiers of stands and ten light rigs, visible through the glass, none of it solid |
+| Bloom on | boost pads, goal frame, ball and countdown all glow; the HUD is drawn after and is untouched |
+| Bloom frame cost | **0.51 ms with, 0.41 ms without** - about 0.1 ms, measured over 600 uncapped frames |
+| Bloom off in Settings | nothing is allocated and the scene draws straight to the screen |
+| `assets/Shaders/Bright.fs` missing | logs `POSTFX: bloom shaders unavailable`, renders unbloomed, exit 0 |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no errors in the log |
+
 ## Layout
 
 ```
@@ -343,6 +362,8 @@ Game/Source/
   ImGuiRaylib.h/cpp            namespace imgui: the whole Dear ImGui backend, dev builds only
   TuningPanel.h/cpp            the F1 tuning panel and its Tuning.cfg, dev builds only
   HUD.h/cpp                    namespace hud: every in-match readout, plus the full time screen
+  Effects.h/cpp                namespace effects: particles, boost flame, ball highlight, contact shadows
+  PostProcess.h/cpp            namespace postprocess: the optional bloom chain
   Match.h/cpp                  score, clock, kickoff/goal/full time state machine
   GameSettings.h               the settings struct App owns
   MenuAction.h                 what a scene asks App to do next
@@ -363,7 +384,7 @@ Game/Source/
   PhysicsLayers.h/cpp          namespace physics: layers and Jolt filters
 Game/ThirdParty/   raylib, Jolt, glm, imgui     (cloned, git-ignored)
 Game/Assets/       Cars-Park/ (OBJ, FBX, Blends, License.txt, Preview.png)
-                   Shaders/ (Lit.vs, Lit.fs)
+                   Shaders/ (Lit.vs, Lit.fs, Bright.fs, Blur.fs)
 Tools/             AssetCooker.py, FbxReader.py, requirements.txt
 Build/<Config>/    ArcadeCarSoccer + assets/Models/*.evmodel + assets/Shaders/*
 README.md          player-facing readme: about the game, stack, controls
@@ -885,6 +906,44 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   Those two stay in `MatchScene::Draw` behind `GAME_DEV_TOOLS`, so Release draws neither — verified on
   a Release screenshot.
 
+### Effects and post-processing
+- **`effects` is a dumb particle pool that decides nothing.** `MatchScene::UpdateEffects` watches the
+  match and the ball and calls `Burst` on the changes it sees, exactly as it does for the HUD. Every
+  effect therefore fires from a *change*, not from a state, which is why the goal burst does not
+  re-fire every frame of the celebration.
+- **A big hit is a jump in the ball's speed, not a contact callback.** The size of the jump is exactly
+  how hard the hit was, so it sizes the burst for free, and the physics stays free of listeners -
+  the same reasoning that keeps goal detection analytic.
+- **`CarObject::jumpPending` is a latch, not a per-step flag.** `Update` runs twice per rendered frame
+  at 120 Hz, so a flag set and cleared inside the step would be missed by half the jumps. It is set by
+  the car and cleared by whoever consumes it.
+- **Shadows are contact shadows, not a shadow map.** A ray is cast down from each car and the ball,
+  and a dark disc is laid on the surface it finds, rotated onto that surface's normal so it follows
+  the ramps rather than cutting into them. It costs one ray per object against geometry that is
+  already there, and in a flat-shaded low-poly arena it reads as well as a shadow map would. A real
+  shadow map is the upgrade path if the arena ever gets more vertical detail.
+- **The particle meshes deliberately skip `lighting::Apply`.** They are meant to read as light, and
+  flat-shading a flame cone turns it into a solid orange traffic cone.
+- **The trail matters more than the flame, because of where the camera is.** A chase camera sits
+  almost directly down the axis of the exhaust, so the flame is largely hidden behind the car; the
+  embers spreading sideways are what actually communicate boost at a distance.
+- **The stands and light rigs are `Piece`s with `solid = false`.** They are drawn from the same list
+  as everything else, so they cannot drift from the arena, but they are skipped when the compound
+  shape is built. That also keeps them out of the camera's occlusion ray, which tests the same body -
+  otherwise standing near a wall would have pulled the camera in on the stands behind it.
+- **Bloom wraps the 3D pass only.** The HUD is drawn afterwards at full resolution, so text never goes
+  through a blur. `postprocess::Begin` returns false when it is off or unavailable and `End` then does
+  nothing, so `MatchScene` needs no branch of its own.
+- **The bloom chain runs at a quarter of each axis.** It is blurred anyway, so the resolution buys
+  nothing; measured, the whole chain costs about 0.1 ms a frame.
+- **Detecting missing bloom shaders needs the same two checks the lit shader needed** - raylib answers
+  a missing file with its *default* shader, whose id is perfectly valid, so `IsShaderValid` alone
+  silently passes. Compare against `rlGetShaderIdDefault()`.
+- **A render texture is stored bottom up, so every draw of one flips the source rectangle.** Getting
+  it wrong is silent - the image is simply upside down - so it lives in one helper.
+- **The render targets are rebuilt when the window size changes, not created at load.** The resolution
+  setting can change at any time, and a stale target would stretch the scene.
+
 ### Tuning panel and the ImGui backend
 - **The sliders point straight at the live fields.** An `Entry` holds a `float *` into the real
   `CarObject` / `BallObject` / `ChaseCamera`, so there is no second copy of the tuning to keep in
@@ -990,10 +1049,11 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 
 - **Assets folder name.** CLAUDE.md says `Game/Assets/Cars-pack/`; on disk it is
   `Game/Assets/Cars-Park/`.
-- **There are still no shadows.** Everything is lit by one directional light plus a hemisphere fill,
-  with no occlusion, so nothing casts onto anything else and the cars do not sit into the floor as
-  firmly as they could. Milestone 14 owns that, along with bloom. Do **not** bake shading into
-  vertex colours as a substitute — the lit shader would then double-darken the model.
+- **The shadows are contact shadows, not cast shadows.** Each car and the ball drops a disc onto the
+  surface below it; nothing casts onto anything else, so a car under a light rig or beside another
+  car is unshadowed. It is deliberate (see the effects decisions) and it is the thing to replace if
+  the arena ever needs real shading. Do **not** bake shading into vertex colours as a substitute —
+  the lit shader would then double-darken the model.
 - **The OBJ+MTL copies in `Game/Assets/Cars-Park/OBJ/` are now unused by the build.** They are worth
   keeping as the reference the FBX reader is validated against
   (`Tools/FbxReader.py` output matched them exactly), but nothing loads them at runtime.
@@ -1019,8 +1079,11 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **CLAUDE.md 2.3 lists "boost pad hints" as a HUD element and there are none.** The pads communicate
   their own state by glowing in the world; the screen-space hint was removed on request. See the HUD
   decisions above before adding one back.
-- **There is no boost flame or trail yet.** `CarObject::boosting` is set every step and the meter
-  brightens while held, but the visual effect belongs to Milestone 14's `Effects.h/cpp`.
+- **The boost flame is drawn from `MatchScene::DrawEffects`, not from `CarObject::Draw`.** Every
+  effect is drawn in one place, after the objects and before the glass, so the blending order is
+  decided once rather than per object.
+- **Nothing fires an effect while the match is frozen.** `UpdateEffects` runs from `MatchScene::Update`
+  after the pause and F1 returns, so a paused match holds its particles exactly where they were.
 - `.venv` does not exist yet; the Makefile falls back to `python3`, which is fine while the cooker
   has no dependencies. Create it before the cooker starts using Pillow/numpy:
   `python3 -m venv .venv && .venv/bin/pip install -r Tools/requirements.txt`.
@@ -1072,20 +1135,19 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **All six previews are painted blue,** because the player is always on the blue team. If teams ever
   become selectable, `SetPaintColor` in `CarSelectScene::Initialize` is the one place to change.
 
-## Next steps — Milestone 14 (Visual polish and effects)
+## Next steps — Milestone 15 (Audio)
 
-1. Lighting was already pulled forward and is done (see the Lighting decisions). What Milestone 14
-   still owns is shadows, bloom / post-processing, and `Effects.h/cpp` — the boost flame and trail,
-   the ball highlight, goal-explosion particles and a hit punch.
-2. `CarObject::boosting` is already set every step and is what a flame should read; `Match` already
-   raises the Celebration state a goal banner is drawn from, so the particles have their trigger.
-3. `GameSettings` carries the post-processing flag, stored and unread since Milestone 03. It is the
-   toggle CLAUDE.md asks for, and `PostProcess.h/cpp` (2.5) is where it should land.
-4. The arena is one `Piece` list that physics and rendering both read (see the arena decisions).
-   Trim, stands and light rigs should join that list rather than being drawn separately, or the
-   collision and the visuals will drift apart.
-5. Anything added to the arena that a car can touch must be a slope, never a step: a box with no
-   wheels stops dead against a lip of a few centimetres.
+1. Nothing audio exists yet: `InitAudioDevice` is never called, and `GameSettings` carries master and
+   SFX volumes that have been stored and unread since Milestone 03.
+2. `AudioSystem.h/cpp` with procedural `AudioCue`s is what CLAUDE.md 2.4 asks for — no sound files.
+   raylib can play a generated `Wave`, so each cue is a short buffer built once at startup.
+3. Every event a cue needs is already detected and in one place: `MatchScene::UpdateEffects` fires on
+   goals, big ball hits, jumps and boost, and `Match` raises the kickoff countdown and full time.
+   An audio call belongs beside each existing `effects::Burst`, not in a new watcher.
+4. The boost cue is the one that loops while `CarObject::boosting` holds, so it needs starting and
+   stopping rather than a one-shot.
+5. UI click and hover belong in `uistyle::Button` and `MenuList`, which every screen already goes
+   through.
 
 ### Verifying without a keyboard
 There is no `xdotool`/`wtype` here, so every milestone so far was verified with a temporary harness

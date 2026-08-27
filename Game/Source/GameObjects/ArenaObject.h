@@ -71,6 +71,10 @@ public:
         // Identity for everything flat, which is why the walls and floor can
         // still be written as a plain four-field initializer.
         Quaternion rotation = { 0.0f, 0.0f, 0.0f, 1.0f };
+        // The stands and the light rigs are drawn but have no collision: they sit
+        // outside the glass, where nothing can ever reach them. Everything that
+        // makes up the arena proper leaves this true.
+        bool solid = true;
     };
     std::vector<Piece> pieces;
 
@@ -114,6 +118,8 @@ private:
     // the floor and ceiling ramps carried around it as a ring of short straight
     // fillets — a faceted torus.
     void AddCorner(float sideX, float sideZ);
+    // Blocky stands and light rigs outside the glass. Drawn, never collided with.
+    void AddStadium();
 };
 
 #endif

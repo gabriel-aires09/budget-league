@@ -95,6 +95,12 @@ public:
     float airControlResponse = 9.0f;   // how fast it reaches that rate, per second
     float airDamping = 0.8f;           // spin bleed with no air input, per second
 
+    // Set when a jump or flip fires and cleared by whoever consumes it (the
+    // effects). It is a latch rather than a per-step flag because Update runs
+    // twice per rendered frame at 120 Hz, so a flag cleared each step would be
+    // missed by half the jumps.
+    bool jumpPending = false;
+
     bool jumpUsed = false;
     bool doubleJumpUsed = false;
     bool jumpHeldPrevious = false;

@@ -144,7 +144,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **11 — HUD** — scoreboard, clock, boost meter, speed, kickoff countdown, goal banner and a full-time screen with a rematch. Boost-pad state is read from the pads' own glow in the world, not from a HUD hint.
 - [x] **12 — Bot Opponent (or Solo Practice)** — an orange bot that drives at the ball from the side its shot comes from, boosts down the long approaches and frees itself when it gets blocked. 6-1 against a player who never moves. Switchable off for solo practice.
 - [x] **13 — Tuning Panels (Debug/Development)** — **F1** opens a Dear ImGui panel over the match with live sliders for gravity, the ball, car handling, boost and camera smoothing, and a Save button writing `Tuning.cfg` next to the executable, which the next match loads. Release contains none of it.
-- [ ] **14 — Visual Polish and Effects** — flat-shaded lighting was pulled forward and is done; shadows, bloom, boost flame/trail and goal particles are not.
+- [x] **14 — Visual Polish and Effects** — contact shadows, a boost flame and ember trail, a ball highlight, particle bursts on goals, big hits and jumps, a goal screen flash, blocky stands and light rigs outside the glass, and toggleable bloom that costs about 0.1 ms a frame.
 - [ ] **15 — Audio** — not started; the audio device is not initialised and the volume settings are stored but unused.
 - [ ] **16 — UI Polish (raygui)** — not started; the UI is drawn with the project's own `uistyle` helpers.
 
@@ -155,11 +155,11 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] The kickoff reset settles cleanly, with physics simply not stepped while frozen.
 - [x] Chase-camera clipping near walls — the camera is pulled in, and trades distance for height when there is none.
 - [x] Ball-cam framing keeps the ball and the car readable, including at speed.
-- [ ] Screen and particle punch on goals and big hits.
-- [ ] Boost flame/trail scaling with boost use.
+- [x] Screen and particle punch on goals and big hits.
+- [x] Boost flame/trail — a flickering cone at the exhaust plus embers while the boost is held.
 - [x] Boost-pad glow reads ready vs cooldown.
 - [x] Bot behaviour — it keeps its target on the flat floor, backs out when blocked and takes a reset if it is ever wedged for five seconds.
-- [ ] Post-processing degrading gracefully — the setting is stored but nothing consumes it yet.
+- [x] Post-processing degrades gracefully — off in Settings costs nothing, and missing shaders log a warning and draw the scene unbloomed.
 - [x] No major errors in the log during a run.
 
 ## Layout
