@@ -113,6 +113,14 @@ and shaders, written by `Tools/AssetCooker.py` as part of the build.
 | Development | yes | yes | `-O2` |
 | Release | no | no | `-O3` |
 
+### Soundtrack
+
+Six tracks in `Game/Assets/Sounds/` are copied into each build's `assets/Music/` and played as a
+shuffled playlist: one streams at a time and a new one starts whenever it ends, never the same track
+twice in a row. It runs through the whole game, menus included, on its own **Music volume** slider in
+Settings. Adding or removing a track is dropping a `.mp3` in or out of that folder - nothing lists
+them in code.
+
 ### Run
 
 ```sh
@@ -156,6 +164,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **17 — Title Screen ("Press Any Button")** — the game now boots on a title card over a live view of the real arena: the cooked badge beside the BUDGET LEAGUE wordmark, a pulsing prompt, and the ball resting on the pitch beside the far goal. Any key, mouse button or gamepad button goes to the main menu.
 - [x] **18 — Main Menu Showcase** — the main menu is now a live showcase: the real arena behind it, a random one of the seven cooked cars parked on the pitch in a random team colour on a slow turntable, and the menu list down the left. Re-rolled every time the menu is entered.
 - [x] **19 — Settings Screen (main-menu layout)** — opened from the main menu the panel is centred on both axes with no game title above it, over the still-running showcase; opened from the pause menu it is unchanged. The one shared widget takes a background flag.
+- [x] **20 — Soundtrack (OST playlist)** — the six tracks in `Game/Assets/Sounds/` are copied into each build and streamed as a shuffled playlist: a new song starts whenever one ends, never the same one twice in a row, with its own Music volume slider.
 
 ### Final milestone — polish
 

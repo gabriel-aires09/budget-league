@@ -38,7 +38,7 @@ bool App::Initialize(int argc, char **argv)
         }
     }
 
-    InitWindow(windowWidth, windowHeight, "Arcade Car Soccer");
+    InitWindow(windowWidth, windowHeight, "Budget League");
     if (!IsWindowReady())
         return false;
 
@@ -92,7 +92,8 @@ void App::Run()
 #endif
         // Read every frame rather than at Initialize, so both volume sliders are
         // heard as they move, exactly like the camera sensitivity.
-        audio::SetVolumes(settings.masterVolume, settings.sfxVolume);
+        audio::SetVolumes(settings.masterVolume, settings.sfxVolume, settings.musicVolume);
+        audio::UpdateMusic(); // refills the stream and moves the playlist on
         activeScene->Update(GetFrameTime());
 
         BeginDrawing();

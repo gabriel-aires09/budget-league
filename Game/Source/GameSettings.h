@@ -25,6 +25,7 @@ struct GameSettings
     // Audio
     int masterVolume = 80;
     int sfxVolume = 80;
+    int musicVolume = 60; // the soundtrack sits under the effects by default
 };
 
 #endif

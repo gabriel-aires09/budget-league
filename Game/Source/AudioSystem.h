@@ -1,8 +1,10 @@
 #ifndef AUDIOSYSTEM_H
 #define AUDIOSYSTEM_H
 
-// Every sound the game makes is generated at startup from the table in
-// AudioSystem.cpp. There are no sound files and nothing for the cooker to do.
+// Every sound *effect* the game makes is generated at startup from the table in
+// AudioSystem.cpp - there are no sound-effect files. The soundtrack is the one
+// thing that does come from disk: the cooked tracks in assets/Music, streamed
+// one at a time as a shuffled playlist.
 //
 // Like effects, it decides nothing: the scenes call Play from the events they
 // already watch for the HUD and the particles.
@@ -28,9 +30,15 @@ namespace audio
     void Load();
     void Unload();
 
-    // From GameSettings, both 0..100. Cheap enough to call every frame, which is
+    // From GameSettings, all 0..100. Cheap enough to call every frame, which is
     // what makes the volume sliders felt as they move.
-    void SetVolumes(int masterPercent, int sfxPercent);
+    void SetVolumes(int masterPercent, int sfxPercent, int musicPercent);
+
+    // The soundtrack: a shuffled playlist over whatever is in assets/Music, one
+    // track streaming at a time and a new one picked whenever the current one
+    // ends. Update has to run every frame - it is what refills the stream, and
+    // what notices a track finishing.
+    void UpdateMusic();
 
     void Play(AudioCue cue, float volume = 1.0f, float pitch = 1.0f);
 
