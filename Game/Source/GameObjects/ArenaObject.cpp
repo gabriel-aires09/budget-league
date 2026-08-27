@@ -12,15 +12,17 @@
 
 #include <cmath>
 
-static const Color FLOOR_COLOR = { 42, 50, 68, 255 };
+static const Color FLOOR_COLOR = { 34, 74, 45, 255 };
 // Glass, not masonry: the chase camera regularly ends up outside the arena, and
 // a solid wall then hides the car completely. The alpha is what puts these in
 // the late, depth-write-free pass (see DrawGlassWalls).
-static const Color WALL_COLOR = { 96, 132, 190, 52 };
-// Glass too, so the whole edge of the arena — ramp, wall, ceiling ramp — is one
-// continuous see-through surface. Held a little more opaque than WALL_COLOR
-// because this one is driven on and the slope still has to read.
-static const Color RAMP_COLOR = { 96, 132, 190, 90 };
+static const Color WALL_COLOR = { 126, 136, 148, 62 };
+// The floor-to-wall ramp is neutral gray and lightly transparent. Its generated
+// mesh adds a subtle lightening gradient towards the wall; alpha here still
+// identifies it as part of the late transparent pass.
+static const Color RAMP_COLOR = { 138, 144, 150, 150 };
+static const Color RAMP_COLOR_LOW = { 112, 118, 124, 130 };
+static const Color RAMP_COLOR_HIGH = { 168, 174, 180, 175 };
 
 // How deep each ramp box is behind its driving face. Has to clear the car's box
 // but stay inside the floor slab and the wall it is buried in, so under the 2 m
@@ -67,6 +69,8 @@ void ArenaObject::AddFillet(Vector3 corner, Vector3 inward, Vector3 up, Vector3 
                             float radius, float runCenter, float runHalfLength, Color color,
                             int segments, float drawCenter, float drawHalfLength, float drawTaper)
 {
+    const bool floorRamp = color.r == RAMP_COLOR.r && color.g == RAMP_COLOR.g
+                        && color.b == RAMP_COLOR.b && color.a == RAMP_COLOR.a;
     const float step = (PI * 0.5f) / (float)segments;
     const float chordHalf = radius * sinf(step * 0.5f);
     const float midRadius = radius * cosf(step * 0.5f);
@@ -104,6 +108,8 @@ void ArenaObject::AddFillet(Vector3 corner, Vector3 inward, Vector3 up, Vector3 
     mesh.triangleCount = segments * 2;
     mesh.vertexCount = mesh.triangleCount * 3;
     mesh.vertices = (float *)MemAlloc((unsigned int)mesh.vertexCount * 3 * sizeof(float));
+    if (floorRamp)
+        mesh.colors = (unsigned char *)MemAlloc((unsigned int)mesh.vertexCount * 4 * sizeof(unsigned char));
 
     // tangent x normal is constant along the arc and equals up x inward, which is
     // the run direction the winding has to agree with. It is not always runAxis:
@@ -140,12 +146,28 @@ void ArenaObject::AddFillet(Vector3 corner, Vector3 inward, Vector3 up, Vector3 
             mesh.vertices[vertex * 3 + 0] = corners[k].x;
             mesh.vertices[vertex * 3 + 1] = corners[k].y;
             mesh.vertices[vertex * 3 + 2] = corners[k].z;
+
+            if (mesh.colors != nullptr)
+            {
+                // Vertices 2, 4 and 5 sit on the upper edge of the quad. The
+                // GPU interpolates these endpoint colors across each triangle,
+                // producing one continuous gradient along the curved ramp.
+                const bool upperVertex = k == 2 || k == 4 || k == 5;
+                const float gradient = (i + (upperVertex ? 1.0f : 0.0f)) / (float)segments;
+                const Color vertexColor = ColorLerp(RAMP_COLOR_LOW, RAMP_COLOR_HIGH, gradient);
+                mesh.colors[vertex * 4 + 0] = vertexColor.r;
+                mesh.colors[vertex * 4 + 1] = vertexColor.g;
+                mesh.colors[vertex * 4 + 2] = vertexColor.b;
+                mesh.colors[vertex * 4 + 3] = vertexColor.a;
+            }
         }
     }
 
     // LoadModelFromMesh does not upload, so this has to happen first.
     UploadMesh(&mesh, false);
-    RampMesh ramp = { LoadModelFromMesh(mesh), color };
+    // A white tint preserves the authored vertex gradient. Alpha 254 keeps the
+    // ramp classified for the transparent pass without visibly changing it.
+    RampMesh ramp = { LoadModelFromMesh(mesh), floorRamp ? Color{ 255, 255, 255, 254 } : color };
     lighting::Apply(ramp.model);
     rampMeshes.push_back(ramp);
 }
@@ -224,14 +246,25 @@ void ArenaObject::AddStadium()
         float top = 4.0f + tier * 4.5f;
         Color color = tier % 2 == 0 ? STAND_COLOR : STAND_TRIM;
 
+        // The end banks stand off further than the side ones, because the goal
+        // recess reaches goalDepth behind the back wall. At the side banks'
+        // offset an end bank is an opaque box *inside* the net, standing exactly
+        // where a car that followed the ball in has to stay visible - it, and the
+        // tier behind it, are the dark slab that used to fill each goal mouth.
+        // Half the bank depth plus a metre of clearance puts its near face just
+        // behind the back of the net.
+        float endZ = halfLength + goalDepth + 3.4f + tier * 5.0f;
+
         for (float side = -1.0f; side <= 1.0f; side += 2.0f)
         {
+            // Run the side banks all the way to the end ones, so the ring still
+            // closes at the corners now that the ends sit further back.
             Piece bank = { { side * (halfWidth + out), top * 0.5f, 0.0f },
-                           { 2.4f, top * 0.5f, halfLength + out }, color, true };
+                           { 2.4f, top * 0.5f, endZ + 2.4f }, color, true };
             bank.solid = false;
             pieces.push_back(bank);
 
-            Piece end = { { 0.0f, top * 0.5f, side * (halfLength + out) },
+            Piece end = { { 0.0f, top * 0.5f, side * endZ },
                           { halfWidth + out, top * 0.5f, 2.4f }, color, true };
             end.solid = false;
             pieces.push_back(end);
@@ -400,8 +433,49 @@ void ArenaObject::Draw()
         DrawModel(ramp.model, Vector3Zero(), 1.0f, ramp.color);
     }
 
+    // A deterministic triangle mosaic over the flat collider gives the pitch
+    // its low-poly grass look without adding texture assets or changing physics.
+    // Every triangle is one solid green, so the facets stay crisp at any camera
+    // distance instead of blurring like a stretched image.
+    const Color grassColors[] = {
+        { 42, 100, 55, 255 }, { 49, 112, 59, 255 }, { 55, 124, 65, 255 },
+        { 38, 91, 51, 255 },  { 62, 132, 69, 255 }, { 46, 106, 62, 255 }
+    };
+    const float grassTile = 6.0f;
+    const float floorHalfWidth = width * 0.5f;
+    const float floorHalfLength = length * 0.5f;
+    int tileZ = 0;
+    for (float z = -floorHalfLength; z < floorHalfLength; z += grassTile, ++tileZ)
+    {
+        float nextZ = fminf(z + grassTile, floorHalfLength);
+        int tileX = 0;
+        for (float x = -floorHalfWidth; x < floorHalfWidth; x += grassTile, ++tileX)
+        {
+            float nextX = fminf(x + grassTile, floorHalfWidth);
+            unsigned int hash = (unsigned int)(tileX * 73856093) ^ (unsigned int)(tileZ * 19349663);
+            Color first = grassColors[hash % 6];
+            Color second = grassColors[(hash / 7 + 3) % 6];
+            const float y = 0.008f;
+
+            if (((tileX + tileZ) & 1) == 0)
+            {
+                DrawTriangle3D(Vector3{ x, y, z }, Vector3{ nextX, y, nextZ },
+                               Vector3{ nextX, y, z }, first);
+                DrawTriangle3D(Vector3{ x, y, z }, Vector3{ x, y, nextZ },
+                               Vector3{ nextX, y, nextZ }, second);
+            }
+            else
+            {
+                DrawTriangle3D(Vector3{ x, y, z }, Vector3{ x, y, nextZ },
+                               Vector3{ nextX, y, z }, first);
+                DrawTriangle3D(Vector3{ nextX, y, z }, Vector3{ x, y, nextZ },
+                               Vector3{ nextX, y, nextZ }, second);
+            }
+        }
+    }
+
     // Field markings, drawn as unlit lines just above the floor. Explicit lines
-    // rather than DrawGrid, which is square and cannot match a 55 x 80 field.
+    // rather than DrawGrid, which is square and cannot match this rectangular field.
     //
     // The flat floor is a rounded rectangle: the ramps take the outer 5 m, and the
     // corners are arcs of (cornerRadius - floorRampRadius) about each corner axis.
@@ -413,8 +487,8 @@ void ArenaObject::Draw()
     const float cornerAxisX = width * 0.5f - cornerRadius;
     const float cornerAxisZ = length * 0.5f - cornerRadius;
     const float flatCorner = cornerRadius - floorRampRadius;
-    const Color gridColor = { 90, 190, 255, 45 };
-    const Color lineColor = { 90, 190, 255, 190 };
+    const Color gridColor = { 255, 255, 255, 32 };
+    const Color lineColor = { 255, 255, 255, 255 };
 
     // How far a grid line may run before it reaches the rounded corner.
     for (float x = -halfWidth; x <= halfWidth + 0.01f; x += 5.0f)
@@ -432,11 +506,15 @@ void ArenaObject::Draw()
         DrawLine3D(Vector3{ -limit, 0.02f, z }, Vector3{ limit, 0.02f, z }, gridColor);
     }
 
+    // rlgl batches the line vertices but line width is immediate GL state, so
+    // flush before changing it or every marking would use the later reset width.
+    rlDrawRenderBatchActive();
+    rlSetLineWidth(4.0f);
     DrawCircle3D(Vector3{ 0.0f, 0.02f, 0.0f }, 8.0f, Vector3{ 1.0f, 0.0f, 0.0f }, 90.0f, lineColor);
     DrawLine3D(Vector3{ -halfWidth, 0.03f, 0.0f }, Vector3{ halfWidth, 0.03f, 0.0f }, lineColor);
 
     // Pitch outline: four straights between the corner arcs, then the arcs.
-    const Color outline = { 90, 190, 255, 120 };
+    const Color outline = { 255, 255, 255, 220 };
     for (float side = -1.0f; side <= 1.0f; side += 2.0f)
     {
         DrawLine3D(Vector3{ side * halfWidth, 0.02f, -cornerAxisZ },
@@ -459,6 +537,8 @@ void ArenaObject::Draw()
             }
         }
     }
+    rlDrawRenderBatchActive();
+    rlSetLineWidth(1.0f);
 }
 
 void ArenaObject::DrawGlassWalls()
@@ -501,7 +581,7 @@ void ArenaObject::DrawGlassWalls()
     const float roofX = halfWidth - ceilingRampRadius;
     const float roofZ = halfLength - ceilingRampRadius;
     const float roofCorner = cornerRadius - ceilingRampRadius;
-    const Color edge = { 110, 160, 220, 150 };
+    const Color edge = { 255, 255, 255, 235 };
 
     for (float side = -1.0f; side <= 1.0f; side += 2.0f)
     {
@@ -531,63 +611,169 @@ void ArenaObject::DrawGlassWalls()
     // and the mullions give the panels enough structure to read as surfaces
     // without making them any less see-through — which the chase camera depends
     // on, and which is now the only thing telling the player where the ramp is.
-    const float halfGoal = goalWidth * 0.5f;
     const float rampTop = floorRampRadius;                 // where the ramp becomes wall
     const float wallTop = wallHeight - ceilingRampRadius;   // where the wall becomes ceiling
-    const float inset = 0.03f;                              // just inside the panel, so no z-fighting
-    const Color seam = { 130, 195, 250, 215 };
-    const Color mullion = { 110, 160, 220, 60 };
+    // Keep the linework clearly in front of the glass surface. At the old 3 cm
+    // offset, depth precision at the far blue wall could reject an isolated
+    // diagonal and leave an apparently missing edge in the diamond pattern.
+    const float inset = 0.12f;
+    const Color seam = { 255, 255, 255, 245 };
+    const Color metalFacet = { 210, 216, 222, 180 };
+    const float latticeWidth = 7.0f;
+    const float latticeHeight = 3.6f;
+
+    // The reference is an open diamond mesh, not diagonal bracing over solid
+    // panels. Staggered nodes connect to both neighbours on the next row to
+    // form the repeating low-poly metal cells. Thicker lines read as bars.
+    rlDrawRenderBatchActive();
+    rlSetLineWidth(3.0f);
 
     // The straights stop where the rounded corners begin; the arcs below carry
     // them round. Past that tangent point a straight line is buried in the corner.
     for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
     {
         const float x = sideX * (halfWidth - inset);
+        const int runSegments = (int)ceilf(cornerAxisZ * 2.0f / latticeWidth);
+        const float runSpacing = cornerAxisZ * 2.0f / (float)runSegments;
         DrawLine3D(Vector3{ x, rampTop, -cornerAxisZ }, Vector3{ x, rampTop, cornerAxisZ }, seam);
-        DrawLine3D(Vector3{ x, wallTop, -cornerAxisZ }, Vector3{ x, wallTop, cornerAxisZ }, mullion);
-        for (float z = -cornerAxisZ; z <= cornerAxisZ + 0.01f; z += 5.0f)
-            DrawLine3D(Vector3{ x, rampTop, z }, Vector3{ x, wallTop, z }, mullion);
+        DrawLine3D(Vector3{ x, wallTop, -cornerAxisZ }, Vector3{ x, wallTop, cornerAxisZ }, seam);
+        int row = 0;
+        for (float y = rampTop; y < wallTop - 0.01f; y += latticeHeight, ++row)
+        {
+            float nextY = fminf(y + latticeHeight, wallTop);
+            float offset = (row & 1) ? runSpacing * 0.5f : 0.0f;
+            for (float z = -cornerAxisZ + offset; z <= cornerAxisZ + 0.01f; z += runSpacing)
+            {
+                for (float direction = -1.0f; direction <= 1.0f; direction += 2.0f)
+                {
+                    float nextZ = z + direction * runSpacing * 0.5f;
+                    if (nextZ >= -cornerAxisZ && nextZ <= cornerAxisZ)
+                        DrawLine3D(Vector3{ x, y, z }, Vector3{ x, nextY, nextZ }, metalFacet);
+                }
+            }
+        }
     }
+
+    // Build the orange end first and mirror each exact segment onto the blue
+    // end. Using integer node indices avoids accumulated float comparisons at
+    // the boundary and guarantees that neither side can lose a diagonal the
+    // other side has.
+    const float endWallZ = halfLength - inset;
+    const int endSegments = (int)ceilf(cornerAxisX * 2.0f / latticeWidth);
+    const float endSpacing = cornerAxisX * 2.0f / (float)endSegments;
+    auto DrawEndSegment = [endWallZ, metalFacet](Vector3 from, Vector3 to)
+    {
+        from.z = -endWallZ;
+        to.z = -endWallZ;
+        DrawLine3D(from, to, metalFacet);
+        from.z = endWallZ;
+        to.z = endWallZ;
+        DrawLine3D(from, to, metalFacet);
+    };
 
     for (float sideZ = -1.0f; sideZ <= 1.0f; sideZ += 2.0f)
     {
-        const float z = sideZ * (halfLength - inset);
-        // The back-wall ramps stop either side of the goal mouth, so the seam does
-        // too — and the mouth is exactly rampTop high, so no mullion crosses it.
-        for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
-        {
-            DrawLine3D(Vector3{ sideX * halfGoal, rampTop, z },
-                       Vector3{ sideX * cornerAxisX, rampTop, z }, seam);
-        }
-        DrawLine3D(Vector3{ -cornerAxisX, wallTop, z }, Vector3{ cornerAxisX, wallTop, z }, mullion);
-        for (float x = -cornerAxisX; x <= cornerAxisX + 0.01f; x += 5.0f)
-            DrawLine3D(Vector3{ x, rampTop, z }, Vector3{ x, wallTop, z }, mullion);
+        const float z = sideZ * endWallZ;
+        DrawLine3D(Vector3{ -cornerAxisX, rampTop, z }, Vector3{ cornerAxisX, rampTop, z }, seam);
+        DrawLine3D(Vector3{ -cornerAxisX, wallTop, z }, Vector3{ cornerAxisX, wallTop, z }, seam);
     }
 
-    // Round the corners off with the same two lines plus a mullion per facet, so
-    // the seam runs unbroken from one wall to the next the way the surface does.
+    int endRow = 0;
+    for (float y = rampTop; y < wallTop - 0.01f; y += latticeHeight, ++endRow)
+    {
+        const float nextY = fminf(y + latticeHeight, wallTop);
+        const bool offsetRow = (endRow & 1) != 0;
+        const int nodeCount = offsetRow ? endSegments : endSegments + 1;
+        for (int node = 0; node < nodeCount; ++node)
+        {
+            const float x = -cornerAxisX + (node + (offsetRow ? 0.5f : 0.0f)) * endSpacing;
+            for (int direction = -1; direction <= 1; direction += 2)
+            {
+                const float nextX = x + direction * endSpacing * 0.5f;
+                if (nextX < -cornerAxisX - 0.001f || nextX > cornerAxisX + 0.001f)
+                    continue;
+                DrawEndSegment(Vector3{ x, y, 0.0f }, Vector3{ nextX, nextY, 0.0f });
+            }
+        }
+    }
+
+    // Carry the same diamond lattice around the rounded corners. The collision
+    // has ten fine facets, but using every facet as a visual column compressed
+    // the grid at each transition. Visual nodes are instead spaced by arc
+    // length, matching latticeWidth on the straight walls.
     const float cornerLine = cornerRadius - inset;
+    const int latticeCornerSegments = (int)ceilf(cornerLine * PI * 0.5f / latticeWidth);
+    const float latticeCornerStep = PI * 0.5f / (float)latticeCornerSegments;
     for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
     {
         for (float sideZ = -1.0f; sideZ <= 1.0f; sideZ += 2.0f)
         {
-            for (int i = 0; i <= cornerSegments; ++i)
+            int row = 0;
+            for (float y = rampTop; y < wallTop - 0.01f; y += latticeHeight, ++row)
             {
-                float a = (PI * 0.5f) * i / (float)cornerSegments;
-                Vector3 at = { sideX * (cornerAxisX + cornerLine * cosf(a)), 0.0f,
-                               sideZ * (cornerAxisZ + cornerLine * sinf(a)) };
-                DrawLine3D(Vector3{ at.x, rampTop, at.z }, Vector3{ at.x, wallTop, at.z }, mullion);
-                if (i == cornerSegments)
-                    continue;
-
-                float b = (PI * 0.5f) * (i + 1) / (float)cornerSegments;
-                Vector3 next = { sideX * (cornerAxisX + cornerLine * cosf(b)), 0.0f,
-                                 sideZ * (cornerAxisZ + cornerLine * sinf(b)) };
-                DrawLine3D(Vector3{ at.x, rampTop, at.z }, Vector3{ next.x, rampTop, next.z }, seam);
-                DrawLine3D(Vector3{ at.x, wallTop, at.z }, Vector3{ next.x, wallTop, next.z }, mullion);
+                float nextY = fminf(y + latticeHeight, wallTop);
+                float offset = (row & 1) ? latticeCornerStep * 0.5f : 0.0f;
+                for (float angle = offset; angle <= PI * 0.5f + 0.001f; angle += latticeCornerStep)
+                {
+                    Vector3 at = { sideX * (cornerAxisX + cornerLine * cosf(angle)), y,
+                                   sideZ * (cornerAxisZ + cornerLine * sinf(angle)) };
+                    for (float direction = -1.0f; direction <= 1.0f; direction += 2.0f)
+                    {
+                        float nextAngle = angle + direction * latticeCornerStep * 0.5f;
+                        if (nextAngle < 0.0f || nextAngle > PI * 0.5f)
+                            continue;
+                        Vector3 next = { sideX * (cornerAxisX + cornerLine * cosf(nextAngle)), nextY,
+                                         sideZ * (cornerAxisZ + cornerLine * sinf(nextAngle)) };
+                        DrawLine3D(at, next, metalFacet);
+                    }
+                }
             }
         }
     }
+
+    // White bands continue both wall/ramp joins around the rounded corners.
+    // These use the collision facet division so their endpoints coincide with
+    // the ramp strip seams and meet the straight runs without a visual gap.
+    for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
+    {
+        for (float sideZ = -1.0f; sideZ <= 1.0f; sideZ += 2.0f)
+        {
+            for (int i = 0; i < cornerSegments; ++i)
+            {
+                float a = PI * 0.5f * i / (float)cornerSegments;
+                float b = PI * 0.5f * (i + 1) / (float)cornerSegments;
+                Vector3 at = { sideX * (cornerAxisX + cornerLine * cosf(a)), 0.0f,
+                               sideZ * (cornerAxisZ + cornerLine * sinf(a)) };
+                Vector3 next = { sideX * (cornerAxisX + cornerLine * cosf(b)), 0.0f,
+                                 sideZ * (cornerAxisZ + cornerLine * sinf(b)) };
+                DrawLine3D(Vector3{ at.x, rampTop, at.z }, Vector3{ next.x, rampTop, next.z }, seam);
+                DrawLine3D(Vector3{ at.x, wallTop, at.z }, Vector3{ next.x, wallTop, next.z }, seam);
+            }
+        }
+    }
+
+    // The ceiling collision stays invisible, but an open diamond lattice makes
+    // it part of the same metal cage as the walls and upper ramps without
+    // placing an opaque slab between the camera and the field.
+    const float ceilingY = wallHeight - inset;
+    const float ceilingRow = 5.0f;
+    int row = 0;
+    for (float z = -roofZ; z < roofZ - 0.01f; z += ceilingRow, ++row)
+    {
+        float nextZ = fminf(z + ceilingRow, roofZ);
+        float offset = (row & 1) ? latticeWidth * 0.5f : 0.0f;
+        for (float x = -roofX + offset; x <= roofX + 0.01f; x += latticeWidth)
+        {
+            for (float direction = -1.0f; direction <= 1.0f; direction += 2.0f)
+            {
+                float nextX = x + direction * latticeWidth * 0.5f;
+                if (nextX >= -roofX && nextX <= roofX)
+                    DrawLine3D(Vector3{ x, ceilingY, z }, Vector3{ nextX, ceilingY, nextZ }, metalFacet);
+            }
+        }
+    }
+    rlDrawRenderBatchActive();
+    rlSetLineWidth(1.0f);
 }
 
 BoundingBox ArenaObject::GetWorldBounds() const

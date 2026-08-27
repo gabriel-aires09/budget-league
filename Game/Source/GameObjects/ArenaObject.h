@@ -27,9 +27,9 @@ public:
     // the car, and that only works if nothing writes depth over the car first.
     void DrawGlassWalls();
 
-    float width = 55.0f;  // along X, sideline to sideline
-    float length = 80.0f; // along Z, goal line to goal line
-    float wallHeight = 15.0f;
+    float width = 76.81f;   // along X, sideline to sideline
+    float length = 102.41f; // along Z, goal line to goal line
+    float wallHeight = 20.73f;
     float wallThickness = 2.0f;
     float floorThickness = 2.0f;
 
@@ -53,10 +53,14 @@ public:
     float FlatHalfWidth() const { return width * 0.5f - floorRampRadius; }
     float FlatHalfLength() const { return length * 0.5f - floorRampRadius; }
 
-    // The opening in each back wall. GoalObject must be built from the same
-    // numbers, so MatchScene copies them across rather than repeating them.
+    // The opening in each back wall, and how far the net recess reaches behind
+    // it. GoalObject must be built from the same numbers, so MatchScene copies
+    // them across rather than repeating them. The depth is the arena's business
+    // as well as the goal's: the stands have to start beyond the recess, or they
+    // stand inside it (see AddStadium).
     float goalWidth = 14.0f;
     float goalHeight = 5.0f;
+    float goalDepth = 4.0f;
 
     // One box of the arena. Physics and rendering both read this list, so the
     // collision can never drift away from what is on screen.
@@ -80,7 +84,8 @@ public:
 
     // One ramp, drawn as a single continuous surface. Its collision is still the
     // boxes in `pieces`, which are marked invisible; this mesh is generated from
-    // the same arc in the same call, so the two cannot drift apart.
+    // the same arc in the same call, so the two cannot drift apart. Floor ramps
+    // carry vertex colors for their subtle gray transparency gradient.
     //
     // Drawing the boxes instead made a transparent ramp read as stacked bands:
     // eight overlapping boxes compound their alpha wherever they overlap, and
