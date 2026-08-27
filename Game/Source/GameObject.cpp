@@ -12,6 +12,12 @@ Vector3 GameObject::GetBodyPosition() const
     return Vector3{ (float)position.GetX(), (float)position.GetY(), (float)position.GetZ() };
 }
 
+Vector3 GameObject::GetBodyVelocity() const
+{
+    JPH::Vec3 velocity = scene->physicsSystem.GetBodyInterface().GetLinearVelocity(bodyID);
+    return Vector3{ velocity.GetX(), velocity.GetY(), velocity.GetZ() };
+}
+
 Matrix GameObject::GetBodyRotation() const
 {
     // Both libraries use right handed Y up and (x, y, z, w) quaternions.

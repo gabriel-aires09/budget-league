@@ -15,8 +15,8 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 09 — Jumps, Flips and Air Control**
 - [x] **Milestone 10 — Camera Modes**
 - [x] **Milestone 11 — HUD**
-- [ ] **Milestone 12 — Bot Opponent (or Solo Practice)** — the next one
-- [ ] **Milestone 13 — Tuning Panels (Debug/Development)**
+- [x] **Milestone 12 — Bot Opponent (or Solo Practice)**
+- [ ] **Milestone 13 — Tuning Panels (Debug/Development)** — the next one
 - [ ] **Milestone 14 — Visual Polish and Effects** — lighting is done, pulled forward; shadows, bloom and effects are not
 - [ ] **Milestone 15 — Audio**
 - [ ] **Milestone 16 — UI Polish (raygui)**
@@ -35,15 +35,16 @@ seven cooked cars on a 2 x 3 grid of pedestals, spinning slowly in the team colo
 from there opens a real match: an enclosed
 55 x 80 m arena with side walls, back walls, a ceiling and two coloured goals; a player car driven
 with WASD/arrows on a Jolt rigid body; a ball; a score, a match clock and a kickoff countdown; and
-a smooth third-person chase camera. A goal resets the field and counts down again, and the match
-ends on a full-time screen offering a rematch. Every readout now lives in `HUD.h/cpp`: a scoreboard
+a smooth third-person chase camera; and an orange bot opponent that chases the ball and shoots at
+the player's goal, or solo practice when it is switched off in the settings. A goal resets the field
+and counts down again, and the match ends on a full-time screen offering a rematch. Every readout now lives in `HUD.h/cpp`: a scoreboard
 with both team scores and the clock, a boost meter and a speed readout, the kickoff countdown and a
 goal band in the scoring team's colour. The car draws a real low-poly model from the Cars-Park pack, cooked from FBX and
 painted in the team colour, and the whole scene is flat-shaded by one directional light. Shift
 boosts, drawing on a 0-100 meter refilled by 18 boost pads spread across the field. Space jumps,
 a second press flips in whatever direction is held, and the car can be pitched, yawed and rolled in
 the air, so aerial ball touches work. Esc or P pauses, with Resume / Settings / Return to main menu
-/ Exit. No opponent yet — the bot is Milestone 12.
+/ Exit.
 
 **C** toggles between the chase camera and a ball cam that sits on the far side of the car from the
 ball so both are in frame, and the camera now keeps itself inside the arena: it is clamped under the
@@ -294,6 +295,24 @@ each state and resized the window from the environment (removed afterwards):
 | Release build | no GROUNDED / CHASE CAM readouts — they are behind `GAME_DEV_TOOLS` |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no errors in the log |
 
+Milestone 12 bot, measured by a temporary probe that stepped the whole match loop directly - the
+match state machine and physics, no rendering - with the player car left with no controller at all,
+so every number below is the bot playing against a car that never moves (removed afterwards):
+
+| Measurement | Result |
+|---|---|
+| Full 5 minute match | **bot 6, player 1** - the one against it was its own goal, so it is fallible |
+| Same match, 2 minutes | bot 3, player 0 |
+| Distance driven in 5 minutes | 3417 m, so it is genuinely working the whole field |
+| Time under 2 m/s | 31% - approaches, turns and the kickoff freeze |
+| Longest single stretch under 2 m/s | 5.12 s, which is the jam reset firing |
+| Jam resets in 5 minutes | 2 |
+| Ever inverted (uprightness < 0.3) | 1% of the match |
+| Started nose-first into a wall | free and driving in 0.10 s, scores inside 30 s, no resets |
+| Ever left the flat floor / entered a goal recess | no, the target is clamped to the flat floor |
+| Bot switched off in settings | no bot car is built at all; the scene is exactly the solo practice it was |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no errors in the log |
+
 ## Layout
 
 ```
@@ -320,6 +339,7 @@ Game/Source/
   GameObjects/ArenaObject.h/cpp floor, walls, ceiling, back walls with goal openings, edge ramps
   CarController.h              CarInput + abstract controller
   PlayerController.h/cpp       keyboard input
+  BotController.h/cpp          the AI opponent: approach point, boost, stuck recovery
   ChaseCamera.h/cpp            third person follow camera, ball cam and the arena clamps
   PhysicsLayers.h/cpp          namespace physics: layers and Jolt filters
 Game/ThirdParty/   raylib, Jolt, glm, imgui     (cloned, git-ignored)
@@ -348,8 +368,8 @@ Controls so far: **WASD / arrows** drive and steer on the ground and pitch/yaw i
 **P** pauses.
 In menus: **up/down** or **W/S** move, **Enter**/**Space** activate, **left/right** change a value,
 and the mouse works too. In the car picker: **arrows** or **WASD** move around the grid, **Enter**
-or **Space** starts the match, **Esc** goes back to the main menu, left click picks a car and
-**right click on a car picks it and starts the match in one go**.
+or **Space** starts the match, **Esc** goes back to the main menu, right click picks a car and
+**left click on a car picks it and starts the match in one go**.
 
 `make clean` removes the build output. `make clean-thirdparty` additionally forces a raylib rebuild.
 The first build takes a few minutes (raylib + 153 Jolt translation units per config); after that it
@@ -803,11 +823,16 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   indented by hand, as in the boost section.
 - **Only ASCII.** The default font has no dashes or arrows beyond `-`, so em dashes render as boxes.
 
-### Car selection: right click
-- **Right click on a car is the whole choice in one action** — that car, and start the match — while
-  left click still only highlights, so the grid can be browsed with either button. Right clicking the
-  car that is already highlighted therefore behaves exactly like pressing START MATCH.
-- The click is collected in the same cell loop that does hover and left click, into `rightClicked`,
+### Car selection: click to start
+- **Left click on a car is the whole choice in one action** — that car, and start the match — while
+  right click still only highlights, so the grid can be browsed with either button. Left clicking the
+  car that is already highlighted therefore behaves exactly like pressing START MATCH. The two
+  buttons were the other way round at first and were swapped on request.
+- **The car cells and the START MATCH / BACK buttons cannot overlap**, which is what makes it safe for
+  a cell to act on the same button the buttons use. Measured at 720p: the lower row of cells ends at
+  y = 519 and the buttons start at y = 624, and both scale with the window, so a click on a button
+  never lands on a car as well.
+- The click is collected in the same cell loop that does hover and right click, into `startClicked`,
   and applied after the buttons are drawn. It cannot be handled inside the loop, because `selected`
   is what the start path reads and the buttons have not been drawn yet at that point.
 
@@ -839,6 +864,45 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **Speed graduated from debug text to a HUD element; GROUNDED/AIRBORNE and the camera mode did not.**
   Those two stay in `MatchScene::Draw` behind `GAME_DEV_TOOLS`, so Release draws neither — verified on
   a Release screenshot.
+
+### Bot opponent
+- **The bot aims by choosing where to drive, not by deciding when to hit.** Its target is a point
+  `approachOffset` behind the ball on the far side from the goal it is attacking, so simply driving
+  through that point *is* the shot. There is no separate shooting decision, no timing and no
+  prediction of contact - which is also why it is beatable.
+- **`CarController::Poll` gained a `deltaTime`.** The bot needs timers (stuck detection) and `Poll`
+  runs once per fixed step, so the step is the only honest source of time available to it -
+  `GetFrameTime()` would be the frame, which is a different clock. `PlayerController` ignores it.
+- **The bot's target is clamped to the flat floor** (`fieldHalfWidth`/`fieldHalfLength`, taken from
+  `ArenaObject::FlatHalfWidth/FlatHalfLength`). Unclamped, a ball rolling towards the bot's own net
+  puts the approach point *inside the goal recess*: measured, the bot followed it in, wedged itself
+  in the goal mouth beside the opening and never came out - 94% of a two minute match spent stuck.
+  The clamp also keeps it off the ramps, which it has no reason to climb.
+- **Backing out cannot free a wedged car, so a five second jam takes the reset.** The unstick reverses
+  for 0.8 s, which handles the ordinary case of driving into a wall; a car actually jammed in geometry
+  reverses into the same wedge forever. `stuckResetTime` escalates to `CarInput::reset`, the same
+  reset the player has on **R**, which teleports the bot to its own spawn. It is the only guarantee
+  behind "the bot never gets stuck against a wall for long", and it fired twice in five minutes.
+- **The jam timer runs through the unstick attempts, the stuck timer does not.** They measure
+  different things: one is "how long since it last moved at all", the other is "how long since the
+  last unstick attempt". Resetting the jam timer on each attempt would let a wedged car alternate
+  forever without ever reaching the escalation.
+- **A stationary car cannot steer, which is why the recovery reverses rather than turns.** Steering
+  authority ramps in with speed (`steerSpeedFloor`), so a bot nosed into a wall at 0 m/s has no yaw
+  rate available at all. Reversing gives it both the speed to turn and somewhere to turn into.
+- **Steering is `atan2` of the heading error, and the sign works out to a direct steer.** Positive yaw
+  turns left and `CarObject` negates the steer, so a positive error in the XZ plane is a positive
+  steer. Reversing mirrors the mapping in `CarObject`, so both the unstick and the swing-round branch
+  invert their steer to compensate.
+- **The bot drives `SportsCar2`, the one cooked car the picker never offers.** It can therefore never
+  turn up in the same model as the player's pick, without any logic to exclude one.
+- **The bot is not given `settings->playerCarModel`.** That field is the player's choice; the bot's
+  model is fixed in `MatchScene::Initialize`.
+- **Boost is spent only on long, straight approaches** - grounded, more than `boostMinDistance` away,
+  within `boostMaxAngle` of the target, and never below `boostReserve`. Boosting through a turn just
+  makes it overshoot the ball.
+- **It never jumps.** Nothing in the milestone needs it, and a bot that flips has to recover from
+  landing on its roof. It is the single biggest thing to add if it is ever wanted to be sharper.
 
 ### Menus
 - **`uistyle::Button` is the shared standalone button** used by the car picker and the how-to-play
@@ -890,7 +954,8 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   lands upside down with no input rights itself as before; a car being deliberately rotated is left
   alone. Both are verified.
 - `CarInput` carries `throttle`, `steer`, `boost`, `jump`, `airPitch`, `airYaw`, `airRoll` and
-  `reset` — everything the bot in Milestone 12 needs.
+  `reset`. The bot uses `throttle`, `steer`, `boost` and `reset`; the air axes and `jump` are the
+  player's alone so far.
 - **CLAUDE.md 2.3 lists "boost pad hints" as a HUD element and there are none.** The pads communicate
   their own state by glowing in the world; the screen-space hint was removed on request. See the HUD
   decisions above before adding one back.
@@ -912,8 +977,16 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   slopes, never as steps. The wall transitions are now exactly that (see the ramp notes above, and
   the measured "biggest backward step 0.000 m"); keep it true for boost pads and any Milestone 14
   trim.
+- **The bot can teleport.** A five second jam sends it back to its own spawn (see the bot decisions
+  above). It is deliberate and it is the only hard guarantee that it never sits stuck, but it is a
+  thing a player cannot do, so it is worth knowing before anyone reports it as a bug.
+- **The goal recess had no floor until Milestone 12.** The arena floor slab stops at the goal line, so
+  anything that followed the ball into a net fell out of the world for good — the player included,
+  not just the bot. `GoalObject` now builds its own floor, flush with the arena's at y = 0.
+- **`GameSettings::botEnabled` is read once, at `MatchScene::Initialize`.** Toggling it in the pause
+  menu therefore does nothing until the next match, exactly like `matchDurationMinutes`.
 - **Some settings are stored but not consumed yet**, because the systems that read them do not exist:
-  bot enabled (Milestone 12) and the master/SFX volumes (Milestone 15 — the audio device is not even
+  the master/SFX volumes (Milestone 15 — the audio device is not even
   initialised). Fullscreen, resolution, camera sensitivity and the post-processing flag are the ones
   with an effect today, and post-processing is just a stored flag until Milestone 14.
 - **Settings live for the session only.** Nothing is written to disk; Milestone 13 introduces the
@@ -924,24 +997,20 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **All six previews are painted blue,** because the player is always on the blue team. If teams ever
   become selectable, `SetPaintColor` in `CarSelectScene::Initialize` is the one place to change.
 
-## Next steps — Milestone 12 (Bot opponent, or solo practice)
+## Next steps — Milestone 13 (Tuning panels, Debug/Development only)
 
-1. `BotController` implements `CarController`, the same interface `PlayerController` already does, so
-   it plugs into a second `CarObject` with no changes to `CarObject` itself. `CarInput` already
-   carries throttle, steer, boost, jump, the three air axes and reset.
-2. `GameSettings` already has the bot-enabled flag, and it is already a row in the settings panel —
-   it is simply not read yet. `MatchScene::Initialize` is where it has to be consulted, and the
-   fallback when it is off is solo practice, which is exactly what the scene does today.
-3. The HUD needs nothing new for a second car: the scoreboard is already per team and
-   `Match::AddCar` puts any car into the kickoff reset. Give the bot its own `spawnPosition` at the
-   orange end and a `spawnYawDegrees` facing the middle.
-4. `MatchScene::boostPads` currently pushes only `&playerCar` into each pad's `cars` list; the bot has
-   to be added there too or it will drive over pads and collect nothing.
-
-The opponent car needs no new asset work: give the second `CarObject` a different
-`modelName` and the orange `teamColor` before `Initialize()` and it cooks, fits and paints itself.
-It should not be given `settings->playerCarModel` — that field is the player's car; pick the bot's
-from the same `CARS` table in `CarSelectScene.cpp`, or simply leave it on the `SportsCar` default.
+1. ImGui is already linked and initialised, and `GAME_DEV_TOOLS` is already defined in Debug and
+   Development only — `App.cpp` has the two `#ifdef` blocks. `ImGuiRaylib.h/cpp` (namespace `imgui`,
+   CLAUDE.md 2.3) does not exist yet and is what the panels need.
+2. Nearly everything worth tuning is already a public field with a comment saying so: `CarObject`
+   (drive, steering, boost, jump, air control, stability), `BallObject` (gravity factor, restitution,
+   friction, damping) and `ChaseCamera`. `CarObject::ApplyTuning` and `BallObject::ApplyTuning` exist
+   precisely to push the body-level ones back into Jolt after a slider moves — call them.
+3. `BotController`'s fields belong on a panel too, and it is the cheapest way to judge whether the bot
+   is beatable: `steerGain`, `approachOffset`, `leadTime` and the boost thresholds all change how it
+   plays within one match.
+4. The milestone also asks for a save button and a config the game loads at startup. That config is
+   the natural home for `GameSettings` as well, which currently lives only for the session.
 
 ### Verifying without a keyboard
 There is no `xdotool`/`wtype` here, so every milestone so far was verified with a temporary harness

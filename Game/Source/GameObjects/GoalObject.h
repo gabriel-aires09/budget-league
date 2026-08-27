@@ -32,6 +32,9 @@ public:
     float height = 5.0f;
     float depth = 4.0f;
     float frameThickness = 0.6f;
+    // The arena floor slab stops at the goal line, so the recess brings its own
+    // floor. Its top face sits at y = 0, flush with the arena's.
+    float floorThickness = 0.5f;
 
     int defendingTeam = 0; // 0 blue, 1 orange. The other team scores here.
     Color teamColor = { 60, 140, 255, 255 };

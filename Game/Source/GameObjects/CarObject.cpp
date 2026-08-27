@@ -84,7 +84,7 @@ void CarObject::Update(float deltaTime)
 {
     CarInput input;
     if (controller != nullptr)
-        input = controller->Poll();
+        input = controller->Poll(deltaTime);
 
     if (input.reset)
         ResetTo(spawnPosition, spawnYawDegrees);

@@ -21,6 +21,7 @@ public:
     virtual BoundingBox GetWorldBounds() const = 0;
 
     Vector3 GetBodyPosition() const;
+    Vector3 GetBodyVelocity() const;
     Matrix GetBodyRotation() const;
 
     Scene *scene = nullptr;

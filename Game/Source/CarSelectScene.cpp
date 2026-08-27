@@ -124,7 +124,7 @@ void CarSelectScene::Draw()
     // laid out in screen space, so the frame and the label sit on their car at
     // any window size and in either row, which the camera sees from a different
     // angle.
-    int rightClicked = -1;
+    int startClicked = -1;
     for (int i = 0; i < CAR_COUNT; ++i)
     {
         Vector3 base = CarPosition(i);
@@ -141,12 +141,12 @@ void CarSelectScene::Draw()
         bool hovered = CheckCollisionPointRec(GetMousePosition(), cell);
         if (hovered && (mouseDelta.x != 0.0f || mouseDelta.y != 0.0f))
             selected = i;
-        if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
-            selected = i;
-        // Right click is the whole choice in one go: that car, and start. Left
-        // click still just highlights, so the grid can be browsed either way.
         if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
-            rightClicked = i;
+            selected = i;
+        // Left click is the whole choice in one go: that car, and start. Right
+        // click still just highlights, so the grid can be browsed either way.
+        if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+            startClicked = i;
 
         if (i == selected)
             DrawRectangleLinesEx(cell, 2.0f * scale, uistyle::Accent);
@@ -164,9 +164,9 @@ void CarSelectScene::Draw()
     bool start = uistyle::Button(startButton, "START MATCH", true);
     bool back = uistyle::Button(backButton, "BACK", false);
 
-    if (rightClicked >= 0)
+    if (startClicked >= 0)
     {
-        selected = rightClicked;
+        selected = startClicked;
         start = true;
     }
 
