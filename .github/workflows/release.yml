@@ -6,6 +6,10 @@ on:
       - "v*.*.*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+  releases: write
+
 env:
   RAYLIB_TAG: "6.0"
   JOLT_TAG: "v5.6.0"
