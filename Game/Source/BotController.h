@@ -38,6 +38,28 @@ public:
     // of trying to drag a wide turn through it.
     float reverseAngle = 2.0f;
 
+    // --- Positioning
+    // When the ball is in its own half and the ball is already past it, chasing
+    // from behind is exactly the over-commitment CLAUDE.md 6.4 names: it cannot
+    // catch the ball before the ball reaches the goal, and it leaves the net
+    // open while it tries. It recovers goal-side first instead.
+    //
+    // It is also what breaks the midfield shoving match. Two cars pushing the
+    // same ball from opposite sides move it nowhere - measured, the ball was
+    // under 3 m/s for 35% of open play and the bot managed three shots on target
+    // in over three minutes. The car that is out of position backing off is what
+    // gives the other one a clean run at it.
+    float defendStandOff = 12.0f; // how far in front of its own line it recovers to
+    // How much of the ball's sideways position it lines up with while recovering.
+    // Fully tracking the ball would put it on the ball rather than between the
+    // ball and the goal.
+    float recoverLineUp = 0.5f;
+    // Inside this it plays the ball whatever the geometry says: it is close
+    // enough to contest, and turning away would be the worse mistake. Measured
+    // against a fixed opponent, 8 m beat both 0 (never contest) and 14 m, which
+    // gave up on balls it could have reached and produced a 5.11 s stall.
+    float recoverMinRange = 8.0f;
+
     // --- Boost
     float boostMinDistance = 14.0f; // only worth it on a long run
     float boostMaxAngle = 0.25f;    // radians of heading error still worth boosting through

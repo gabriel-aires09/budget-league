@@ -58,9 +58,20 @@ public:
     // them across rather than repeating them. The depth is the arena's business
     // as well as the goal's: the stands have to start beyond the recess, or they
     // stand inside it (see AddStadium).
-    float goalWidth = 14.0f;
-    float goalHeight = 5.0f;
-    float goalDepth = 4.0f;
+    // These are the Rocket League reference goal, in the same 100 uu = 1 m the
+    // field dimensions above use (Milestone 16): 1786 x 642.775 x 880 uu. The
+    // recess used to be 4 m deep, which is barely longer than the 3.2 m car — a
+    // car that followed the ball in was wedged nose-to-back-of-net with no room
+    // to turn round. 8.8 m is what makes the inside of a goal a place you can
+    // actually drive in.
+    //
+    // goalHeight is no longer tied to floorRampRadius. It used to be exactly 5.0
+    // like the ramp, and DrawGlassWalls quietly relied on that: the end-wall seam
+    // and the first lattice row start at the top of the ramp, so with a taller
+    // mouth they need skipping around the opening. See DrawGlassWalls.
+    float goalWidth = 17.86f;
+    float goalHeight = 6.43f;
+    float goalDepth = 8.8f;
 
     // One box of the arena. Physics and rendering both read this list, so the
     // collision can never drift away from what is on screen.

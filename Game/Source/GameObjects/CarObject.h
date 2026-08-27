@@ -5,6 +5,7 @@
 #include "CarController.h"
 #include "StaticModelAsset.h"
 
+#include <cmath>
 #include <string>
 
 // Rocket car: a single dynamic box driven by arcade forces plus a ground probe.
@@ -78,12 +79,27 @@ public:
     float boostForce = 6000.0f;
     float boostMaxSpeed = 46.0f;   // boost drives past the normal top speed
     bool boosting = false;         // for the HUD, and the flame in Milestone 13
+    // How long boost has been held without a break. The flame and the ember
+    // trail ramp in over boostRampTime, so a tap does not look like a sustained
+    // burn — which is what CLAUDE.md 6.3 asks for and what the flame did not do:
+    // it was drawn at one fixed size the whole time.
+    float boostHeldTime = 0.0f;
+    float boostRampTime = 0.45f;
+    float BoostIntensity() const
+    {
+        return boostRampTime > 0.0f ? fminf(boostHeldTime / boostRampTime, 1.0f) : 1.0f;
+    }
 
     // --- Jump, flip and air control
     float jumpImpulse = 1000.0f;       // N s along the car's own up axis
     float secondJumpImpulse = 900.0f;
     float flipImpulse = 1500.0f;       // horizontal, towards whatever is held
     float flipSpin = 9.0f;             // rad/s of the flip rotation
+    // A flip holds that spin for this long instead of leaving it to air control
+    // and the body's angular damping, which together bleed about 3 rad/s and
+    // stall the rotation before it completes. flipSpin * flipDuration is the
+    // angle swept, so 9.0 * 0.70 is a whole turn.
+    float flipDuration = 0.70f;
     // Grounded is ignored for this long after a jump, otherwise the ground probe
     // still hits on the next step and instantly hands the jumps back.
     float jumpLockout = 0.15f;
@@ -105,6 +121,10 @@ public:
     bool doubleJumpUsed = false;
     bool jumpHeldPrevious = false;
     float jumpLockoutRemaining = 0.0f;
+    // While this is running the spin is held about flipAxis (world space) and air
+    // control is ignored, which is what makes a flip a committed move.
+    float flipTimeRemaining = 0.0f;
+    Vector3 flipAxis = { 0.0f, 0.0f, 0.0f };
 
     // --- Stability
     float linearDamping = 0.1f;
@@ -131,6 +151,10 @@ public:
     // -1 inverted relative to it. On the floor that is the world up, on a wall it
     // is the wall's normal, which is what lets the same test work everywhere.
     float uprightness = 1.0f;
+    // The surface that alignment is measured against: the normal under the car
+    // when grounded, world up otherwise. ChaseCamera offsets along it, so the
+    // view goes out from a wall instead of climbing it.
+    Vector3 surfaceNormal = { 0.0f, 1.0f, 0.0f };
 
     StaticModelAsset carModel;
     // Fitted in Initialize() so the model always matches the collision box.

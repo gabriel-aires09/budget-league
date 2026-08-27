@@ -671,10 +671,34 @@ void ArenaObject::DrawGlassWalls()
         DrawLine3D(from, to, metalFacet);
     };
 
+    // The goal mouth is taller than the floor ramp, so both the seam and the
+    // lowest lattice row would otherwise be drawn straight across the opening —
+    // and glass never writes depth, so being "behind" the mouth would not have
+    // hidden them. Anything that overlaps the mouth in X while any part of it is
+    // below the top of the mouth is left out. The opening keeps its own outline:
+    // GoalObject draws the mouth in the team colour.
+    const float halfGoal = goalWidth * 0.5f;
+    auto CrossesGoalMouth = [halfGoal, this](float fromX, float toX, float lowY)
+    {
+        return lowY < goalHeight - 0.001f &&
+               fminf(fromX, toX) < halfGoal - 0.001f && fmaxf(fromX, toX) > -halfGoal + 0.001f;
+    };
+
     for (float sideZ = -1.0f; sideZ <= 1.0f; sideZ += 2.0f)
     {
         const float z = sideZ * endWallZ;
-        DrawLine3D(Vector3{ -cornerAxisX, rampTop, z }, Vector3{ cornerAxisX, rampTop, z }, seam);
+        if (CrossesGoalMouth(-cornerAxisX, cornerAxisX, rampTop))
+        {
+            DrawLine3D(Vector3{ -cornerAxisX, rampTop, z }, Vector3{ -halfGoal, rampTop, z }, seam);
+            DrawLine3D(Vector3{ halfGoal, rampTop, z }, Vector3{ cornerAxisX, rampTop, z }, seam);
+            // Carry the seam across at the top of the mouth instead, so the line
+            // that reads as "this is where the ramp ends" stays continuous.
+            DrawLine3D(Vector3{ -halfGoal, goalHeight, z }, Vector3{ halfGoal, goalHeight, z }, seam);
+        }
+        else
+        {
+            DrawLine3D(Vector3{ -cornerAxisX, rampTop, z }, Vector3{ cornerAxisX, rampTop, z }, seam);
+        }
         DrawLine3D(Vector3{ -cornerAxisX, wallTop, z }, Vector3{ cornerAxisX, wallTop, z }, seam);
     }
 
@@ -691,6 +715,8 @@ void ArenaObject::DrawGlassWalls()
             {
                 const float nextX = x + direction * endSpacing * 0.5f;
                 if (nextX < -cornerAxisX - 0.001f || nextX > cornerAxisX + 0.001f)
+                    continue;
+                if (CrossesGoalMouth(x, nextX, y))
                     continue;
                 DrawEndSegment(Vector3{ x, y, 0.0f }, Vector3{ nextX, nextY, 0.0f });
             }

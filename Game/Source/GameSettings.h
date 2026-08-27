@@ -13,7 +13,9 @@ struct GameSettings
     std::string playerCarModel = "SportsCar";
 
     // Graphics
-    bool fullscreen = false;
+    // The game opens fullscreen. App::Initialize is what acts on this at launch;
+    // SettingsMenu::ApplyGraphics is what acts on it afterwards.
+    bool fullscreen = true;
     int resolutionIndex = 0; // 0 = custom, meaning whatever size the window has
     bool postProcessing = true;
 

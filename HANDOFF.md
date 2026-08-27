@@ -25,7 +25,17 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 19 — Settings Screen (main-menu layout)**
 - [x] **Milestone 20 — Soundtrack (OST playlist)**
 
-Every milestone in CLAUDE.md is now done; what is left is the section 6 polish list.
+Final milestone (CLAUDE.md section 6), a subsection at a time:
+
+- [x] **6.1 — Handling and Feel**
+- [x] **6.2 — Camera**
+- [x] **6.3 — Feedback and Juice**
+- [x] **6.4 — Bot**
+- [x] **6.5 — Performance and Stability**
+
+Every milestone in CLAUDE.md is now done, and the section 6 polish list is under way: **the whole of section 6 is finished** -
+6.1 Handling and Feel, 6.2 Camera, 6.3 Feedback and Juice, 6.4 Bot and 6.5 Performance and
+Stability, each with its own section below.
 
 Two pieces of work outside the milestone list are also done: the **asset pipeline** (FBX cooking plus
 the car models, CLAUDE.md 4.1) and the **arena ramps with wall and ceiling driving** (PROMPTS.md).
@@ -576,6 +586,400 @@ temporary probe that seeked each track to a second from its end, so a whole play
 | No audio device | the playlist is never even scanned - it is behind the same `ready` gate as the cues |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no errors in the log |
 
+Final Milestone 6.1 handling and feel, implemented on `fix/final-milestone` on 2026-08-06. Measured
+with a temporary harness that stepped the match loop directly - no rendering - and was removed
+afterwards. The README's polish list had all three items ticked already; measuring them showed two of
+the three were not actually true, which is the whole reason this pass exists.
+
+**Bumps were already right and nothing was changed for them.** A bump is a one-off angular kick, which
+is what a wheel-less box actually takes out of a glancing contact - the arena is smooth by design, so
+there is no lip to drive over. The car was kicked about its own forward axis at 25 m/s:
+
+| Roll kick | Worst lean | Back to level | Speed kept |
+|---|---|---|---|
+| 2 rad/s | 0.0 deg | 0.12 s | 32.0 m/s |
+| 4 rad/s | 4.4 deg | 0.12 s | 32.0 m/s |
+| 6 rad/s | 6.8 deg | 0.12 s | 32.0 m/s |
+| 8 rad/s | 8.9 deg | 0.12 s | 32.0 m/s |
+| 12 rad/s | 12.6 deg | 0.12 s | 32.0 m/s |
+
+The offset centre of mass and `tumbleDamping` between them mean even the hardest kick never gets near
+tipping the car, and none of them costs it any speed at all.
+
+**Flips did not work, and that is what was fixed.** Left to air control and the body's angular damping,
+a flip's spin decays at about 3 rad/s combined, so it stalled long before the rotation finished:
+
+| Flip | Half turn | Full turn | Lands upright |
+|---|---|---|---|
+| Forward, before | never | never | 2.54 s |
+| Forward, after | 0.37 s | 0.70 s | 2.23 s |
+| Backward, before | never | never | 1.25 s |
+| Backward, after | 0.38 s | 0.70 s | 2.04 s |
+| Side, before | 0.76 s | never | 0.99 s |
+| Side, after | 0.39 s | 0.70 s | 0.93 s |
+
+Traced through a forward flip after the fix, sampled every 0.1 s: the car sweeps the whole turn under
+the held spin, comes out at uprightness **+0.987 at 0.71 s**, holds exactly that for the entire 1.6 s
+descent from 6.6 m, and lands flat at 2.31 s.
+
+**The ball was left heavy but stopped being sluggish.** Only the rolling resistance moved; every hit
+number is untouched, which was the point.
+
+| Measurement | Before | After |
+|---|---|---|
+| Roll from 15 m/s | 25.4 m in 7.0 s | 31.6 m in 8.9 s |
+| Roll from 20 m/s | 35.6 m in 7.7 s | 43.7 m in 9.8 s |
+| Roll from 30 m/s | 58.2 m in 8.7 s | 69.7 m in 11.0 s |
+| Hit at 16.4 m/s | 19.6 m/s (1.19x), 13.6 m | unchanged |
+| Hit at 25.9 m/s | 29.8 m/s (1.15x), 34.2 m | unchanged |
+| Hit at 32.0 m/s | 37.8 m/s (1.18x), 50.3 m | unchanged |
+| Hit at 46.2 m/s, boosted | 52.4 m/s (1.13x), 80.2 m | unchanged |
+| Bounce apexes from 12 m | 5.61 / 3.16 / 2.11 / 1.66 m | unchanged |
+| Resting height | exactly `radius` (1.2500 m) | unchanged |
+
+**The kickoff reset now moves nothing at all.**
+
+| Check | Before | After |
+|---|---|---|
+| Car jumps returned by the reset | **no** - `jumpUsed` and `doubleJumpUsed` both stayed set | yes, both cleared |
+| Car drift over 2 s of idle play | 0.0100 m | **0.0000 m** |
+| Car peak speed over the same | 0.3839 m/s | **0.0000 m/s** |
+| Car resting height vs spawn | 0.3500 against a 0.3600 spawn | 0.3500 against a 0.3500 spawn |
+| Ball drift and peak speed | 0.0000 m, 0.0000 m/s | unchanged |
+| Car tilt | 0.00000 | unchanged |
+
+| Check | Result |
+|---|---|
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors in the log |
+| `flipDuration` on the F1 panel | yes, in `Car air` beside `flipImpulse` and `flipSpin`, mirrored onto the bot |
+
+Final Milestone 6.2 camera, implemented on `fix/final-milestone` on 2026-08-06. Measured with a
+temporary harness that ran the **real** `ChaseCamera` over scripted driving and then judged the
+result by asking Jolt and the projection directly — never by asking the camera about itself
+(removed afterwards). Every routine reports: whether the eye was inside static geometry
+(`CollidePoint`), whether anything solid sat within a 0.25 m bubble of it (`CollideShape`), whether
+arena geometry stood between the eye and the car, whether the car / ball / attacked goal projected
+inside the window, the biggest camera move in a frame and the biggest change in that.
+
+Milestone 10 had already verified the camera at a set of *static* placements, which is why the
+defects below survived: they only appear while something is moving.
+
+**Clipping, before and after.** Zeros in every column are the after; the numbers are the before.
+
+| Routine | inSolid | nearClip | car hidden | car off screen | worst jump | worst jerk | min clearance |
+|---|---|---|---|---|---|---|---|
+| open field, straight | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 | 0.529 → 0.529 | 0.030 → 0.030 | 3.75 → 3.75 |
+| open field, hard turn | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 | 0.529 → 0.529 | 0.095 → 0.095 | 3.70 → 3.70 |
+| into the +X side wall | **33 → 0** | 73 → 0 | 33 → 0 | 58 → 0 | 1.406 → 0.735 | 0.984 → 0.574 | 0.00 → 3.45 |
+| into the -X side wall | **61 → 0** | 76 → 0 | 61 → 0 | 61 → 0 | 1.348 → 0.723 | 0.777 → 0.540 | 0.00 → 0.79 |
+| into the +Z back wall | **26 → 0** | 58 → 0 | 26 → 0 | 41 → 0 | 1.312 → 0.748 | 1.036 → 0.598 | 0.00 → 1.32 |
+| into the -Z back wall | **41 → 0** | 58 → 0 | 41 → 0 | 0 → 0 | 1.320 → 0.738 | 0.891 → 0.637 | 0.17 → 0.92 |
+| boosted up the +X wall | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 | 0.746 → 0.748 | 0.074 → 0.075 | 3.75 → 1.65 |
+| into each of the 4 corners | 0 → 0 | 43-68 → 0 | 0 → 0 | 0 → 0 | 1.53 → 0.85 | 1.02 → 0.36 | 0.00 → 0.61 |
+| into the +Z / -Z net | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 | 0.53 → 0.59 | 0.06 → 0.06 | 3.74 → 0.61 |
+| hugging the +X wall | **28 → 0** | 92 → 0 | 28 → 0 | 53 → 0 | 0.764 → 0.678 | 0.550 → 0.212 | 0.00 → 0.34 |
+
+The first two rows are the point of the other twelve: in open field every clamp is inert and the
+numbers are identical to the digit, so the flat-ground framing Milestone 02 tuned is untouched.
+
+**Ball cam, before and after.** Two routines were added while measuring, because the original "high
+ball" case turned out to be two different failures wearing one hat — a ball the car *trails* and a
+ball the car *overtakes* — and only splitting them showed that both failed for the same reason.
+
+| Routine | car off screen | longest run | ball off screen | worst jump | worst jerk |
+|---|---|---|---|---|---|
+| ball cam, slow chase | 0 → 0 | 0 → 0 | 0 → 0 | 0.533 → 0.622 | 0.034 → 0.041 |
+| ball cam, fast chase | 0 → 0 | 0 → 0 | 0 → 0 | 0.534 → 0.533 | 0.066 → 0.066 |
+| ball cam, boosted chase | 0 → 0 | 0 → 0 | **7 → 0** | **1.738 → 0.767** | **1.458 → 0.089** |
+| ball cam, high ball trailed | **21 → 0** | 12 → 0 | 2 → 0 | **3.067 → 0.534** | **2.533 → 0.066** |
+| ball cam, high ball overtaken | **33 → 0** | 20 → 0 | 6 → 66 | **3.035 → 0.534** | **2.535 → 0.059** |
+| ball cam, ball off to the side | 0 → 0 | 0 → 0 | **32 → 0** | 0.893 → 0.862 | 0.115 → 0.062 |
+| ball cam, arriving at the ball | 0 → 0 | 0 → 0 | 0 → 8 | **1.741 → 1.698** | **1.442 → 0.166** |
+| chase cam, same fast chase | 0 → 0 | 0 → 0 | 0 → 0 | 0.534 → 0.534 | 0.065 → 0.065 |
+
+**The car is now on screen for every frame of every routine in both tables**, and the worst
+single-frame camera move across the whole ball-cam set fell from 3.07 m to 0.53 m outside the one
+arrival case.
+
+The one row that went backwards is deliberate and is the trade the turn rate buys: driving *past*
+the ball at 32 m/s and continuing away from it now costs 66 frames with the ball out of shot,
+where before it cost 20 unbroken frames with the **car** out of shot while the view slid across at
+3 m per frame. Losing sight of a ball you have chosen to drive away from is ordinary; having the
+car ripped out from under you is not.
+
+The turn rate was swept rather than guessed:
+
+| `ballCamTurnRate` | car off screen, overtake | longest run | ball off, arriving | goal off, arriving |
+|---|---|---|---|---|
+| 1.5 | 0 | 0 | 73 | 106 |
+| 2.5 | 0 | 0 | 11 | 49 |
+| **4.0** | **0** | **0** | **8** | **28** |
+| 6.0 | 4 | 4 | 4 | 16 |
+| 9.0 | **38** | **36** | 0 | 6 |
+
+4.0 is the last value that never loses the car at all; by 9.0 the swing is throwing the view around
+again, which is the thing being fixed.
+
+Two candidate changes were measured and **rejected**, which is worth recording so they are not tried
+again. A `ballCamRangeStretch` that pulled the camera back as the car and ball separated made
+"ball off to the side" strictly worse (ball off screen 0 → 24-31) and did not fix the high ball at
+all (car off screen 35 → 23, still bad), so it was taken back out. Raising `ballCamNearRange` from
+7 to 12 fixed the boosted-chase snap on its own, but once the direction rotation went in it made no
+measurable difference to anything, so `ballCamNearRange` stayed at 7 — one fewer value moved.
+
+| Check | Result |
+|---|---|
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors in the log |
+| Kickoff framing | unchanged on a screenshot, as the open-field rows predict |
+
+Fullscreen at launch and a bigger goal interior, on `fix/final-milestone` on 2026-08-06. Neither is a
+CLAUDE.md milestone; both were asked for directly.
+
+**The game now opens fullscreen.** `GameSettings::fullscreen` defaults to true and `App::Initialize`
+acts on it once, after `InitWindow`.
+
+- **The window is resized to the monitor before the toggle.** `ToggleFullscreen` keeps the current
+  window size as the fullscreen resolution, so without the `SetWindowSize` the game would fill the
+  screen with a stretched 1280x720 image. Verified: `fullscreen=1 size=2560x1080` on this monitor.
+- **It is `ToggleFullscreen`, not `ToggleBorderlessWindowed`.** `SettingsMenu::ApplyGraphics` compares
+  the setting against `IsWindowFullscreen()`, which only knows about the former; using the borderless
+  variant would leave the panel's Fullscreen row reading "Yes" over a window the API calls windowed,
+  and the first toggle would then fight it.
+- **The smoke test deliberately stays windowed.** It exists to render a fixed 1280x720 frame and write
+  it out, and its screenshots are compared across configurations — going fullscreen would make them
+  whatever size the machine running them happens to be. Verified: 0 fullscreen transitions under
+  `--smoke-test`, and the screenshots are still 1280x720.
+- `App::windowWidth/windowHeight` still exist and are still what a windowed launch gets, so turning
+  Fullscreen off in Settings lands on the same 1280x720 it always did.
+
+**The goal interiors were far too small to drive into**, and are now the Rocket League reference goal
+in the same 100 uu = 1 m the field already uses (Milestone 16): 1786 x 642.775 x 880 uu.
+
+| | Before | After |
+|---|---|---|
+| Interior, w x h x d | 14.00 x 5.00 x 4.00 m | **17.86 x 6.43 x 8.80 m** |
+| Depth in car lengths | 1.25 | **2.75** |
+| Depth against the car's 3.62 m rotation diameter | 1.10x — no usable margin | **2.43x** |
+| Driving in at speed, deepest point reached | 2.55 m past the line | **7.40 m** |
+| Car stayed flat on the way in | yes | yes |
+| Reversing back out | 0.64 s | 0.91 s |
+
+The rotation diameter is the row that explains the complaint: a 1.7 x 3.2 m box needs 3.62 m of
+clear space to turn on the spot, and the old recess was 4.00 m deep. Measured with a temporary
+harness that drove a car in and back out at both sizes (removed afterwards).
+
+Two things about that harness are worth keeping, because both cost a run. **A car cannot turn round
+on the spot in either goal, and that is the steering model rather than the goal**: steering authority
+ramps in with speed (`steerSpeedFloor`), so a stationary car nosed into the back of a net has no yaw
+rate at all — the same fact `BotController` handles by reversing. The escape test therefore has to
+reverse, as a player does. And **the two sizes have to be tested from the same depth**: starting each
+at `depth - 2` made the deeper goal look worse purely because the car began further in.
+
+| Check | Result |
+|---|---|
+| Lattice or seam lines drawn across the mouth | none — see the note below |
+| Stands still clear of the deeper recess | yes, they derive from `goalDepth`; first tier now starts 2.8 m behind the net |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors or warnings in the log |
+
+Final Milestone 6.3 feedback and juice, implemented on `fix/final-milestone` on 2026-08-06. All three
+of its README items were ticked and **all three turned out to be unimplemented or half-implemented**.
+Measured with a temporary harness that forced each piece of feedback into view, screenshotted it and
+read the camera numerically (removed afterwards).
+
+**There was no screen punch at all.** Only the goal colour flash in `HUD.cpp` existed; the camera
+itself never moved on any event.
+
+| Event | Eye moved | Aim step per frame | Peak aim offset | Car off screen |
+|---|---|---|---|---|
+| Idle, before and after | 0.3235 m | 0.040 deg | 0.38 deg | 0 / 60 |
+| Big ball hit, **before** | 0.0003 m | 0.034 deg | — | 0 / 60 |
+| Big ball hit, **after** | 0.0003 m | **0.973 deg** | **0.97 deg** | 0 / 60 |
+| Goal, **before** | 0.0000 m | 0.034 deg | — | 0 / 60 |
+| Goal, **after** | **0.0000 m** | **2.503 deg** | **2.50 deg** | 0 / 60 |
+
+The "before" rows for a goal and for idle are identical to three decimals, which is the measurement
+that says the feature was simply absent.
+
+**The boost flame did not scale with anything.** `DrawBoostFlame`'s own comment claimed `strength`
+made a tapped boost look different from a held one, but the only thing ever passed was a flicker, so
+the cone was the same size at 0.15 s and at 1.5 s of hold — checked on screenshots as well as in the
+arithmetic.
+
+| Boost held | Intensity | Flame scale | Cone length | Trail per frame |
+|---|---|---|---|---|
+| Before, any hold | — | 1.00 | 2.30 m | 3 |
+| 0.05 s | 0.11 | 0.42 | **0.97 m** | 1 |
+| 0.15 s | 0.33 | 0.57 | 1.30 m | 2 |
+| 0.30 s | 0.67 | 0.78 | 1.80 m | 3 |
+| 0.45 s and beyond | 1.00 | 1.00 | **2.30 m** | 4 |
+
+**The boost pads told you ready or not-ready and nothing else.** Two different colours, but every pad
+on cooldown looked like every other one: a pad taken a moment ago and a pad about to come back were
+the same flat dark disc, so there was nothing to plan a run around. The lit disc now grows back with
+the charge, and a ready pad breathes.
+
+| Pad state | Before | After |
+|---|---|---|
+| Ready | flat bright disc | bright disc, gently pulsing |
+| Just taken (95% of cooldown left) | flat dark disc | dark seat, no light |
+| Nearly back (20% left) | **the same flat dark disc** | **dark seat with the light 80% grown back** |
+
+| Check | Result |
+|---|---|
+| Punch ever loses the car | no — 0 of 60 frames on a goal, a big hit and idle alike |
+| Punch ever moves the eye | no — 0.0000 m on a goal, by construction |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors or warnings in the log |
+
+Final Milestone 6.4 bot, implemented on `fix/final-milestone` on 2026-08-06. Measured with a temporary
+harness that played whole matches with no rendering at all - the match state machine and the physics,
+stepped directly - and with a provoked test that deliberately wedged the bot (both removed
+afterwards). **Milestone 12's bot numbers were all stale**: the field, the ball's rolling damping and
+the goals have all changed since, so everything below was re-measured from scratch.
+
+**Getting stuck was already solved, and nothing was changed for it.** Eight deliberate wedges, ten
+seconds each:
+
+| Provocation | Free and driving in | Resets | Ended up |
+|---|---|---|---|
+| Nose into the +X wall | 0.37 s | 0 | 39 m away |
+| Nose into the -X wall | 0.33 s | 0 | 37 m away |
+| Nose into its own back wall | 0.12 s | 0 | 13 m away |
+| Nose into the +X-Z corner | 0.34 s | 0 | 68 m away |
+| Nose into the -X+Z corner | 0.34 s | 0 | 11 m away |
+| Deep inside its own net | 0.12 s | 0 | 12 m away |
+| Deep inside the far net | 0.32 s | 0 | 42 m away |
+| Upside down at midfield | 1.29 s | 0 | 6 m away |
+
+**The failure was that the bot only ever scored from the kickoff.** Every goal in every match -
+52 of 52 against an idle opponent, 54 of 54 against a goalie, 6 of 6 against a mirror of itself -
+landed within 6 s of the field going live, at an average of 3.1 to 3.3 s. In the mirror match that
+left **199 seconds of contested open play that produced three shots on target and no goals at all**.
+That is the "not trivial" half of CLAUDE.md 6.4 failing: survive the kickoff and the bot has nothing.
+
+The cause is that it always drove at the ball, including when the ball was already past it in its own
+half — which is also the over-commitment the milestone names. Two cars shoving the same ball from
+opposite sides move it nowhere: the ball was under 3 m/s for 35% of open play. **The car that is out
+of position backing off is what gives either of them a clean run at it.**
+
+The fix is one branch: in its own half, if the ball is already past it and further away than
+`recoverMinRange`, it drives to a point in front of its own goal instead of at the ball, and picks
+the attack straight back up as soon as it is goal-side again.
+
+**A mirror match cannot measure this and it was a mistake to try.** Two identical agents are a chaotic
+system: the same parameter measured 6-9, then 11-6, then 47-52 across runs that differed only in
+rounding. Everything below is instead **six decorrelated three-minute matches against a fixed
+opponent — the bot exactly as it was before this change** — with the kickoff nudged sideways per run
+so the matches are genuinely independent.
+
+| Bot under test | Goals | Of those, open play | Conceded | Goal difference | Shots | Worst stall | Resets |
+|---|---|---|---|---|---|---|---|
+| **Before** (always chases) | 3.2 | 1.0 | 4.3 | **-1.1** | 1.7 | 1.58 s | 0 |
+| **After** (recovers goal-side) | **6.8** | **2.0** | 6.0 | **+0.8** | 1.8 | **1.33 s** | 0 |
+
+It went from losing to the old bot to beating it, doubled its open-play goals, and got *less* prone
+to stalling while doing it. It is still beatable: it never jumps, never goes for an aerial, reads the
+ball 0.25 s ahead and keeps a boost reserve, all of which are unchanged.
+
+Both new numbers were swept against that same fixed opponent rather than guessed:
+
+| `defendStandOff` | Goals | Open play | Goal difference | Worst stall |
+|---|---|---|---|---|
+| 8 m | 5.5 | 1.2 | -1.2 | 1.93 s |
+| **12 m** | **6.8** | **2.0** | **+0.8** | **1.33 s** |
+| 18 m | 2.3 | 1.5 | -0.9 | 3.78 s |
+
+| `recoverMinRange` | Goals | Open play | Goal difference | Worst stall | Resets |
+|---|---|---|---|---|---|
+| 0 m (never contest) | 5.0 | 1.5 | 0.0 | 1.93 s | 0 |
+| **8 m** | **6.8** | **2.0** | **+0.8** | **1.33 s** | **0** |
+| 14 m | 4.7 | 1.5 | -0.5 | 5.11 s | 1 |
+
+| Check | Result |
+|---|---|
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank, no errors or warnings in the log |
+
+Final Milestone 6.5 performance and stability, implemented on `fix/final-milestone` on 2026-08-06.
+Measured with a temporary harness that timed whole frames with the frame rate cap lifted and timed
+each pass inside them (removed afterwards), plus fault injection on the post-processing and full
+matches run in all three configurations.
+
+**Read the hardware caveat before quoting any of these numbers.** They were taken on an **NVIDIA
+RTX 3060**, which is not the "common laptop" CLAUDE.md 6.5 asks about. What they establish is the
+shape of the cost, and that is the part that carries across machines.
+
+Release, uncapped, at the resolutions that matter:
+
+| Resolution | Bloom on | Bloom off | Frames over 16.7 ms |
+|---|---|---|---|
+| 1280 x 720 | 0.61 ms (1626 fps) | 0.49 ms (2033 fps) | 0 of 840 |
+| 1920 x 1080 | 0.60 ms (1677 fps) | 0.51 ms (1952 fps) | 0 of 840 |
+| 2560 x 1080 (the fullscreen default) | 0.62 ms (1613 fps) | 0.54 ms (1846 fps) | 0 of 840 |
+
+Bloom costs 0.08 to 0.12 ms, which agrees with the 0.1 ms Milestone 14 measured for it.
+
+**The game is not fill-bound**, which is the finding that matters for a weaker GPU. Pushing the
+resolution far past anything real:
+
+| Resolution | Megapixels | Mean frame |
+|---|---|---|
+| 1280 x 720 | 0.92 | 0.59 ms |
+| 2560 x 1440 | 3.69 | 0.85 ms |
+| 3840 x 2160 | 8.29 | 1.32 ms |
+| 5120 x 2880 | 14.75 | 1.91 ms |
+
+Sixteen times the pixels costs 3.2 times the frame, so the cost is about **0.50 ms fixed plus
+0.096 ms per megapixel** on this GPU. The fixed half is CPU submission, which barely varies with the
+GPU at all:
+
+| Pass | Submission cost per frame |
+|---|---|
+| 3D objects | 0.23 ms |
+| Glass walls and their lattice | 0.17 ms |
+| Bloom resolve | 0.04 ms |
+| HUD | 0.007 ms |
+| Effects | 0.006 ms |
+
+So on a machine with, say, twenty times less fill rate than this one, 1080p would be roughly
+0.45 ms of submission plus 4 ms of fill - still four times inside a 60 fps budget. That is an
+extrapolation from the slope above, not a measurement, and it is the honest limit of what this
+machine can say.
+
+**Post-processing degraded gracefully in one direction and badly in the other.** The missing-shader
+path was already right. The missing-*targets* path was not: `EnsureTargets` never checked whether
+`LoadRenderTexture` had actually succeeded.
+
+| Fault | Before | After |
+|---|---|---|
+| Bloom shaders missing | warns once, draws unbloomed, exit 0 | unchanged |
+| Render targets fail to allocate | **no check at all** | warns once, draws unbloomed, exit 0 |
+| Warnings logged over 300 frames of the target fault | **300** | **1** |
+| `LoadRenderTexture` calls per frame while failing | **3, forever** | 3 once, then none |
+
+Both faults were injected and run, not reasoned about: with the targets forced to fail the game
+writes its screenshot and exits 0 with a single warning, and the same with `Bright.fs` deleted.
+
+**A full match logs nothing.** Two rounds of this. First 20000 frames - 333 seconds of continuous
+play, 39 goals and therefore 39 celebrations, resets and kickoffs - in each configuration, Debug
+included, so with `JPH_ENABLE_ASSERTS` on. Then 32000 frames in Debug and Release, which is long
+enough to run the clock all the way down and reach the full time screen, since that transition is
+exactly where an end-of-match bug would live:
+
+| Run | Configuration | ERROR | WARNING | Asserts, aborts, segfaults | Exit |
+|---|---|---|---|---|---|
+| 333 s, mid-match | Debug | 0 | 0 | 0 | 0 |
+| 333 s, mid-match | Development | 0 | 0 | 0 | 0 |
+| 333 s, mid-match | Release | 0 | 0 | 0 | 0 |
+| To full time | Debug | 0 | 0 | 0 | 0 |
+| To full time | Release | 0 | 0 | 0 | 0 |
+
+The full time run finishes 0 - 54 with the FULL TIME panel, ORANGE WINS and both buttons drawn
+correctly, screenshotted. The scoreline is what an idle player concedes - the smoke test never
+presses a key - not a statement about the bot.
+
+Resident memory was sampled twice during those runs and did not move by a single kilobyte
+(Debug 209004 kB, Development 146356 kB, Release 144840 kB both times), which is what the fixed
+particle pool and the fixed ramp meshes should give.
+
 ## Layout
 
 ```
@@ -690,6 +1094,14 @@ is incremental.
   damping would also bleed speed off a ball in flight and make big hits feel weak. At the first
   guess of 0.35 a 20 m/s roll crossed 69 m of an 80 m field and took 16 s to stop; 1.2 gives 36 m
   in 7.7 s.
+- **That 1.2 was tuned against the 80 m field and Milestone 16 left it behind.** The field became
+  102.41 m long, so the same 20 m/s pass reached barely a third of the way down it and the ball read
+  as sluggish - the "heavy but never sluggish" item in CLAUDE.md 6.1. **0.85** puts the roll back at
+  the fraction of the field 1.2 was chosen for: 43.7 m instead of 35.6 m. Nothing else about the ball
+  moved, and that is deliberate - the hit transfer (1.13-1.19x), the bounce apexes and the resting
+  height all measure identically before and after, because none of them is a rolling number. Any
+  future change to the arena length should look at this value again; it is the one ball tunable that
+  is really a ratio to the size of the pitch.
 - **Ball restitution drives car-ball hits too**, because Jolt combines restitution with `max()` and
   the car's is only 0.05. So the one number controls both how lively the floor bounces are and how
   hard the ball comes off the car — they cannot be tuned separately without a contact listener.
@@ -731,6 +1143,32 @@ is incremental.
   With the short probe used during the lockout the car is already 0.72 m up when it expires, past
   the 0.35 m the short probe can see, so grounded stays false. Verified: jump held for 4 s peaks at
   1.85 m, identical to before.
+- **A flip is a committed move, held for `flipDuration` rather than left to decay.** Setting the spin
+  once and handing the car back to air control does not work: `airDamping` (0.8/s) and the body's
+  `angularDamping` (2.2/s) together bleed about 3 rad/s, and measured, **no flip ever swept even half
+  a turn** - the forward and backward ones stalled part way round and dropped the car on its roof.
+  While `flipTimeRemaining` is running the angular velocity is re-set to `flipAxis * flipSpin` every
+  step and air control is skipped entirely, so `flipSpin * flipDuration` is exactly the angle swept:
+  9.0 x 0.70 is one turn.
+- **The spin is cancelled when the flip ends, not released.** This is the sharp edge in it. Letting
+  the timer expire and simply falling through to air control hands 9 rad/s back to a car that has
+  just come round to level, and it carries straight past upright: traced, the car ended a clean full
+  rotation at uprightness +0.999 and was at -0.9 a third of a second later, landing inverted every
+  time. Zeroing the angular velocity on the step the timer reaches zero is what makes the car come
+  out of a flip flat and stay flat all the way down.
+- **Landing clears `flipTimeRemaining`**, so a flip that puts a wheel back on the ground early ends
+  there rather than fighting the ground contact for the rest of its window.
+- **`CarObject::ResetTo` clears the car's transient state, not just its transform.** A reset that only
+  teleports leaves a player who spent both jumps before a goal **kicking off unable to jump at all**,
+  and carries a jump lockout or a half-finished flip through the countdown. `jumpHeldPrevious` is
+  deliberately *not* cleared: setting it false would make a jump key still held across the reset read
+  as a fresh press the instant play starts, and the car would jump on the kickoff whistle.
+- **The cars spawn at exactly `halfExtents.y`, not a hair above it.** The old 0.36 was described as
+  "half-height plus a hair so it does not visibly drop" - but a hair above the resting height *is* a
+  drop, and it is the only thing that ever moved at a kickoff: measured, 0.0100 m of fall peaking at
+  0.3839 m/s. `convexRadius` is inside the box in Jolt, so the resting height is the half extent
+  exactly, and spawning there makes two seconds of idle play after a reset move the car 0.0000 m. The
+  ball was already spawning at exactly `radius` and was already perfect.
 - **`CarInput::jump` is held, not an edge, and `CarObject` finds the rising edge itself.**
   `CarObject::Update` runs once per *fixed step* while `IsKeyPressed` stays true for a whole frame,
   so at 120 Hz an edge-triggered field would fire twice in one frame and eat the double jump
@@ -895,8 +1333,13 @@ is incremental.
   bright line along the top of every ramp (`y = floorRampRadius`) plus faint vertical mullions every
   5 m up the flat part of each wall, matching the field grid spacing. Pushing the walls' alpha up
   would read too, but at the cost of the see-through the chase camera depends on — lines cost
-  nothing and keep both. The back-wall seam is split around the goal mouth, which works out
-  because `goalHeight` and `floorRampRadius` are both 5.0, so no mullion ever crosses the opening.
+  nothing and keep both. The back-wall seam **used** to work out for free
+  because `goalHeight` and `floorRampRadius` were both 5.0, so nothing ever crossed the opening. The
+  goal is taller than the ramp now, so `DrawGlassWalls` skips the mouth explicitly: any seam or
+  lattice segment that overlaps it in X while any part of it sits below `goalHeight` is left out, and
+  the seam is carried across the top of the mouth instead so the ramp line stays continuous. Glass
+  never writes depth, so being "behind" the opening would not have hidden them — they had to be not
+  drawn at all.
 - **The two trim strips along the base of the side walls were removed.** The floor ramp now occupies
   that space and they were left buried inside it.
 - **The field markings are drawn to the flat area, not to the field bounds.** Past the ramp toe they
@@ -921,8 +1364,8 @@ is incremental.
   bodies and no risk of Jolt waking something. `Match::IsFrozen()` covers Kickoff and Finished;
   Celebration deliberately keeps simulating so the ball is seen going into the net.
 - Car and ball kickoff positions come from their own `spawnPosition` fields, so `Match::ResetField`
-  does not duplicate them. The car's spawn Y is 0.36 (its box half-height plus a hair) so it does
-  not visibly drop when the countdown ends.
+  does not duplicate them. The car's spawn Y is its box half extent exactly, so it does not drop at
+  all when the countdown ends - see the Milestone 6.1 note on that below.
 - **Physics runs at a fixed 120 Hz** with an accumulator (`Scene::StepPhysics`, 0.25 s clamp).
   `GameObject::Update` is called once per *fixed step*, right before the simulation runs — this
   matters because Jolt forces only persist for one step, so applying them per frame would be wrong.
@@ -1174,9 +1617,53 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   clears instead of snapping the frame the ray stops hitting.
 - **Only `physics::Arena` blocks the view.** The ball and the other car are on their own layers, so
   something passing behind the car can never yank the camera in.
-- **`minDistance` (1.5 m) is a last resort and is the one clamp that can still put the camera in a
-  wall.** The lift is what normally keeps the pull-in from ever getting that short. Raising it back
-  towards the old 2.5 m re-introduces the clipping it was measured to cause on the ramp.
+- **`minDistance` (1.5 m) used to be the one clamp that could still put the camera in a wall, and
+  Milestone 6.2 took that away from it.** It sat on the *final* clamp, where `clear < minDistance`
+  meant "sit at 1.5 m" whether or not there were 1.5 m to sit in — so along a blocked line it did
+  not floor the pull-in, it authorised the eye to cross a surface. Measured, that put the camera
+  inside the arena's own collision for **11-25% of the frames** of every wall-contact routine, with
+  the car hidden behind geometry for exactly the same frames. It now floors the *desired* position
+  instead, which is what it was always described as doing, and the final clamp has no floor at all:
+  the surface is the only thing that decides. Raising it back towards the old 2.5 m still
+  re-introduces the ramp clipping it was measured to cause, so leave it at 1.5.
+- **The final clamp keeps the full `wallMargin` when the gap can pay for it and half the gap when it
+  cannot** (`max(solid - wallMargin, solid * 0.5)`). Both branches are strictly inside the free
+  space, which is the property the old floor lacked; taking `solid - wallMargin` alone would go
+  negative whenever the surface was closer than the margin.
+- **`SolidReach` reports the raw distance plus a `blocked` flag rather than folding the margin in.**
+  Only one of its two callers wants the margin, and the original note still applies to that one:
+  subtracting it when nothing was hit creeps the camera in every frame and compounds, because the
+  clamped position is what gets stored.
+- **The camera lifts along the surface the car is standing on, not along the world.** `CarObject`
+  already computes that normal every step for its own driving (`alignTo`); 6.2 stores it as
+  `CarObject::surfaceNormal` and `ChaseCamera` smooths a copy of it into `surfaceUp`. On the flat
+  floor the two vectors are identical, so nothing about ordinary framing changes — verified, the
+  open-field rows match to the digit. On a wall it is what stops the camera climbing the wall
+  alongside the car: a car that stalls high on one sits in the ceiling fillet, and a world-up offset
+  drove the view straight into it, collapsing the trail to 0.37 m and holding the car off screen for
+  the rest of the run.
+- **`surfaceUp` is smoothed at 3/s, slower than the position at 7/s.** The normal under the car can
+  flick between facets on a ramp, and an unsmoothed lift would hand that straight to the framing.
+- **A car on a wall or the ceiling has no usable flat forward, and normalising what is left of one
+  is a bug, not a fallback.** `FollowDirection` flattened the car's nose to XZ and normalised
+  whatever remained; on a vertical wall that is a vector a couple of centimetres long whose
+  *direction* is numerical noise, and it swung the camera through a half circle between frames. It
+  now keeps the last usable direction below `flatForwardMinimum` (0.25). The old guard was 0.001,
+  which is far too small to catch this — by the time the vector is that short the direction has been
+  meaningless for a long while.
+- **Ball cam rotates the side it sits on rather than interpolating its position, and that is the
+  single biggest fix in 6.2.** The direction can genuinely reverse: the moment the car overtakes the
+  ball, the ball is behind it and the view belongs on the other side. Smoothing the camera's
+  *position* between those two sides draws a straight line, and that line runs through the car —
+  measured, the view crossed at 3.07 m a frame and the car was off screen for 20 unbroken frames.
+  Rotating the direction instead swings the camera round the car at its own distance and never
+  crosses it. It applies in ball cam only: chase mode's direction follows the car's heading, which
+  cannot reverse, so chase framing is left exactly as it was.
+- **`ballCamActive` seeds the rotation instead of smoothing it on the first frame in ball cam**, so
+  pressing `C` never starts a swing from a direction the camera was never actually at.
+- **The near-range handover is a smoothstep, not the raw ratio.** A linear weight changes the follow
+  direction fastest exactly as the ball crosses the car, which is the worst possible moment for it;
+  smoothstep is flat at both ends.
 - **`cameraSensitivity` scales the smoothing rates.** There is no mouse look for it to mean anything
   else, and this is the one number that changes how the camera feels: 0.5 takes 59 frames to recover
   from a shove, 2.0 takes 14. `MatchScene` copies it in every frame rather than at `Initialize`, so
@@ -1273,6 +1760,32 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   a Release screenshot.
 
 ### Effects and post-processing
+- **The screen punch rotates the aim and never moves the eye.** That is the whole reason it is safe:
+  Milestone 6.2's clipping guarantees are all statements about where the *eye* is, so a punch that
+  only moves the look-at point cannot put the camera through a wall however hard it is hit — measured
+  at 0.0000 m of eye movement on a goal. A positional shake would have had to be re-validated against
+  all fourteen 6.2 routines, and would have fought the pull-in every time it fired near a wall.
+- **The shake is two sine pairs at incommensurate rates, not random numbers.** It stays smooth at any
+  frame rate, it is reproducible between runs, and — the non-obvious one — it does not draw from
+  raylib's global random sequence, which the particle bursts and the audio cues share. Pulling from
+  it here would shift every random number they take.
+- **`ChaseCamera::Shake` takes the strongest pending punch rather than accumulating.** A scramble in
+  front of the net fires a big-hit punch several times a second; adding them would compound into
+  nausea, and the goal that follows has to still read as bigger than any of them.
+- **Strength is squared before it is applied and decays at 3.4/s**, so the punch lands hard and is out
+  of the way in about a third of a second. The goal is the only full-strength one in the game
+  (2.50 degrees of aim offset); a big hit reaches 0.97.
+- **The punch is cleared with the field on a kickoff**, next to `effects::Clear()` — the same reason
+  the particles are: everything has just been re-centred and nothing should carry over.
+- **`CarObject::boostHeldTime` is what makes the flame scale, and it is reset by `ResetTo`.** The
+  flame took a `strength` argument from the day it was written and the caller only ever passed a
+  flicker, so the documented behaviour never existed. Intensity ramps over `boostRampTime` (0.45 s)
+  and drives the cone, the ember count, their size and their life together, so a tap is a puff and a
+  held boost is a stream.
+- **The boost pad's lit disc grows back with the charge.** Ready versus not-ready was already two
+  colours; what was missing was *how far off* a pad was, which is the thing a player routes around.
+  The dark seat is always drawn underneath so the pad never vanishes from the floor, and the ready
+  pulse is what separates "full" from "nearly full" without introducing a third colour.
 - **`effects` is a dumb particle pool that decides nothing.** `MatchScene::UpdateEffects` watches the
   match and the ball and calls `Burst` on the changes it sees, exactly as it does for the HUD. Every
   effect therefore fires from a *change*, not from a state, which is why the goal burst does not
@@ -1302,6 +1815,16 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   nothing, so `MatchScene` needs no branch of its own.
 - **The bloom chain runs at a quarter of each axis.** It is blurred anyway, so the resolution buys
   nothing; measured, the whole chain costs about 0.1 ms a frame.
+- **A render target that fails to allocate has to be detected too, and the detection has to happen
+  before the size is cached.** `LoadRenderTexture` answers failure with an id of 0 rather than
+  loudly, and `EnsureTargets` recorded `targetWidth`/`targetHeight` regardless — so every later frame
+  would have matched the cache, skipped the rebuild and rendered into an invalid framebuffer for the
+  rest of the run. `IsRenderTextureValid` on all three targets is the check.
+- **The failed size is remembered, and that is not the same as a flag.** Without it the fallback
+  retried three `LoadRenderTexture` calls every single frame and logged its warning every single
+  frame: measured, **300 warnings in 300 frames**. Keying it on the size means a machine that cannot
+  give these targets is asked once, while a resize to something the driver *will* give still gets its
+  own attempt. Both post-processing faults were injected and run rather than reasoned about.
 - **Detecting missing bloom shaders needs the same two checks the lit shader needed** - raylib answers
   a missing file with its *default* shader, whose id is perfectly valid, so `IsShaderValid` alone
   silently passes. Compare against `rlGetShaderIdDefault()`.
@@ -1438,6 +1961,30 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   makes it overshoot the ball.
 - **It never jumps.** Nothing in the milestone needs it, and a bot that flips has to recover from
   landing on its roof. It is the single biggest thing to add if it is ever wanted to be sharper.
+- **It gives up a chase it has already lost, and that is what stopped it being a kickoff-only bot.**
+  Before Milestone 6.4 it drove at the ball unconditionally, including when the ball was past it in
+  its own half — a chase it cannot win, run while its own net stands open. Measured, *every* goal it
+  ever scored came within 6 s of a kickoff and 199 s of contested open play produced three shots and
+  no goals. The recovery is one branch and it is a recovery, not a mode: the moment it is goal-side
+  again it attacks.
+- **`recoverMinRange` (8 m) is what keeps the recovery from being cowardice.** Inside it the bot plays
+  the ball whatever the geometry says, because it is close enough to contest and turning away is the
+  worse mistake. At 0 it never contests and the goal difference falls to zero; at 14 m it abandons
+  balls it could have reached and produced a 5.11 s stall and a reset — the only reset in the whole
+  sweep.
+- **A hysteresis margin on "goal side" was built, measured and removed.** The idea was to stop it
+  flip-flopping when the car and the ball are level. Every value tried made it worse (at 3 m the goal
+  difference went to -2.9 and open-play goals to 0.7), and its best value was zero, so it is not
+  shipped as a knob that does nothing.
+- **The bot must never be tuned against a mirror of itself.** Two identical agents are chaotic: the
+  same build measured 6-9, 11-6 and 47-52 across runs differing only in rounding. Every number in the
+  6.4 section comes from six decorrelated matches against a *fixed* opponent — the previous bot — with
+  the kickoff nudged sideways per run. Use that shape of experiment for any future bot work.
+- **The provoked wall test gets slower with the recovery, and that is the recovery working.** Nose
+  into a side wall with the ball deep in its own half now takes 1.95 s to get back up to speed rather
+  than 0.39 s, because the bot is turning towards its own goal instead of towards the ball. With the
+  ball up the pitch the same wedge still frees in 0.37 s, and in real matches the worst stall actually
+  *fell* from 1.58 s to 1.33 s. It is a different target, not a stall.
 
 ### Menus
 - **`uistyle::Button` is the shared standalone button** used by the car picker and the how-to-play
@@ -1559,9 +2106,13 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 
 ## Next steps — the milestone list is finished
 
-Every milestone in CLAUDE.md section 5 is done, so what is left is the section 6 polish list, all of
-whose items are ticked in README.md, plus whatever the known-deviations list above still calls out.
-The four worth picking up first, in order of how much they would be felt:
+Every milestone in CLAUDE.md section 5 is done, and section 6 is being worked through a subsection at
+a time. **6.1 through 6.4 are done**; 6.5 is next, and their README items should be
+treated the way 6.1's, 6.2's and 6.3's were - as claims to be measured rather than as work already
+finished. Two of 6.1's three ticked items turned out not to be true when a harness was pointed at
+them, both of 6.2's did, and so did all three of 6.3's.
+
+Beyond section 6, the four worth picking up first, in order of how much they would be felt:
 
 1. **The bot never jumps** (see the bot decisions). It is the single biggest thing standing between
    the current opponent and one that feels like a player.

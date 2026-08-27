@@ -7,8 +7,8 @@ maths and [Dear ImGui](https://github.com/ocornut/imgui) for the in-engine tunin
 
 ## The game
 
-Pick one of six low-poly cars, then kick off in a 76.81 x 102.41 m glass-walled arena with a
-20.73 m ceiling. Drive, boost, jump,
+The game opens fullscreen. Pick one of six low-poly cars, then kick off in a 76.81 x 102.41 m
+glass-walled arena with a 20.73 m ceiling and Rocket League's own goal, 17.86 x 6.43 x 8.80 m. Drive, boost, jump,
 double-jump, flip and fly: every edge of the arena is ramped like Rocket League, so you can carry a
 wall and, with enough boost, cross the ceiling. Put the heavy-but-bouncy ball fully across the
 opponent's goal line to score. The match runs on a clock, a goal resets the field with a kickoff
@@ -107,6 +107,10 @@ raylib rebuild.
 Each configuration lands in `Build/<Config>/` next to an `assets/` folder of cooked models, textures
 and shaders, written by `Tools/AssetCooker.py` as part of the build.
 
+The game opens fullscreen at the monitor's own resolution; **Fullscreen** in Settings turns it back
+into a 1280x720 window. `--smoke-test` always runs windowed, so its screenshots are the same size on
+every machine.
+
 | Configuration | Debug symbols | ImGui tuning tools | Optimisation |
 |---|:---:|:---:|---|
 | Debug | yes | yes | `-O0` |
@@ -168,17 +172,18 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 
 ### Final milestone — polish
 
-- [x] Minor bumps never flip the car, while intentional flips stay snappy.
-- [x] The ball is heavy but not sluggish; big hits carry.
-- [x] The kickoff reset settles cleanly, with physics simply not stepped while frozen.
-- [x] Chase-camera clipping near walls — the camera is pulled in, and trades distance for height when there is none.
-- [x] Ball-cam framing keeps the ball and the car readable, including at speed.
-- [x] Screen and particle punch on goals and big hits.
-- [x] Boost flame/trail — a flickering cone at the exhaust plus embers while the boost is held.
-- [x] Boost-pad glow reads ready vs cooldown.
-- [x] Bot behaviour — it keeps its target on the flat floor, backs out when blocked and takes a reset if it is ever wedged for five seconds.
-- [x] Post-processing degrades gracefully — off in Settings costs nothing, and missing shaders log a warning and draw the scene unbloomed.
-- [x] No major errors in the log during a run.
+- [x] Minor bumps never flip the car, while intentional flips stay snappy — a hard sideways kick at speed costs the car under 2.5 degrees of lean and 0.12 s, and a flip is now a committed 0.70 s rotation that sweeps a full turn and comes out level instead of stalling half way round.
+- [x] The ball is heavy but not sluggish; big hits carry — a hit leaves at 1.13-1.19x the car's speed and a top-speed one crosses 50 m, while a 20 m/s pass now rolls 43.7 m instead of 35.6 m of the 102.41 m field.
+- [x] The kickoff reset settles cleanly, with physics simply not stepped while frozen — the car and the ball now sit at exactly their resting height, so two seconds of idle play after a reset move them 0.0000 m, and the reset hands the car's jumps back.
+- [x] Chase-camera clipping near walls — the camera is pulled in, trades distance for height when there is none, and lifts along the surface the car is standing on rather than the world. Measured over fourteen driving routines: the eye is never inside the arena's collision and the car is never hidden behind it, where before it was for up to a quarter of the frames of a wall climb.
+- [x] Ball-cam framing keeps the ball and the car readable, including at speed — the side the camera sits on now swings round the car instead of sliding through it, so the car stays on screen for every frame of every routine and the worst single-frame camera move drops from 3.07 m to 0.53 m.
+- [x] Screen and particle punch on goals and big hits — the view takes a short kick, 2.50 degrees on a goal and 0.97 on a big hit, scaled by how hard the ball was struck. It rotates the aim rather than moving the camera, so it can never push the view into a wall and never loses the car.
+- [x] Boost flame/trail intensity scales with boost use — a tapped boost gets a 0.97 m cone and one ember a frame, a held one the full 2.30 m and four, ramping over 0.45 s.
+- [x] Boost-pad glow reads ready vs cooldown — a ready pad breathes, and a recharging one fills its light back in as it goes, so a pad just taken and a pad about to return no longer look the same.
+- [x] Bot behaviour — it keeps its target on the flat floor, backs out when blocked and takes a reset if it is ever wedged for five seconds. Eight deliberate wedges (walls, corners, both nets, upside down) all free themselves in 0.12-1.29 s with no resets. It also stops chasing a ball that is already past it in its own half and recovers goal-side instead, which took it from scoring *only* from kickoffs to scoring in open play, and from losing to the previous bot to beating it.
+- [x] Smooth frame rate — 0.62 ms a frame in Release at 2560 x 1080 with bloom on, and not one frame over 16.7 ms in any configuration measured. The cost is about 0.50 ms fixed plus 0.096 ms per megapixel, so it is nowhere near fill-bound. Measured on an RTX 3060, not a laptop.
+- [x] Post-processing degrades gracefully — off in Settings costs nothing, missing shaders log a warning and draw the scene unbloomed, and render targets that fail to allocate now do the same instead of rendering into an invalid framebuffer for the rest of the run.
+- [x] No major errors in the log during a run — a full match to the final whistle logs zero errors, zero warnings and zero asserts in Debug, Development and Release, with resident memory unchanged across the run.
 
 ## Layout
 

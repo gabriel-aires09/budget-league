@@ -42,6 +42,23 @@ bool App::Initialize(int argc, char **argv)
     if (!IsWindowReady())
         return false;
 
+    // Open fullscreen, at whatever the monitor actually is. The window has to be
+    // resized to the monitor first: ToggleFullscreen keeps the current size as
+    // the fullscreen resolution, so without this the game would fill the screen
+    // with a 1280x720 image. IsWindowFullscreen is what the settings panel reads,
+    // so this is the same ToggleFullscreen it uses rather than the borderless
+    // variant, and the Fullscreen row is in step from the first frame.
+    //
+    // The smoke test deliberately stays windowed: it exists to render a fixed
+    // 1280x720 frame and write it out, and its screenshots would otherwise change
+    // size with whatever machine ran it.
+    if (settings.fullscreen && !smokeTest)
+    {
+        int monitor = GetCurrentMonitor();
+        SetWindowSize(GetMonitorWidth(monitor), GetMonitorHeight(monitor));
+        ToggleFullscreen();
+    }
+
     SetTargetFPS(targetFps);
     SetExitKey(KEY_NULL); // Esc pauses the match instead of closing the game
 

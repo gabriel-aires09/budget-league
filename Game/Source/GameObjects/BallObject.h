@@ -37,8 +37,12 @@ public:
     float friction = 0.35f;
     float linearDamping = 0.15f;
     // Carries most of the rolling resistance. At the original 0.35 a 20 m/s roll
-    // crossed 69 m of an 80 m field and took 16 s to stop.
-    float angularDamping = 1.20f;
+    // crossed 69 m of an 80 m field and took 16 s to stop, so it went to 1.20 —
+    // which was then tuned against that 80 m field. Milestone 16 made the field
+    // 102.41 m long and left the number behind, so the same pass only reached a
+    // third of the way down it and the ball read as sluggish. 0.85 puts it back
+    // at the fraction of the field 1.20 was chosen for.
+    float angularDamping = 0.85f;
     // Keeps a boosted aerial hit from launching the ball out of the arena.
     float maxSpeed = 55.0f;
 

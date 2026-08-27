@@ -39,6 +39,25 @@ CarInput BotController::Poll(float deltaTime)
     float targetX = Clamp(aimX - goalX * approachOffset, -fieldHalfWidth, fieldHalfWidth);
     float targetZ = Clamp(aimZ - goalZ * approachOffset, -fieldHalfLength, fieldHalfLength);
 
+    // The two goal lines are opposite ends of the same axis, so the one it
+    // defends is simply the far side of the one it attacks.
+    const float defendZ = -targetGoalZ;
+    const float towardField = defendZ > 0.0f ? -1.0f : 1.0f;
+    const bool ballInOwnHalf = defendZ > 0.0f ? aimZ > 0.0f : aimZ < 0.0f;
+    // Goal side: nearer its own line than the ball is. Measured against the aim
+    // point rather than the ball, so a ball already rolling that way counts.
+    const bool goalSide = fabsf(carPosition.z - defendZ) <= fabsf(aimZ - defendZ);
+    const float ballRange = sqrtf((aimX - carPosition.x) * (aimX - carPosition.x) +
+                                  (aimZ - carPosition.z) * (aimZ - carPosition.z));
+    if (ballInOwnHalf && !goalSide && ballRange > recoverMinRange)
+    {
+        // Beaten in its own half: get between the ball and the net instead of
+        // trailing the ball into it. It picks the attack back up the moment it is
+        // goal-side again, so this is a recovery, not a mode it sits in.
+        targetX = Clamp(aimX * recoverLineUp, -fieldHalfWidth, fieldHalfWidth);
+        targetZ = Clamp(defendZ + towardField * defendStandOff, -fieldHalfLength, fieldHalfLength);
+    }
+
     // Signed heading error in the XZ plane. Positive yaw turns left, and steering
     // negates it, so a positive error is exactly a positive steer.
     Vector3 forward = Vector3Transform(Vector3{ 0.0f, 0.0f, -1.0f }, car->GetBodyRotation());
