@@ -12,11 +12,14 @@ double-jump, flip and fly: every edge of the arena is ramped like Rocket League,
 wall and, with enough boost, cross the ceiling. Put the heavy-but-bouncy ball fully across the
 opponent's goal line to score. The match runs on a clock, a goal resets the field with a kickoff
 countdown, and boost is a 0-100 meter drained by holding Shift and refilled by 18 pads spread around
-the pitch.
+the pitch. **C** swaps between the chase camera and a ball cam that keeps the ball and the car lined
+up in frame.
 
 Priority is fun over realism: the car is a single box body driven by arcade forces rather than a
 simulated suspension, so acceleration is strong, cornering is drift-friendly and the car rights
 itself after a tumble.
+
+The main menu carries a **How to play** screen with the rules and the full control list.
 
 **Current state:** playable solo — there is no opponent yet (see the milestone checklist below).
 <p align="center">
@@ -52,6 +55,7 @@ If everything goes well, I want to implement a split screen two-player mode  (2v
 | **Shift** (hold) | Boost |
 | **W / A / S / D** (airborne) | Pitch and yaw |
 | **Q / E** (airborne) | Air roll |
+| **C** | Toggle chase cam / ball cam |
 | **R** | Reset the car to its spawn |
 | **Esc** or **P** | Pause |
 
@@ -72,7 +76,8 @@ If everything goes well, I want to implement a split screen two-player mode  (2v
 | **Arrows** or **WASD** | Move around the 2 x 3 grid |
 | **Enter** / **Space** | Start the match with the highlighted car |
 | **Esc** | Back to the main menu |
-| Mouse | Hover or click a car to pick it |
+| Left click | Pick a car |
+| **Right click a car** | Pick it and start the match in one go |
 
 ## How to run
 
@@ -145,7 +150,7 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] **07 — Boost System and Boost Pads** — 0-100 meter, 3 s of boost from full, 18 pads with cooldown and glow.
 - [x] **08 — Car Selection** — six of the seven cooked cars on a 2 x 3 grid, shown after Play; the pick carries into the match.
 - [x] **09 — Jumps, Flips and Air Control** — single and double jump, directional flips, pitch/yaw/roll in the air, aerial ball touches.
-- [ ] **10 — Camera Modes** — the chase camera smooths position and target, but there is no ball-cam toggle (**C**) and no wall occlusion yet.
+- [x] **10 — Camera Modes** — smooth chase cam, ball cam on **C**, and the camera keeps itself out of the arena geometry by ray cast rather than clipping through it.
 - [ ] **11 — HUD** — score, clock and boost meter exist as a placeholder readout in `MatchScene`; the real HUD widget, pad hints and goal banner are still to do.
 - [ ] **12 — Bot Opponent (or Solo Practice)** — no opponent car yet; `CarInput` already carries everything a bot needs.
 - [ ] **13 — Tuning Panels (Debug/Development)** — ImGui is linked and `GAME_DEV_TOOLS` is defined, but no panels are drawn and nothing is saved to a config.
@@ -158,8 +163,8 @@ design decisions live in [HANDOFF.md](HANDOFF.md).
 - [x] Minor bumps never flip the car, while intentional flips stay snappy.
 - [x] The ball is heavy but not sluggish; big hits carry.
 - [x] The kickoff reset settles cleanly, with physics simply not stepped while frozen.
-- [ ] Chase-camera clipping near walls (the walls are glass, so the car stays visible, but the camera is not pulled in).
-- [ ] Ball-cam framing — waits on milestone 10.
+- [x] Chase-camera clipping near walls — the camera is pulled in, and trades distance for height when there is none.
+- [x] Ball-cam framing keeps the ball and the car readable, including at speed.
 - [ ] Screen and particle punch on goals and big hits.
 - [ ] Boost flame/trail scaling with boost use.
 - [x] Boost-pad glow reads ready vs cooldown.

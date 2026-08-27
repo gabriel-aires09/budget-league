@@ -47,6 +47,9 @@ void MatchScene::Initialize()
     }
 
     physicsSystem.OptimizeBroadPhase();
+    // Keep the camera under the ceiling: above it the ray that keeps the camera
+    // out of the walls would start by hitting the ceiling slab itself.
+    chaseCamera.maxHeight = arena.wallHeight - 0.8f;
     chaseCamera.Initialize(camera, playerCar);
 
     match.AddCar(playerCar);
@@ -118,7 +121,9 @@ void MatchScene::Update(float deltaTime)
     if (!match.IsFrozen())
         StepPhysics(deltaTime);
 
-    chaseCamera.Update(camera, playerCar, deltaTime);
+    // Read every frame, so changing it in the pause menu is felt immediately.
+    chaseCamera.sensitivity = settings->cameraSensitivity;
+    chaseCamera.Update(camera, playerCar, ball.GetBodyPosition(), deltaTime);
 }
 
 // Score, clock and the state banners. This is deliberately minimal: the real HUD
@@ -197,9 +202,10 @@ void MatchScene::Draw()
     // flag would read stale for the first three seconds of every match.
     if (!match.IsFrozen())
         uistyle::DrawTextAt(playerCar.grounded ? "GROUNDED" : "AIRBORNE", 20.0f, 52.0f, 18.0f, uistyle::TextDim);
-    uistyle::DrawTextAt("WASD drive / air pitch+yaw - Space jump - Shift boost - Q/E air roll - R reset - Esc pause",
-                        20.0f, GetScreenHeight() - 32.0f, 18.0f, uistyle::TextDim);
-
+    uistyle::DrawTextAt(chaseCamera.ballCam ? "BALL CAM" : "CHASE CAM", 20.0f, 76.0f, 18.0f, uistyle::TextDim);
+    // uistyle::DrawTextAt("WASD drive / air pitch+yaw - Space jump - Shift boost - Q/E air roll - C camera - R reset - Esc pause",
+    //                     20.0f, GetScreenHeight() - 32.0f, 18.0f, uistyle::TextDim);
+    //
     if (!paused)
         return;
 

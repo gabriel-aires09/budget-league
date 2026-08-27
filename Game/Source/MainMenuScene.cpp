@@ -29,8 +29,7 @@ void MainMenuScene::Draw()
     ClearBackground(uistyle::Background);
 
     // Placeholder title treatment until the real art lands (Milestone 13).
-    uistyle::DrawTitle("ARCADE CAR SOCCER", centerX, 90.0f * scale, 52.0f);
-    uistyle::DrawTextCentered("ROCKET POWERED SOCCER", centerX, 172.0f * scale, 18.0f, uistyle::TextDim);
+    uistyle::DrawTitle("BUDGET LEAGUE", centerX, 90.0f * scale, 52.0f);
 
     if (settingsOpen)
     {
@@ -45,7 +44,7 @@ void MainMenuScene::Draw()
         const float rowGap = 12.0f * scale;
         Rectangle row = { centerX - rowWidth * 0.5f, 260.0f * scale, rowWidth, rowHeight };
 
-        menu.itemCount = 3;
+        menu.itemCount = 4;
         menu.Update();
 
         // Play goes to the car picker, which is what starts the match.
@@ -53,18 +52,22 @@ void MainMenuScene::Draw()
             pendingAction = MenuAction::SelectCar;
         row.y += rowHeight + rowGap;
 
-        if (menu.Item(row, "Settings", 1))
+        if (menu.Item(row, "How to play", 1))
+            pendingAction = MenuAction::HowToPlay;
+        row.y += rowHeight + rowGap;
+
+        if (menu.Item(row, "Settings", 2))
             settingsOpen = true;
         row.y += rowHeight + rowGap;
 
-        if (menu.Item(row, "Exit", 2))
+        if (menu.Item(row, "Exit", 3))
             pendingAction = MenuAction::ExitGame;
     }
 
-    uistyle::DrawTextAt("Made with raylib, Jolt Physics and Dear ImGui",
-                        20.0f * scale, GetScreenHeight() - 58.0f * scale, 16.0f, uistyle::TextDim);
-    uistyle::DrawTextAt(TextFormat("Arcade Car Soccer - %s build - %s", BUILD_NAME, __DATE__),
-                        20.0f * scale, GetScreenHeight() - 34.0f * scale, 16.0f, uistyle::TextDim);
+    // uistyle::DrawTextAt("Made with raylib, Jolt Physics and Dear ImGui",
+    //                    20.0f * scale, GetScreenHeight() - 58.0f * scale, 16.0f, uistyle::TextDim);
+    //uistyle::DrawTextAt(TextFormat("Arcade Car Soccer - %s build - %s", BUILD_NAME, __DATE__),
+    //                    20.0f * scale, GetScreenHeight() - 34.0f * scale, 16.0f, uistyle::TextDim);
 }
 
 void MainMenuScene::Shutdown()
