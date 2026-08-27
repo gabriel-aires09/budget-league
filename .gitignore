@@ -3,6 +3,7 @@ Build/Debug/
 Build/Development/
 Build/Release/
 Build/Intermediate/
+Build/Windows/
 
 # External libraries (cloned, see HANDOFF.md)
 Game/ThirdParty/

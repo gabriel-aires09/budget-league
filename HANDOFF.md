@@ -347,6 +347,7 @@ Game/Assets/       Cars-Park/ (OBJ, FBX, Blends, License.txt, Preview.png)
                    Shaders/ (Lit.vs, Lit.fs)
 Tools/             AssetCooker.py, FbxReader.py, requirements.txt
 Build/<Config>/    ArcadeCarSoccer + assets/Models/*.evmodel + assets/Shaders/*
+README.md          player-facing readme: about the game, stack, controls
 ```
 
 ## How to build and run
