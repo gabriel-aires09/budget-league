@@ -1,6 +1,6 @@
 #include "AudioSystem.h"
 
-#include "StaticModelAsset.h" // assets::Path, the one scheme for cooked files
+#include "AssetPack.h"
 
 #include <raylib.h>
 
@@ -61,32 +61,45 @@ namespace
 
     // The soundtrack. One track streams at a time; the rest are just names, so
     // the playlist costs nothing however long it gets.
-    std::vector<std::string> trackPaths;
+    std::vector<std::string> trackNames;
     Music track = {};
     bool trackPlaying = false;
     int currentTrack = -1;
     float musicVolume = 0.7f;
+    // The bytes of the track being played. raylib's memory decoder reads from
+    // this buffer as it goes rather than copying it, so it has to outlive the
+    // stream — and it is one track's worth, not the whole soundtrack's.
+    unsigned char *trackData = nullptr;
 
     // Starts a track that is not the one just played, so the shuffle never
     // repeats a song back to back. With a single track it plays that one again.
     void StartAnotherTrack()
     {
-        if (trackPaths.empty())
+        if (trackNames.empty())
             return;
 
-        int next = GetRandomValue(0, (int)trackPaths.size() - 1);
-        if (trackPaths.size() > 1)
+        int next = GetRandomValue(0, (int)trackNames.size() - 1);
+        if (trackNames.size() > 1)
             while (next == currentTrack)
-                next = GetRandomValue(0, (int)trackPaths.size() - 1);
+                next = GetRandomValue(0, (int)trackNames.size() - 1);
 
         if (trackPlaying)
             UnloadMusicStream(track);
+        assets::UnloadData(trackData); // only after the stream that was reading it is gone
+        trackData = nullptr;
 
-        track = LoadMusicStream(trackPaths[next].c_str());
+        // Streamed from memory rather than from a path, because a track inside
+        // assets.pak has no path. It is still streamed: raylib decodes it as it
+        // plays, and only the compressed MP3 of the one track is resident.
+        int size = 0;
+        trackData = assets::LoadData(trackNames[next], &size);
+        track = trackData != nullptr ? LoadMusicStreamFromMemory(".mp3", trackData, size) : Music{};
         trackPlaying = IsMusicValid(track);
         if (!trackPlaying)
         {
-            TraceLog(LOG_WARNING, "MUSIC: could not stream %s", trackPaths[next].c_str());
+            TraceLog(LOG_WARNING, "MUSIC: could not stream %s", trackNames[next].c_str());
+            assets::UnloadData(trackData);
+            trackData = nullptr;
             return;
         }
 
@@ -95,7 +108,7 @@ namespace
         currentTrack = next;
         SetMusicVolume(track, musicVolume);
         PlayMusicStream(track);
-        TraceLog(LOG_INFO, "MUSIC: %s", GetFileName(trackPaths[next].c_str()));
+        TraceLog(LOG_INFO, "MUSIC: %s", GetFileName(trackNames[next].c_str()));
     }
 
     // The boost loop. gain is written by the game thread and read by the audio
@@ -223,17 +236,14 @@ void audio::Load()
     // stopping it is what would be heard as a click.
     PlayAudioStream(boostStream);
 
-    // The playlist is whatever the cooker copied, found by scanning rather than
+    // The playlist is whatever the cooker copied, found by looking rather than
     // by a list in the code: adding a track is dropping a file in Assets/Sounds.
-    std::string musicFolder = assets::Path("Music");
-    FilePathList files = LoadDirectoryFilesEx(musicFolder.c_str(), ".mp3", false);
-    for (unsigned int i = 0; i < files.count; ++i)
-        trackPaths.push_back(files.paths[i]);
-    UnloadDirectoryFiles(files);
+    // assets::List looks in the archive or in the folder, whichever is in use.
+    trackNames = assets::List("Music", ".mp3");
 
     ready = true;
     TraceLog(LOG_INFO, "AUDIO: %i procedural cues ready, %i music track(s)",
-             (int)AudioCue::Count, (int)trackPaths.size());
+             (int)AudioCue::Count, (int)trackNames.size());
 
     StartAnotherTrack();
 }
@@ -246,7 +256,9 @@ void audio::Unload()
     if (trackPlaying)
         UnloadMusicStream(track);
     trackPlaying = false;
-    trackPaths.clear();
+    assets::UnloadData(trackData);
+    trackData = nullptr;
+    trackNames.clear();
 
     StopAudioStream(boostStream);
     UnloadAudioStream(boostStream);

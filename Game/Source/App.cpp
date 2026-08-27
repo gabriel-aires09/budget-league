@@ -1,5 +1,6 @@
 #include "App.h"
 
+#include "AssetPack.h"
 #include "AudioSystem.h"
 #include "CarSelectScene.h"
 #include "GamepadInput.h"
@@ -43,6 +44,10 @@ bool App::Initialize(int argc, char **argv)
     InitWindow(windowWidth, windowHeight, "Budget League");
     if (!IsWindowReady())
         return false;
+
+    // Before anything reads an asset: from here on every load goes through the
+    // archive if there is one, and through the loose folder if there is not.
+    assets::Mount();
 
     // The window icon: the same cooked logo the title screen draws, decoded to
     // pixels and handed over at three sizes, which is what a desktop wants —
@@ -187,5 +192,7 @@ void App::Shutdown()
     delete JPH::Factory::sInstance;
     JPH::Factory::sInstance = nullptr;
 
+    // Last, so nothing is still reading assets when the archive closes.
+    assets::Unmount();
     CloseWindow();
 }

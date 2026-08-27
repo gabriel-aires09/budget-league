@@ -1110,6 +1110,61 @@ branch of `LDFLAGS_MODE`.
 `CLAUDE.md` still names `./ArcadeCarSoccer` in the Milestone 21 verification line. That file is the
 spec and belongs to the project owner, so it was left alone.
 
+## The .pak archive
+
+Every cooked asset in one file beside the executable, so a build ships as the executable plus
+`assets.pak`. Written by `Tools/PakWriter.py` at the end of the cook, read by
+`Game/Source/AssetPack.cpp`; the two share the layout, which is documented in the Python file.
+
+    char[8]   "EVPAK001"
+    uint32    entryCount
+    uint32    directoryOffset
+    <blobs>
+    directory, entryCount x:
+        uint16 nameLength, char[] name, uint32 offset, uint32 storedBytes,
+        uint32 originalBytes, uint8 compression   (0 = stored, 1 = raw DEFLATE)
+
+### Decisions
+
+- **The archive wins whenever it is there, in every configuration.** Not "packed in Release, loose in
+  development": that would leave the shipped path exercised only by shipping.
+- **The cooked files are an intermediate and do not sit beside the executable.** They live in
+  `Build/Intermediate/<Config>/assets/`, so a build folder holds the executable and `assets.pak` and
+  nothing else. Keeping them at all is what makes the cook incremental — the archive is built from
+  them rather than from the sources — and gives the loose fallback something to copy across. The
+  fallback itself is unchanged: an `assets/` folder next to the executable is read when there is no
+  archive, which is also what happens to a build whose archive is deleted or corrupt.
+- **Raw DEFLATE, because raylib already decompresses it.** `DecompressData` reads exactly what
+  Python's `zlib.compressobj(9, DEFLATED, -15)` writes — checked against a real cooked model before
+  any of this was written, not assumed. No new third-party dependency was needed for the archive.
+- **Compression is per entry and only kept when it pays** (5% or better). The models fall to a fifth
+  of their size and the shaders further; the MP3s and the QOI textures are already compressed, so
+  they are stored as they are. 34.2 MB of assets, 32.7 MB of archive, and 15 of the 21 entries
+  deflated.
+- **The archive is kept open, not read into memory.** The soundtrack alone is 32 MB of it, and one
+  track at a time is what actually plays.
+- **The music streams from memory now, and that is the one real behaviour change.** A track inside an
+  archive has no path for `LoadMusicStream`, so `LoadMusicStreamFromMemory` takes its bytes instead.
+  It is still streamed rather than decoded up front — dr_mp3 decodes as it plays — but the compressed
+  MP3 of the current track (about 5 MB) is resident while it plays. **dr_mp3 reads from the caller's
+  buffer rather than copying it**, so `AudioSystem` holds that buffer until the stream is unloaded;
+  freeing it earlier is a use-after-free that would only show up as audio garbage.
+- **Shaders load through `LoadShaderFromMemory`** for the same reason. `assets::LoadText` exists for
+  that: the cooked shaders are text stored as bytes, with no terminator of their own.
+- **`assets::Path` moved out of `StaticModelAsset` into `AssetPack`**, which is where the one scheme
+  for finding a cooked asset belongs now that there are two places to find one.
+
+### Verified
+
+| Check | Result |
+|---|---|
+| Every entry round-trips byte for byte against the cooked file it came from | 21 of 21 |
+| Game runs with **the loose folder deleted**, archive only | exit 0, non-blank screenshot, **no warnings at all**, all 6 tracks found |
+| Game runs with **the archive deleted**, folder only | exit 0, logs `PAK: no assets.pak, reading the loose assets folder` |
+| Truncated archive | detected, logs it, falls back to the folder, exit 0 |
+| Debug / Development / Release | build with no game-code warnings, smoke tests exit 0, each with its own `assets.pak` |
+| Windows cross build, archive only, under Wine | exit 0, non-blank screenshot |
+
 ## Layout
 
 ```
@@ -1151,7 +1206,7 @@ Game/Assets/       Cars-Park/ (OBJ, FBX, Blends, License.txt, Preview.png)
                    Icon/ (budget-league-logo.png), Textures/ (three unused arena PNGs)
                    Shaders/ (Lit.vs, Lit.fs, Bright.fs, Blur.fs)
 Tools/             AssetCooker.py, FbxReader.py, requirements.txt
-Build/<Config>/    BudgetLeague + assets/Models/*.evmodel + assets/Textures/*.evtex
+Build/<Config>/    BudgetLeague + assets.pak (the cooked files are an intermediate)
                    + assets/Shaders/*
 ```
 

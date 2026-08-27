@@ -1,6 +1,6 @@
 #include "Lighting.h"
 
-#include "StaticModelAsset.h" // assets::Path
+#include "AssetPack.h"
 
 #include <raymath.h>
 #include <rlgl.h>
@@ -27,8 +27,13 @@ namespace
 
 void lighting::Load()
 {
-    Shader shader = LoadShader(assets::Path("Shaders/Lit.vs").c_str(),
-                               assets::Path("Shaders/Lit.fs").c_str());
+    // From memory rather than from paths, because the sources may be inside
+    // assets.pak, where they have no path of their own.
+    std::string vertex = assets::LoadText("Shaders/Lit.vs");
+    std::string fragment = assets::LoadText("Shaders/Lit.fs");
+    Shader shader = (vertex.empty() || fragment.empty())
+                        ? Shader{}
+                        : LoadShaderFromMemory(vertex.c_str(), fragment.c_str());
     // Two separate failures to catch: a shader that would not compile comes back
     // with id 0, but missing files come back as raylib's *default* shader, whose
     // id is perfectly valid. Only the second check notices an uncooked build.

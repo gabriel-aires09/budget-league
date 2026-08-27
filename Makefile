@@ -205,9 +205,15 @@ $(RAYLIB_LIB):
 		RAYLIB_LIBTYPE=STATIC RAYLIB_BUILD_MODE=RELEASE \
 		RAYLIB_RELEASE_PATH=$(RAYLIB_OUT)
 
-# Build event: cooked assets live next to the executable of each configuration.
+# Build event. The cooked files themselves are an intermediate: they live beside
+# the object files, and what lands next to the executable is the one archive the
+# game actually reads (Game/Source/AssetPack.h), so a build folder is exactly
+# what ships. Keeping them means the cook stays incremental — the archive is
+# rebuilt from them, not from the sources — and gives the loose fallback
+# something to be built from if anyone wants to unpack beside the executable.
 cook:
-	@$(PYTHON) $(ROOT)/Tools/AssetCooker.py --assets $(ASSETS_DIR) --output $(BUILD_DIR)/assets
+	@$(PYTHON) $(ROOT)/Tools/AssetCooker.py --assets $(ASSETS_DIR) --output $(OBJ_DIR)/assets \
+		--pak $(BUILD_DIR)/assets.pak
 
 run: game
 	@cd $(BUILD_DIR) && ./BudgetLeague$(EXE_EXT)

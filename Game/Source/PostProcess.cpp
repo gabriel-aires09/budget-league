@@ -1,6 +1,6 @@
 #include "PostProcess.h"
 
-#include "StaticModelAsset.h" // assets::Path
+#include "AssetPack.h"
 
 #include <raylib.h>
 #include <rlgl.h>
@@ -117,8 +117,10 @@ void postprocess::Load()
 
     // Both share raylib's default vertex shader: these are full screen passes,
     // so there is nothing for a vertex shader of our own to do.
-    brightShader = LoadShader(nullptr, assets::Path("Shaders/Bright.fs").c_str());
-    blurShader = LoadShader(nullptr, assets::Path("Shaders/Blur.fs").c_str());
+    std::string bright = assets::LoadText("Shaders/Bright.fs");
+    std::string blur = assets::LoadText("Shaders/Blur.fs");
+    brightShader = bright.empty() ? Shader{} : LoadShaderFromMemory(nullptr, bright.c_str());
+    blurShader = blur.empty() ? Shader{} : LoadShaderFromMemory(nullptr, blur.c_str());
 
     // Same trap as the lit shader: raylib answers a missing file with its own
     // default shader, whose id is perfectly valid, so comparing against the
