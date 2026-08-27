@@ -19,6 +19,38 @@ If everything goes well, I want to implement a split screen two-player mode  (2v
 - **Debug/tuning UI:** [Dear ImGui](https://github.com/ocornut/imgui)
 - **Assets:** cooked by `Tools/AssetCooker.py` as a build event
 
+## How to Compile and Run
+
+### Requirements
+- Linux
+- `g++` and `make`
+- Python 3 (used by the asset cooker, runs automatically during the build)
+
+### Compile
+Open a terminal in the project folder and run:
+```
+make
+```
+This builds the **Development** version by default. Other options:
+```
+make debug         # Debug build
+make development    # Development build
+make release        # Release build (final, no debug tools)
+make all             # builds all three at once
+```
+
+### Run
+```
+make run
+```
+This builds (if needed) and launches the game.
+
+You can also run the built executable directly, for example:
+```
+./Build/Development/BudgetLeague
+```
+(Replace `Development` with `Debug` or `Release` depending on which one you built.)
+
 ## Controls
 
 ### Driving
