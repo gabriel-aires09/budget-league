@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    MSVC / Visual Studio 2022 build. Additional to the Makefile, which stays the
+    authoritative Linux build and is not changed by this project. See
+    docs/VisualStudioBuild.md for the full plan this file implements.
+
+    Third-party libraries (raylib, Jolt, glm, imgui) are git-ignored and must be
+    cloned into Game/ThirdParty/ at the pinned versions from README.md before this
+    project will build. raylib additionally needs to be built into a static
+    raylib.lib for Windows/x64 ahead of time (its own projects/VS2022 project, or
+    an equivalent static-lib build) - this project links against that output, it
+    does not compile raylib's C sources itself. Point RaylibLibDir below at wherever
+    that raylib.lib ends up if it is not at the default location.
+
+    raylib is built once and shared by all three configurations (mirroring the
+    Makefile's own "raylib is third party and never debugged" approach), so every
+    configuration here uses the non-debug static CRT (/MT) to stay ABI-compatible
+    with a single Release raylib.lib - mixing /MT and /MTd against one prebuilt
+    raylib.lib is not safe.
+  -->
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Development|x64">
+      <Configuration>Development</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{5A6F0F0F-6F2E-4E4F-9C34-1F9F0B7BA001}</ProjectGuid>
+    <RootNamespace>BudgetLeague</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <!-- Single editable knob for where the prebuilt raylib.lib lives. -->
+    <RaylibLibDir>$(SolutionDir)Game\ThirdParty\raylib\src\</RaylibLibDir>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'!='Debug'">false</UseDebugLibraries>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+
+  <PropertyGroup Label="UserMacros" />
+
+  <PropertyGroup>
+    <OutDir>$(SolutionDir)Build\Windows\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)Build\Windows\Intermediate\$(Configuration)\</IntDir>
+    <TargetName>BudgetLeague</TargetName>
+    <LinkIncremental Condition="'$(Configuration)'=='Debug'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)'!='Debug'">false</LinkIncremental>
+  </PropertyGroup>
+
+  <!-- Debug -->
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <Optimization>Disabled</Optimization>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalIncludeDirectories>$(ProjectDir)Source;$(ProjectDir)ThirdParty\raylib\src;$(ProjectDir)ThirdParty\Jolt;$(ProjectDir)ThirdParty\glm;$(ProjectDir)ThirdParty\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GAME_DEBUG;GAME_DEV_TOOLS;JPH_PROFILE_ENABLED;JPH_DEBUG_RENDERER;JPH_OBJECT_STREAM;JPH_ENABLE_ASSERTS;JPH_USE_SSE4_1;JPH_USE_SSE4_2;JPH_USE_LZCNT;JPH_USE_TZCNT;JPH_USE_F16C;JPH_USE_FMADD;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(RaylibLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>raylib.lib;opengl32.lib;gdi32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- Development -->
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalIncludeDirectories>$(ProjectDir)Source;$(ProjectDir)ThirdParty\raylib\src;$(ProjectDir)ThirdParty\Jolt;$(ProjectDir)ThirdParty\glm;$(ProjectDir)ThirdParty\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GAME_DEVELOPMENT;GAME_DEV_TOOLS;JPH_PROFILE_ENABLED;JPH_DEBUG_RENDERER;JPH_OBJECT_STREAM;JPH_USE_SSE4_1;JPH_USE_SSE4_2;JPH_USE_LZCNT;JPH_USE_TZCNT;JPH_USE_F16C;JPH_USE_FMADD;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(RaylibLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>raylib.lib;opengl32.lib;gdi32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- Release -->
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <AdditionalIncludeDirectories>$(ProjectDir)Source;$(ProjectDir)ThirdParty\raylib\src;$(ProjectDir)ThirdParty\Jolt;$(ProjectDir)ThirdParty\glm;$(ProjectDir)ThirdParty\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GAME_RELEASE;NDEBUG;JPH_OBJECT_STREAM;JPH_USE_SSE4_1;JPH_USE_SSE4_2;JPH_USE_LZCNT;JPH_USE_TZCNT;JPH_USE_F16C;JPH_USE_FMADD;NOMINMAX;WIN32_LEAN_AND_MEAN;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <!-- No terminal alongside the game window, matching the Makefile's -mwindows
+           for Release (see its LDFLAGS_MODE comment). Debug and Development keep
+           the Console subsystem, where the startup log is wanted. The entry point
+           override is needed because Main.cpp defines a plain main(), not WinMain -
+           the standard way to keep that under the Windows subsystem with MSVC. -->
+      <SubSystem>Windows</SubSystem>
+      <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(RaylibLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>raylib.lib;opengl32.lib;gdi32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- Cooks Game/Assets into Build\Windows\<Config>\assets.pak, same as the
+       Makefile's own `cook` build event (Tools/AssetCooker.py). The loose cooked
+       cache is shared with the Makefile build at Build\Intermediate\Cooked, so
+       switching between the two never recooks from scratch. Falls back to a
+       .venv interpreter if one exists, otherwise uses `python` from PATH. -->
+  <ItemDefinitionGroup>
+    <PostBuildEvent>
+      <Command>if exist "$(SolutionDir).venv\Scripts\python.exe" ("$(SolutionDir).venv\Scripts\python.exe" "$(SolutionDir)Tools\AssetCooker.py" --assets "$(SolutionDir)Game\Assets" --cache "$(SolutionDir)Build\Intermediate\Cooked" --output "$(OutDir)assets.pak") else (python "$(SolutionDir)Tools\AssetCooker.py" --assets "$(SolutionDir)Game\Assets" --cache "$(SolutionDir)Build\Intermediate\Cooked" --output "$(OutDir)assets.pak")</Command>
+      <Message>[cook] Game/Assets -&gt; $(OutDir)assets.pak</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+
+  <!-- The executable's own icon: cooks budget-league-logo.png into a .ico ahead
+       of the resource compile below, same as the Makefile's $(ICON_ICO) rule
+       (Tools/MakeIcon.py). -->
+  <ItemDefinitionGroup>
+    <PreBuildEvent>
+      <Command>if exist "$(SolutionDir).venv\Scripts\python.exe" ("$(SolutionDir).venv\Scripts\python.exe" "$(SolutionDir)Tools\MakeIcon.py" --input "$(SolutionDir)Game\Assets\Icon\budget-league-logo.png" --output "$(IntDir)BudgetLeague.ico") else (python "$(SolutionDir)Tools\MakeIcon.py" --input "$(SolutionDir)Game\Assets\Icon\budget-league-logo.png" --output "$(IntDir)BudgetLeague.ico")</Command>
+      <Message>[icon] budget-league-logo.png -&gt; $(IntDir)BudgetLeague.ico</Message>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+
+  <!-- Game sources -->
+  <ItemGroup>
+    <ClCompile Include="Source\**\*.cpp" />
+    <ClInclude Include="Source\**\*.h" />
+  </ItemGroup>
+
+  <!-- The icon + version resource. BudgetLeague.rc names BudgetLeague.ico with
+       no path of its own, so rc.exe is pointed at IntDir to find the one the
+       pre-build event just generated there - the same trick as the Makefile's
+       windres include-dir option. -->
+  <ItemGroup>
+    <ResourceCompile Include="Source\BudgetLeague.rc">
+      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+  </ItemGroup>
+
+  <!-- Jolt (third party) -->
+  <ItemGroup>
+    <ClCompile Include="ThirdParty\Jolt\Jolt\**\*.cpp">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+  </ItemGroup>
+
+  <!-- ImGui (third party) -->
+  <ItemGroup>
+    <ClCompile Include="ThirdParty\imgui\imgui.cpp">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="ThirdParty\imgui\imgui_draw.cpp">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="ThirdParty\imgui\imgui_tables.cpp">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="ThirdParty\imgui\imgui_widgets.cpp">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>
+
