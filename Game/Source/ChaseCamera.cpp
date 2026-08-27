@@ -1,6 +1,7 @@
 #include "ChaseCamera.h"
 
 #include "GameObjects/CarObject.h"
+#include "GamepadInput.h"
 #include "PhysicsLayers.h"
 #include "Scene.h"
 
@@ -120,7 +121,7 @@ void ChaseCamera::Shake(float strength)
 
 void ChaseCamera::Update(Camera3D &camera, const CarObject &car, Vector3 ballPosition, float deltaTime)
 {
-    if (IsKeyPressed(KEY_C))
+    if (IsKeyPressed(KEY_C) || gamepad::BallCam())
         ballCam = !ballCam;
 
     Vector3 carPosition = car.GetBodyPosition();

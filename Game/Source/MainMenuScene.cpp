@@ -1,4 +1,5 @@
 #include "MainMenuScene.h"
+#include "GamepadInput.h"
 
 #include "Effects.h"
 #include "PostProcess.h"
@@ -78,7 +79,7 @@ void MainMenuScene::Update(float deltaTime)
     // The turntable is the only thing that moves: physics is never stepped.
     spinDegrees = fmodf(spinDegrees + SPIN_RATE * deltaTime, 360.0f);
 
-    if (settingsOpen && IsKeyPressed(KEY_ESCAPE))
+    if (settingsOpen && (IsKeyPressed(KEY_ESCAPE) || gamepad::MenuCancel()))
         settingsOpen = false;
 }
 

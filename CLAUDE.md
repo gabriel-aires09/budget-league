@@ -481,6 +481,95 @@ how the game behaves on Linux.
 
 ---
 
+## Milestone 22 — Gamepad Support
+
+Make the whole game playable with a controller, from the title screen to the goal
+celebration, without ever touching the keyboard. The keyboard stays exactly as it is
+(section 8): the gamepad is a second input source alongside it, never a replacement.
+
+**Default mapping: the Rocket League layout** (see 22.1 below). Analogue throttle and
+steering, so a controller is not just "keyboard with a stick" — a half-pressed trigger
+is half throttle, and a small stick tilt is a small steering angle.
+
+**Where it lives:**
+- **GamepadInput.h/cpp** — new, `Game/Source/`, namespace `gamepad`. The one place that
+  knows raylib's gamepad ids, the default button/axis mapping, the dead zone and the
+  trigger curve. Exposes what the rest of the game asks for in game terms
+  (`Available()`, `Throttle()`, `Steer()`, `Boost()`, `Jump()`, `MenuUp()`,
+  `MenuConfirm()`, …), not `GAMEPAD_BUTTON_*` constants.
+- **PlayerController.cpp** — merges gamepad axes/buttons into the existing `CarInput`
+  next to the keyboard reads. Whichever source is pushing hardest wins per field
+  (`fabsf` on the analogue values, OR on the booleans), so both stay live at once and
+  neither needs a "mode".
+- **UserInterface.cpp** — the shared menu list/selector widgets already own
+  `KEY_UP/DOWN/ENTER` and the mouse; they gain the gamepad equivalents there, once, so
+  every menu (main, pause, settings, car select, how-to-play) gets it for free.
+- **MatchScene.cpp / ChaseCamera.cpp / CarSelectScene.cpp / TitleScene.cpp** — pause,
+  camera toggle, back and confirm pick up their gamepad button beside the existing key.
+  The title screen already accepts any gamepad button (Milestone 17) and needs nothing.
+
+**Analogue handling (the part that decides whether it feels good):**
+- **Dead zone** on both sticks, radial rather than per-axis, so a diagonal push does not
+  clip to a square. Default ~0.15, exposed in Settings.
+- Triggers report `[-1..1]` in raylib and rest at `-1`: remap to `[0..1]` before use.
+- Steering keeps the raw analogue value — no snapping to ±1 — and air pitch/yaw come
+  from the same left stick with the same inversion the keyboard uses (nose down on
+  forward).
+- A gamepad that is unplugged mid-match must not freeze the car at its last input:
+  when `IsGamepadAvailable` goes false the gamepad's contribution is zero and the
+  keyboard still drives.
+
+**Settings — a new "Controls" section in the modular SettingsMenu (section 2.3):**
+- **Gamepad enabled** (yes/no).
+- **Stick dead zone** (slider).
+- **Vibration** (yes/no) — raylib 6.0 exposes `SetGamepadVibration`, so short rumble
+  pulses on ball hits, wall impacts and goals are in scope; the toggle silences them.
+- Values live in `GameSettings.h` beside the existing ones and are shared by both menu
+  contexts, like everything else there.
+
+**HUD / prompts:** where the UI names a key ("Press SPACE", the how-to-play sheet), it
+shows the gamepad button instead once a gamepad is the last device used, and switches
+back the moment a key is pressed. Text labels only — no button glyph assets.
+
+**Not in scope:** remapping UI (the mapping is a constant in `GamepadInput.cpp`),
+multiple simultaneous gamepads / local multiplayer, and motion or touchpad input.
+
+### 22.1. Button Layout (Rocket League default)
+
+> **Reserved — the layout table/reference image goes here.** Fill this section in
+> before implementing; `GamepadInput.cpp` must match it exactly, and it is the only
+> normative source for the mapping.
+
+### LAYOUT
+
+| Action     | Xbox |
+| --------   | ------- |
+| Accelerate | RT    |
+| Reverse |  RT     |
+| Steer   | Left Stick    |
+| Jump | A |
+| Boost | B |
+| Focus on Ball | Y |
+| Pitch and yaw | Left stick (airbone) |
+| Air roll | X (airbone) |
+| Reset | RB |
+| Menu or Star button | Pause |
+| Left stick or Directional Pad (D-Pad) | Up, down, left, right to control the menu |
+| Confirm (menu) | A |
+| Cancel (menu) | B |
+
+
+→ verify: with a controller plugged in, the game can be played start to finish on it
+  alone — title, menus, car select, a full match, pause, back to the menu; throttle and
+  steering are analogue (a half-pressed trigger is visibly slower than a full one);
+  jump, flip, boost, reset and the ball-cam toggle all fire from the pad; the keyboard
+  keeps working unchanged at the same time; unplugging the pad mid-match leaves the car
+  controllable instead of stuck; the dead zone, gamepad-enabled and vibration settings
+  take effect live and are shared between the main-menu and pause-menu panels; with no
+  gamepad connected nothing in the HUD or menus changes.
+
+---
+
 # 6. Final Milestone — Polish (individual prompts)
 
 A set of one-off polish and fix tasks. Mark items **OK** as they are completed.
