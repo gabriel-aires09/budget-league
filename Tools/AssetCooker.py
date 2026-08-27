@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Asset Cooker - build event that prepares Game/Assets/ for a build's assets/ folder.
 
-Right now it cooks the Cars-Park FBX models into .evmodel, the engine's own
-model format (see WriteModel for the layout). Textures, UI and fonts arrive
-with the milestones that need them.
+It cooks the Cars-Park FBX models into .evmodel, the engine's own model format
+(see WriteModel for the layout), and the PNGs into .evtex, the engine's texture
+format (see WriteTexture). Fonts arrive with the milestone that needs them.
 
-Cooking is incremental: a model is rebuilt only when its .fbx, this script or
+Cooking is incremental: an asset is rebuilt only when its source, this script or
 FbxReader.py is newer than the cooked file.
 """
 
@@ -16,8 +16,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from FbxReader import ReadMeshes, FbxError
+from PakWriter import PackFolder
 
 MODEL_MAGIC = b"EVMDMSH1"
+TEXTURE_MAGIC = b"EVTXQOI1"
+# CLAUDE.md 3.2. The logo is authored at 1024 and is drawn at about a third of
+# the window height, so nothing in the game asks for more than this.
+MAX_TEXTURE_SIZE = 512
 
 # Materials whose baked colour must survive: tinting the glass, the tyres or
 # the lights with a team colour would turn the whole car into a single blob.
@@ -84,6 +89,104 @@ def WriteModel(path, materials, meshes, bounds):
                                   *[c for _position, normal in vertices for c in normal]))
 
 
+def EncodeQoi(pixels, pixelCount):
+    """QOI chunk stream for RGBA pixels, without QOI's own 14 byte header.
+
+    https://qoiformat.org/qoi-specification.pdf - the header is dropped because
+    the .evtex header below already carries the size, and the end marker with
+    it, because the decoder stops at pixelCount.
+    """
+    out = bytearray()
+    table = [(0, 0, 0, 0)] * 64
+    previous = (0, 0, 0, 255)
+    run = 0
+
+    for i in range(pixelCount):
+        pixel = (pixels[i * 4], pixels[i * 4 + 1], pixels[i * 4 + 2], pixels[i * 4 + 3])
+
+        if pixel == previous:
+            run += 1
+            if run == 62 or i == pixelCount - 1:
+                out.append(0xc0 | (run - 1))
+                run = 0
+            continue
+
+        if run > 0:
+            out.append(0xc0 | (run - 1))
+            run = 0
+
+        slot = (pixel[0] * 3 + pixel[1] * 5 + pixel[2] * 7 + pixel[3] * 11) % 64
+        if table[slot] == pixel:
+            out.append(slot)
+            previous = pixel
+            continue
+        table[slot] = pixel
+
+        if pixel[3] != previous[3]:
+            out.append(0xff)
+            out.extend(pixel)
+            previous = pixel
+            continue
+
+        dr = pixel[0] - previous[0]
+        dg = pixel[1] - previous[1]
+        db = pixel[2] - previous[2]
+        drdg = dr - dg
+        dbdg = db - dg
+
+        if -2 <= dr <= 1 and -2 <= dg <= 1 and -2 <= db <= 1:
+            out.append(0x40 | (dr + 2) << 4 | (dg + 2) << 2 | (db + 2))
+        elif -32 <= dg <= 31 and -8 <= drdg <= 7 and -8 <= dbdg <= 7:
+            out.append(0x80 | (dg + 32))
+            out.append((drdg + 8) << 4 | (dbdg + 8))
+        else:
+            out.append(0xfe)
+            out.extend(pixel[:3])
+
+        previous = pixel
+
+    return bytes(out)
+
+
+def WriteTexture(path, width, height, pixels):
+    """Writes the .evtex binary. All values little endian, no padding.
+
+        char[8]  "EVTXQOI1"
+        uint32   width
+        uint32   height
+        uint32   channels             always 4 (RGBA8)
+        uint32   payloadBytes
+        uint8[]  QOI chunk stream     see EncodeQoi
+
+    The engine decodes this straight into an RGBA buffer and hands it to the
+    GPU, so the format carries no mipmaps, no filtering hints and no palette.
+    """
+    payload = EncodeQoi(pixels, width * height)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "wb") as out:
+        out.write(TEXTURE_MAGIC)
+        out.write(struct.pack("<IIII", width, height, 4, len(payload)))
+        out.write(payload)
+    return payload
+
+
+def CookTexture(source, target):
+    from PIL import Image
+
+    image = Image.open(source).convert("RGBA")
+    width, height = image.size
+    if max(width, height) > MAX_TEXTURE_SIZE:
+        scale = MAX_TEXTURE_SIZE / max(width, height)
+        width = max(1, int(round(width * scale)))
+        height = max(1, int(round(height * scale)))
+        image = image.resize((width, height), Image.LANCZOS)
+
+    payload = WriteTexture(target, width, height, image.tobytes())
+    raw = width * height * 4
+    print("[cook] %-24s %dx%d, %.0f KB, %.0f%% of raw" % (
+        target.name, width, height, len(payload) / 1024.0, 100.0 * len(payload) / raw))
+
+
 def CookModel(source, target):
     materials, triangles = ReadMeshes(source)
 
@@ -139,6 +242,8 @@ def main():
     parser.add_argument("--assets", required=True, type=Path, help="source assets folder")
     parser.add_argument("--output", required=True, type=Path, help="cooked assets folder")
     parser.add_argument("--force", action="store_true", help="ignore timestamps and cook everything")
+    parser.add_argument("--pak", type=Path, default=None,
+                        help="also write every cooked asset into this .pak archive")
     args = parser.parse_args()
 
     if not args.assets.is_dir():
@@ -166,6 +271,23 @@ def main():
             print("[cook] FAILED %s: %s" % (source.name, error))
             failed += 1
 
+    texturesOut = args.output / "Textures"
+    for source in sorted(args.assets.glob("**/*.png")):
+        # The car pack ships a preview thumbnail of itself; the models are what
+        # this cooker takes from that folder.
+        if "Cars-Park" in source.parts:
+            continue
+        target = texturesOut / (source.stem + ".evtex")
+        if not args.force and target.exists() and \
+                target.stat().st_mtime >= max(source.stat().st_mtime, toolStamp):
+            continue
+        try:
+            CookTexture(source, target)
+            cooked += 1
+        except (ImportError, OSError, struct.error) as error:
+            print("[cook] FAILED %s: %s" % (source.name, error))
+            failed += 1
+
     # Shaders are plain GLSL and the engine hands them straight to raylib, so
     # they are copied rather than converted.
     shadersOut = args.output / "Shaders"
@@ -178,9 +300,36 @@ def main():
         print("[cook] %s" % target.name)
         cooked += 1
 
+    # The soundtrack is streamed from disk by raylib at runtime, not decoded
+    # here, so the tracks are copied as they are. The engine finds them by
+    # scanning this folder, which is why the file names are not listed anywhere.
+    musicOut = args.output / "Music"
+    for source in sorted(args.assets.glob("Sounds/*.mp3")):
+        target = musicOut / source.name
+        if not args.force and target.exists() and target.stat().st_mtime >= source.stat().st_mtime:
+            continue
+        musicOut.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+        print("[cook] %-24s %.1f MB" % (target.name, target.stat().st_size / (1024.0 * 1024.0)))
+        cooked += 1
+
     if failed:
         return 1
     print("[cook] %s -> %s" % ("%d asset(s) cooked" % cooked if cooked else "up to date", args.output))
+
+    # The archive is written from the cooked folder rather than from the sources,
+    # so it holds exactly what the loose build holds and the incremental cooking
+    # above is untouched. Rewritten whenever anything was cooked, and when it is
+    # missing, so a build can never leave a stale one beside the executable.
+    if args.pak is not None and (cooked > 0 or not args.pak.exists()):
+        entries, size = PackFolder(args.output, args.pak)
+        if entries == 0:
+            print("[pak] nothing to pack from %s" % args.output)
+        else:
+            loose = sum(f.stat().st_size for f in args.output.rglob("*") if f.is_file())
+            print("[pak] %d asset(s), %.1f MB -> %s (%.1f MB)"
+                  % (entries, loose / (1024.0 * 1024.0), args.pak.name, size / (1024.0 * 1024.0)))
+
     return 0
 
 

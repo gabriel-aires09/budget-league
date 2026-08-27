@@ -68,7 +68,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - Do not run git add, git commit or git push commands
 - Maintain visual consistency with the rest of the application (colors, spacing, etc).
 - When the user requests a git commit, only generate a one-line description of the changes made, in English. Example: "refactor: move and enhanced script VAPID, add docs and hosting"
-- Create a markdown document `./HANDOFF.md` with the actual project state, decisions made, next steps and any important context for a different agent to continue the project. Whenever the project is modified, update the `./HANDOFF.md` document.
+- Create a markdown document `./HANDOFF.md` with the actual project state, decisions made, next steps and any important context for a different agent to continue the project. Whenever the project is modified, update the `./HANDOFF.md` document. > [!IMPORTANT]
+- Create checklist of the milestones that already made of in the `./HANDOFF.md` file. If the milestone is already made put a "x" in the checkbox `[ ]` using the markdown format
 
 # PROJECT
 # Arcade Car Soccer (Rocket League-style)
@@ -123,7 +124,8 @@ Build/
     Development/
     Release/
 Makefile
-.gitignore
+README.md # Description about the game, controls, how to run and checklist of the milestone that already or not already made for the game using the milestone from CLAUDE.md as refers. 
+.gitignore 
 ```
 
 ## 1.4. Code Conventions
@@ -164,7 +166,7 @@ Code lives in `Game/Source/`.
 - **GameObject.h/cpp** — Base class. Each instance represents an object in the 3D world with its own shape, logic, and physics. Specialized by the child classes in `Game/Source/GameObjects/`. Exposes `Initialize`, `Update`, `Draw`, and `GetWorldBounds` (AABB).
 
 Specializations in `Game/Source/GameObjects/`:
-- **CarObject** — The rocket car. Drives, jumps, double-jumps/flips, boosts, and has air control. Reused for both the player-controlled car and the bot (the controller decides the inputs — see 2.4). The **visual mesh comes from the low-poly `Cars-pack`** (see section 4); the physics body stays a simple box driven by arcade forces (2.5). The visual model is only attached to that box for rendering — it does not drive the simulation.
+- **CarObject** — The rocket car. Drives, jumps, double-jumps/flips, boosts, and has air control. Reused for both the player-controlled car and the bot (the controller decides the inputs — see 2.4). The **visual mesh comes from the low-poly `Cars-Pack`** (see section 4); the physics body stays a simple box driven by arcade forces (2.5). The visual model is only attached to that box for rendering — it does not drive the simulation.
 - **BallObject** — The soccer ball (a single dynamic sphere body, heavy but responsive).
 - **ArenaObject** — Static arena geometry: floor, curved/side walls, back walls, and a ceiling or high invisible bound. All collision is static.
 - **GoalObject** — A colored goal with a **trigger volume**. Fires a goal event when the ball fully crosses the goal line into the net.
@@ -294,33 +296,277 @@ Build the enclosed **ArenaObject** (side walls, back walls, ceiling/high bound) 
 Implement boost: a **0–100 meter**, **hold Shift** to accelerate with a flame/trail effect, boost **drains** while active, and **BoostPadObjects** around the arena that **refill** boost on overlap (then cooldown/glow).
 → verify: holding Shift consumes boost and visibly accelerates the car; boost empties and refills; driving over a ready pad refills boost and the pad goes on cooldown.
 
-## Milestone 08 — Jumps, Flips, and Air Control
+## Milestone 08 - Car selection
+Create a new menu for the player can choose a different car before the match. The menu can be displayed after the player select to the start the game. Use the car assets from `Assets/Cars-Park`. Use `Cop.fbx`, `NormalCar1.fbx`, `SUV.fbx`, etc. Because we have seven assets, only use 6. The menu will have two lines and each line will have tree cars for the player to choose. About the assets, you don't need to use `SportsCars2.fbx`.
+
+## Milestone 09 — Jumps, Flips, and Air Control
 Implement the **jump** (Space) with an optional **second jump / flip**, and **air control** (pitch, yaw, roll) while airborne.
 → verify: single and double jump/flip work; the car can be rotated in the air along all three axes and lands recoverably; aerial ball touches are possible.
 
-## Milestone 09 — Camera Modes
+## Milestone 10 — Camera Modes
 Polish the **ChaseCamera**: smooth follow of the car's rotation and velocity, and a **ball-cam** toggle (**C**) that keeps the ball in view. The camera must not clip badly or lose the car.
 → verify: toggling `C` switches between car-facing and ball-cam; neither mode clips through walls or loses the car; motion stays smooth.
 
-## Milestone 10 — HUD
+## Milestone 11 — HUD
 Implement the in-match **HUD**: team scores, match timer, boost meter, kickoff countdown, boost-pad state hints, and a **goal celebration** banner/text. Readable on common laptop screens; resizes correctly.
 → verify: every element updates live and stays legible at different window sizes; the goal banner appears on each score.
 
-## Milestone 11 — Bot Opponent (or Solo Practice)
+## Milestone 12 — Bot Opponent (or Solo Practice)
 Add a simple **BotController**: drives toward the ball, aims its hits roughly toward the player's goal, and boosts occasionally. It must be **beatable**. If the bot is too unstable to be fun, fall back to **solo practice mode** (two goals, working scoreboard, no opponent).
 → verify: a full match can be played against the bot and won by a competent player; the bot never gets stuck against a wall for long. (Fallback: solo practice keeps score across both goals.)
 
-## Milestone 12 — Tuning Panels (Debug/Development)
+## Milestone 13 — Tuning Panels (Debug/Development)
 Add Dear ImGui **tuning panels** (Debug/Development only) to adjust, live: gravity, ball restitution/friction/angular damping, car acceleration/top speed/steering/grip, jump and flip impulses, air-control strength, boost drain/refill rates, and camera smoothing. Include a button to save the current values back to a config the game loads on startup.
 → verify: changing a slider immediately changes gameplay feel; saved values persist across restarts; Release builds contain no tuning UI.
 
-## Milestone 13 — Visual Polish and Effects
+At any moment during gameplay, the developer can press a button to open/hide the Level Editor (**F1**). When the editor is opened, the game is paused. 
+
+## Milestone 14 — Visual Polish and Effects
 Bring the arena to life: futuristic indoor stadium, arena trim, colored goals, boost-pad glow, clear team colors, a boost flame/trail, a ball highlight, goal-explosion particles, lighting, and shadows. Add **bloom / subtle post-processing** only if performance allows (toggleable).
 → verify: the game reads as an energetic arcade sports game; effects fire on the right events (boost, jump, ball hit, goal); frame rate stays smooth on a common laptop.
 
-## Milestone 14 — Audio
+## Milestone 15 — Audio
 Implement a simple, efficient **procedural sound** system for at least: boost (loop while active), jump/flip, car–ball impact, wall/car impact, boost-pad pickup, kickoff countdown ticks, goal celebration, match end, and UI click/hover.
 → verify: each cue fires on its event, respects the audio volume settings, and doesn't stutter under normal play.
+
+## Milestone 16- Arena field dimensions
+Improve the current arena field dimensions. I want a arena simulation from rocket league. That measures for reference creation. There is two type of measures: real life measure using meters and engine units (Unreal Engine units)
+
+**Field Dimensions**
+- Goal line to goal line: 10,248 Unreal Units, equivalent to approximately **102.41 meters**
+- Sideline to sideline: 7,680 Unreal Units, equivalent to approximately **76.81 meters**
+- Floor to ceiling: 2,048 Unreal Units, equivalent to approximately **20.73 meters**
+
+## Milestone 17 — Title Screen ("Press Any Button")
+The **first scene shown at launch**, before the main menu. A lightweight title card
+over a **live 3D view of the arena** — this is a title screen, not a marketing landing
+page. Reuses the existing arena, ball, lighting, and `uistyle` (section 2.3); imports
+no new assets except the game logo. For game logo, use `Game/Assets/Icon/budget-league-logo.png`. 
+And for references to creation/title screen rocket-league like use `img/press-key-menu.png`
+
+**Boot flow:** `TitleScene` → `MainMenuScene` → `MatchScene`. Pressing any key, mouse
+button, or gamepad button leaves the title and goes to the main menu.
+
+**Background — live 3D (not a static image):**
+- Render the real arena (reuse the match arena + lighting) from a low, cinematic fixed
+  camera, with the **ball** (reuse `BallObject`) resting on the field in the foreground.
+- Subtle idle only: a very slow camera drift or a gentle ball spin — enough to read as
+  "alive", no gameplay.
+- Draw order: 3D scene inside BeginMode3D/EndMode3D first, then 2D overlay on top.
+
+**Overlay (2D, using `uistyle`):**
+- The **game logo**, centered (upper-middle). Cooked like the other UI textures
+  (section 3.2). For game logo use 
+- **"PRESS ANY BUTTON TO START"** below the logo, in the UI accent color, **pulsing**
+  (sine-based alpha/scale) so it draws the eye.
+- Studio credit + build string centered at the bottom (same info as the base menu).
+
+**Input:** any key (`GetKeyPressed()`), any mouse button, or any gamepad button
+(`GetGamepadButtonPressed()`) transitions to `MainMenuScene`. Optional short fade.
+
+→ verify: launch opens the title over the live low-poly arena with the ball visible;
+  the prompt text pulses; pressing any key/mouse/gamepad button goes to the main menu;
+  no gameplay happens on the title; layout stays centered and readable when the window
+  resizes.
+
+## Milestone 18 — Main Menu Showcase (Rocket League-style)
+Expands the main-menu portion of the Main Menu milestone. The first screen after
+launch is a **car showcase inside the arena**, with the menu overlaid — **reusing the
+existing MainMenuScene, the `uistyle` UI (section 2.3), the arena, and the Cars-pack
+(section 4)**. Do not build new UI or import new assets for this: only wire the
+pieces already in the game (raylib) into the showcase layout.Use `img/menu-rocket-league.png` 
+as reference. **Do not create the weekly challenges menu from the original image**
+
+**Background — live 3D showcase (not a static image):**
+- Render the real arena behind the menu (reuse the arena + lighting already built for
+  the match), with a single car parked on the field, shown from a 3/4 front angle.
+- The car is a **random model** picked from the Cars-pack (`Cop`, `NormalCar1`,
+  `NormalCar2`, `SportsCar`, `SportsCar2`, `SUV`, `Taxi`), tinted to a random team
+  color (blue/orange) via the diffuse material. Re-roll the pick every time the menu
+  is (re)entered.
+- Slow **turntable** rotation (a few degrees/sec) so it reads as a showcase. Fixed
+  showcase camera; subtle idle only.
+- Draw order: 3D scene first (arena + car inside BeginMode3D/EndMode3D), then the 2D
+  menu on top.
+
+**Menu (left side) — drawn with the existing `uistyle`:**
+- Vertical list using the same panel / accent / text colors as the rest of the UI:
+  **Play**, **Settings**, **Exit**. Local game — no online/shop/pass/garage/profile
+  entries.
+- The selected item is highlighted (accent bar/glow), like the reference. Works with
+  keyboard (up/down/enter) and mouse (hover/click).
+- Credits + game build in the bottom-left corner (as in the base main menu).
+
+**Explicitly removed:** the reference's **Weekly Challenges** panel is **not**
+included — no right-side challenges/quests panel at all.
+
+→ verify: launch goes straight to the showcase (no landing page); a random Cars-pack
+  car appears tinted and slowly turntabling in the arena; the left menu uses the
+  existing `uistyle` with a clear selection highlight and works via keyboard and mouse;
+  Play starts a match, Settings opens the shared settings menu, Exit quits; there is no
+  Weekly Challenges panel; re-entering the menu re-rolls the car; layout resizes
+  correctly on common laptop screens.
+
+## Milestone 19 - Settings Screen — layout tweak (main-menu context)
+When Settings is opened from the main menu, **remove the game-title header**
+("BUDGET LEAGUE") — the Settings panel is the only focal element. **Center the panel
+on screen** (horizontally and vertically). Keep the **live 3D showcase** (arena +
+turntabling car from the main menu) rendering **behind** the panel: the settings panel
+draws as an overlay on top of that scene, not over a flat dark background. The panel
+keeps the existing `uistyle` (border, section labels, Back button highlight).
+
+Scope: this is the **main-menu** Settings only. When the same modular SettingsMenu is
+opened from the **pause menu** during a match, it keeps drawing over the paused match
+as before (no showcase) — the module just takes a "background mode" flag.
+
+→ verify: opening Settings from the main menu shows no game title, a centered panel,
+  and the arena+car still visible behind it; pause-menu Settings is unchanged; the
+  panel stays centered on window resize.
+
+## Milestone 20 — Soundtrack (OST playlist)
+Add the game's soundtrack from the tracks in `Game/Assets/Sounds/`. Unlike the
+Milestone 15 cues, these are **real audio files streamed from disk**, not generated:
+the Asset Cooker copies them into each build's `assets/Music/` and the engine streams
+one at a time (raylib `Music`), so nothing is decoded at cook time.
+
+**Playlist behavior:**
+- One track plays at a time; when it **finishes, another one starts automatically**,
+  picked **randomly** — the playlist never stops on its own.
+- Never the **same track twice in a row**.
+- The track list is **found by scanning the cooked folder**, not listed in code:
+  adding or removing a song is dropping a `.mp3` in or out of `Game/Assets/Sounds/`.
+- The soundtrack runs through the whole game — title screen, menus and match alike.
+
+**Settings:** a **Music volume** slider in the Audio section of the modular
+SettingsMenu (section 2.3), separate from master and SFX, felt live as it moves.
+
+→ verify: a track plays at launch and the playlist keeps advancing on its own; a new
+  song starts when one ends and it is never the one that just played; the Music volume
+  slider changes the music without touching the sound effects; with `assets/Music`
+  missing the game logs a warning and runs silent instead of failing.
+
+## Milestone 21 — Cross-Platform Builds (Windows and macOS)
+Produce a separate runnable executable for **Windows** and **macOS** alongside the Linux
+one. The project header above and section 1.1 still name **Linux** as the platform, and
+they stay that way: this milestone is the explicit, scoped exception to them, and Linux
+remains what the game is developed and verified on.
+
+**No game code changes.** `Game/Source/` contains no platform `#ifdef`s, no POSIX headers
+and no shell calls, and every filesystem touch already goes through raylib. This is a
+build-system change only. The annotated diff lives in `docs/CrossPlatformBuild.md`.
+
+**What changes, all in `Makefile`:**
+- Platform detection from `uname -s` / `uname -m`, or `OS=Windows_NT`.
+- `SIMD_FLAGS` empty on ARM — `-msse4.2 -mpopcnt` will not compile on Apple Silicon, and
+  Jolt autodetects NEON there.
+- `LDLIBS` per platform, taking raylib's own values: `-lopengl32 -lgdi32 -lwinmm` on
+  Windows, the OpenGL/Cocoa/IOKit/CoreAudio/CoreVideo frameworks on macOS.
+- `TARGET` and the `run:` recipe gain `.exe` on Windows.
+- `PYTHON` uses `.venv/Scripts/python.exe` on Windows.
+- Release `LDFLAGS_MODE` drops `-s` on macOS, where Apple's linker rejects it.
+
+**Two supported paths:** native builds on each OS (the main one — Windows needs MSYS2 or
+Git Bash, not `cmd.exe`, because the Makefile uses `find` and `rm -rf`), and
+cross-compiling the Windows executable from Linux with `x86_64-w64-mingw32`. macOS is
+**native-only**: cross-compiling it needs Apple's SDK. `libraylib.a` is not portable
+between platforms and must be rebuilt on each.
+
+**Not in scope:** installers, code signing, notarisation, `.app` bundles, or any change to
+how the game behaves on Linux.
+
+→ verify: each platform builds all three configurations with no game-code warnings;
+  `./ArcadeCarSoccer --smoke-test 60 --screenshot SmokeTest.png` exits 0 and writes a
+  non-blank screenshot on each; the cooked `assets/` folder sits beside every executable
+  produced; the Linux build is unchanged in behaviour.
+
+---
+
+## Milestone 22 — Gamepad Support
+
+Make the whole game playable with a controller, from the title screen to the goal
+celebration, without ever touching the keyboard. The keyboard stays exactly as it is
+(section 8): the gamepad is a second input source alongside it, never a replacement.
+
+**Default mapping: the Rocket League layout** (see 22.1 below). Analogue throttle and
+steering, so a controller is not just "keyboard with a stick" — a half-pressed trigger
+is half throttle, and a small stick tilt is a small steering angle.
+
+**Where it lives:**
+- **GamepadInput.h/cpp** — new, `Game/Source/`, namespace `gamepad`. The one place that
+  knows raylib's gamepad ids, the default button/axis mapping, the dead zone and the
+  trigger curve. Exposes what the rest of the game asks for in game terms
+  (`Available()`, `Throttle()`, `Steer()`, `Boost()`, `Jump()`, `MenuUp()`,
+  `MenuConfirm()`, …), not `GAMEPAD_BUTTON_*` constants.
+- **PlayerController.cpp** — merges gamepad axes/buttons into the existing `CarInput`
+  next to the keyboard reads. Whichever source is pushing hardest wins per field
+  (`fabsf` on the analogue values, OR on the booleans), so both stay live at once and
+  neither needs a "mode".
+- **UserInterface.cpp** — the shared menu list/selector widgets already own
+  `KEY_UP/DOWN/ENTER` and the mouse; they gain the gamepad equivalents there, once, so
+  every menu (main, pause, settings, car select, how-to-play) gets it for free.
+- **MatchScene.cpp / ChaseCamera.cpp / CarSelectScene.cpp / TitleScene.cpp** — pause,
+  camera toggle, back and confirm pick up their gamepad button beside the existing key.
+  The title screen already accepts any gamepad button (Milestone 17) and needs nothing.
+
+**Analogue handling (the part that decides whether it feels good):**
+- **Dead zone** on both sticks, radial rather than per-axis, so a diagonal push does not
+  clip to a square. Default ~0.15, exposed in Settings.
+- Triggers report `[-1..1]` in raylib and rest at `-1`: remap to `[0..1]` before use.
+- Steering keeps the raw analogue value — no snapping to ±1 — and air pitch/yaw come
+  from the same left stick with the same inversion the keyboard uses (nose down on
+  forward).
+- A gamepad that is unplugged mid-match must not freeze the car at its last input:
+  when `IsGamepadAvailable` goes false the gamepad's contribution is zero and the
+  keyboard still drives.
+
+**Settings — a new "Controls" section in the modular SettingsMenu (section 2.3):**
+- **Gamepad enabled** (yes/no).
+- **Stick dead zone** (slider).
+- **Vibration** (yes/no) — raylib 6.0 exposes `SetGamepadVibration`, so short rumble
+  pulses on ball hits, wall impacts and goals are in scope; the toggle silences them.
+- Values live in `GameSettings.h` beside the existing ones and are shared by both menu
+  contexts, like everything else there.
+
+**HUD / prompts:** where the UI names a key ("Press SPACE", the how-to-play sheet), it
+shows the gamepad button instead once a gamepad is the last device used, and switches
+back the moment a key is pressed. Text labels only — no button glyph assets.
+
+**Not in scope:** remapping UI (the mapping is a constant in `GamepadInput.cpp`),
+multiple simultaneous gamepads / local multiplayer, and motion or touchpad input.
+
+### 22.1. Button Layout (Rocket League default)
+
+> **Reserved — the layout table/reference image goes here.** Fill this section in
+> before implementing; `GamepadInput.cpp` must match it exactly, and it is the only
+> normative source for the mapping.
+
+### LAYOUT
+
+| Action     | Xbox |
+| --------   | ------- |
+| Accelerate | RT    |
+| Reverse |  RT     |
+| Steer   | Left Stick    |
+| Jump | A |
+| Boost | B |
+| Focus on Ball | Y |
+| Pitch and yaw | Left stick (airbone) |
+| Air roll | X (airbone) |
+| Reset | RB |
+| Menu or Star button | Pause |
+| Left stick or Directional Pad (D-Pad) | Up, down, left, right to control the menu |
+| Confirm (menu) | A |
+| Cancel (menu) | B |
+
+
+→ verify: with a controller plugged in, the game can be played start to finish on it
+  alone — title, menus, car select, a full match, pause, back to the menu; throttle and
+  steering are analogue (a half-pressed trigger is visibly slower than a full one);
+  jump, flip, boost, reset and the ball-cam toggle all fire from the pad; the keyboard
+  keeps working unchanged at the same time; unplugging the pad mid-match leaves the car
+  controllable instead of stuck; the dead zone, gamepad-enabled and vibration settings
+  take effect live and are shared between the main-menu and pause-menu panels; with no
+  gamepad connected nothing in the HUD or menus changes.
 
 ---
 

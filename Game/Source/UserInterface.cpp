@@ -1,7 +1,17 @@
 #include "UserInterface.h"
 
+#include "AudioSystem.h"
+#include "GamepadInput.h"
+
 namespace uistyle
 {
+    // A standalone button has no identity across frames, so the hover cue is
+    // keyed on the rectangle plus the last frame it was seen on: moving to a
+    // different button, or coming back to the same one after leaving every
+    // button, both read as a new hover.
+    static Rectangle hoveredButton = {};
+    static double hoveredButtonTime = -1.0;
+
     float Scale()
     {
         float scale = GetScreenHeight() / 720.0f;
@@ -48,6 +58,37 @@ namespace uistyle
         DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, alpha));
     }
 
+    void DrawShadowedText(const char *text, float centerX, float y, float baseSize, Color color)
+    {
+        float offset = 2.0f * Scale();
+        DrawTextCentered(text, centerX + offset, y + offset, baseSize, Fade(Background, 0.85f));
+        DrawTextCentered(text, centerX, y, baseSize, color);
+    }
+
+    bool Button(Rectangle bounds, const char *label, bool primary)
+    {
+        bool hovered = CheckCollisionPointRec(GetMousePosition(), bounds);
+        if (hovered)
+        {
+            if (GetTime() - hoveredButtonTime > 0.1 || bounds.x != hoveredButton.x ||
+                bounds.y != hoveredButton.y)
+                audio::Play(AudioCue::UiHover);
+            hoveredButton = bounds;
+            hoveredButtonTime = GetTime();
+        }
+
+        DrawRectangleRec(bounds, hovered ? PanelHighlight : Panel);
+        DrawRectangleLinesEx(bounds, 2.0f * Scale(), (hovered || primary) ? Accent : Border);
+        DrawTextCentered(label, bounds.x + bounds.width * 0.5f,
+                         bounds.y + (bounds.height - FontSize(21.0f)) * 0.5f, 21.0f,
+                         (hovered || primary) ? Text : TextDim);
+
+        bool clicked = hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+        if (clicked)
+            audio::Play(AudioCue::UiClick);
+        return clicked;
+    }
+
     // Shared visuals of a menu row. Returns true when the row is the selected one.
     static bool DrawRow(MenuList &menu, Rectangle bounds, const char *label, int index)
     {
@@ -55,7 +96,11 @@ namespace uistyle
         Vector2 mouseDelta = GetMouseDelta();
         bool hovered = CheckCollisionPointRec(GetMousePosition(), bounds);
         if (hovered && (mouseDelta.x != 0.0f || mouseDelta.y != 0.0f))
+        {
+            if (menu.selected != index)
+                audio::Play(AudioCue::UiHover);
             menu.selected = index;
+        }
 
         bool selected = (menu.selected == index);
         DrawRectangleRec(bounds, selected ? PanelHighlight : Panel);
@@ -74,10 +119,13 @@ namespace uistyle
         if (itemCount <= 0)
             return;
 
-        if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S))
+        int previous = selected;
+        if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S) || gamepad::MenuDown())
             selected = (selected + 1) % itemCount;
-        if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W))
+        if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) || gamepad::MenuUp())
             selected = (selected + itemCount - 1) % itemCount;
+        if (selected != previous)
+            audio::Play(AudioCue::UiHover);
     }
 
     bool MenuList::Item(Rectangle bounds, const char *label, int index)
@@ -87,7 +135,9 @@ namespace uistyle
         bool clicked = CheckCollisionPointRec(GetMousePosition(), bounds) &&
                        IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
         bool activated = selected && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) ||
-                                      IsKeyPressed(KEY_SPACE));
+                                      IsKeyPressed(KEY_SPACE) || gamepad::MenuConfirm());
+        if (clicked || activated)
+            audio::Play(AudioCue::UiClick);
         return clicked || activated;
     }
 
@@ -111,15 +161,18 @@ namespace uistyle
         if (!selected)
             return 0;
 
-        if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D))
-            return 1;
-        if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A))
-            return -1;
+        int delta = 0;
+        if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || gamepad::MenuRight())
+            delta = 1;
+        else if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A) || gamepad::MenuLeft())
+            delta = -1;
         // Clicking or pressing enter cycles forward.
-        if ((CheckCollisionPointRec(GetMousePosition(), bounds) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) ||
-            IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))
-            return 1;
+        else if ((CheckCollisionPointRec(GetMousePosition(), bounds) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) ||
+                 IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || gamepad::MenuConfirm())
+            delta = 1;
 
-        return 0;
+        if (delta != 0)
+            audio::Play(AudioCue::UiClick);
+        return delta;
     }
 }

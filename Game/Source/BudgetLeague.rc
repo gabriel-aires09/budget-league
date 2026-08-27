@@ -1,0 +1,37 @@
+// Windows resource script: the executable's own icon, plus the version block
+// Explorer reads. Compiled by windres into an object that is linked with the
+// rest of the game, and only for Windows builds — see the Makefile.
+//
+// BudgetLeague.ico is generated from Game/Assets/Icon/budget-league-logo.png by
+// Tools/MakeIcon.py into the build's intermediate folder, which windres is given
+// as an include directory. It is not checked in.
+
+#define IDI_ICON_MAIN 101
+
+// The lowest numbered icon in the file is the one Explorer shows for the exe.
+IDI_ICON_MAIN ICON "BudgetLeague.ico"
+
+1 VERSIONINFO
+FILEVERSION     1, 0, 0, 0
+PRODUCTVERSION  1, 0, 0, 0
+FILEOS          0x4L    // VOS_NT_WINDOWS32
+FILETYPE        0x1L    // VFT_APP
+{
+    BLOCK "StringFileInfo"
+    {
+        BLOCK "040904B0"    // US English, Unicode
+        {
+            VALUE "FileDescription", "Budget League"
+            VALUE "FileVersion",     "1.0.0.0"
+            VALUE "InternalName",    "BudgetLeague"
+            VALUE "OriginalFilename", "BudgetLeague.exe"
+            VALUE "ProductName",     "Budget League"
+            VALUE "ProductVersion",  "1.0.0.0"
+        }
+    }
+
+    BLOCK "VarFileInfo"
+    {
+        VALUE "Translation", 0x409, 1200
+    }
+}

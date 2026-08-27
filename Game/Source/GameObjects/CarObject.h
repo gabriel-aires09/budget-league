@@ -5,13 +5,17 @@
 #include "CarController.h"
 #include "StaticModelAsset.h"
 
+#include <cmath>
 #include <string>
+
+class BallObject;
 
 // Rocket car: a single dynamic box driven by arcade forces plus a ground probe.
 // Deliberately not a Jolt VehicleConstraint (see CLAUDE.md 2.5).
 //
-// Every field below is a handling tunable; Milestone 12 binds them to the ImGui
-// panel. Call ApplyTuning() after changing the body ones at runtime.
+// Every field below is a handling tunable, and most are on the F1 tuning panel
+// (TuningPanel.cpp) in Debug and Development. Call ApplyTuning() after changing
+// the body ones at runtime.
 class CarObject final : public GameObject
 {
 public:
@@ -77,12 +81,28 @@ public:
     float boostForce = 6000.0f;
     float boostMaxSpeed = 46.0f;   // boost drives past the normal top speed
     bool boosting = false;         // for the HUD, and the flame in Milestone 13
+    // How long boost has been held without a break. The flame and the ember
+    // trail ramp in over boostRampTime, so a tap does not look like a sustained
+    // burn — which is what CLAUDE.md 6.3 asks for and what the flame did not do:
+    // it was drawn at one fixed size the whole time.
+    float boostHeldTime = 0.0f;
+    float boostRampTime = 0.45f;
+    float BoostIntensity() const
+    {
+        return boostRampTime > 0.0f ? fminf(boostHeldTime / boostRampTime, 1.0f) : 1.0f;
+    }
 
     // --- Jump, flip and air control
-    float jumpImpulse = 1000.0f;       // N s along the car's own up axis
+    float jumpImpulse = 1100.0f;       // N s along the car's own up axis
     float secondJumpImpulse = 900.0f;
     float flipImpulse = 1500.0f;       // horizontal, towards whatever is held
-    float flipSpin = 9.0f;             // rad/s of the flip rotation
+    float flipSpin = 12.0f;            // rad/s of the flip rotation
+    // A flip holds that spin for this long instead of leaving it to air control
+    // and the body's angular damping, which together bleed about 3 rad/s and
+    // stall the rotation before it completes. flipSpin * flipDuration is the
+    // angle swept, so 12.0 * 0.52 is a whole turn, a third quicker than the
+    // 9.0 / 0.70 pair it replaces — that one read as slow motion.
+    float flipDuration = 0.52f;
     // Grounded is ignored for this long after a jump, otherwise the ground probe
     // still hits on the next step and instantly hands the jumps back.
     float jumpLockout = 0.15f;
@@ -94,10 +114,47 @@ public:
     float airControlResponse = 9.0f;   // how fast it reaches that rate, per second
     float airDamping = 0.8f;           // spin bleed with no air input, per second
 
+    // Set when a jump or flip fires and cleared by whoever consumes it (the
+    // effects). It is a latch rather than a per-step flag because Update runs
+    // twice per rendered frame at 120 Hz, so a flag cleared each step would be
+    // missed by half the jumps.
+    bool jumpPending = false;
+
     bool jumpUsed = false;
     bool doubleJumpUsed = false;
     bool jumpHeldPrevious = false;
     float jumpLockoutRemaining = 0.0f;
+    // While this is running the spin is held about flipAxis (world space) and air
+    // control is ignored, which is what makes a flip a committed move.
+    float flipTimeRemaining = 0.0f;
+    Vector3 flipAxis = { 0.0f, 0.0f, 0.0f };
+
+    // --- The flip's hit on the ball
+    // A flip into the ball is the big hit of the game, so it adds this on top of
+    // what the collision itself gave, once per flip, along the direction the ball
+    // was just sent. In N s on a 45 kg ball, so 450 is about 10 m/s.
+    float flipHitImpulse = 450.0f;
+    // How much of the ball's speed has to appear in one step to count as a hit.
+    // Well above anything a roll or a bounce produces, well below a real touch.
+    float flipHitThreshold = 2.0f;
+    // Slack on the proximity test, which is what says the hit was this car's. The
+    // bonus is read a step after the contact, by which time a hard hit has already
+    // carried the ball a third of a metre.
+    float flipHitReach = 0.6f;
+    // A hit landing just as the rotation ends still counts.
+    float flipHitGrace = 0.15f;
+    // Set by MatchScene. Without it a flip simply has no bonus, which is what the
+    // menu showcases and the car picker want.
+    BallObject *ball = nullptr;
+    bool flipHitUsed = false;
+    float flipHitWindow = 0.0f;
+    float ballSpeedPrevious = 0.0f;
+
+    // Highest climb rate the flip is allowed, falling with gravity from the speed
+    // the car had when it fired. See the note in Update: without it the floor
+    // the car rotates through launches it metres into the air.
+    float flipVerticalCap = 0.0f;
+    bool flipCapped = false;
 
     // --- Stability
     float linearDamping = 0.1f;
@@ -105,13 +162,29 @@ public:
     float bodyFriction = 0.55f;
     float bodyRestitution = 0.05f;
     float groundProbe = 0.35f;     // how far below the box counts as driving
+    // Reach of the same probe once already grounded, so bridging a concave curve
+    // does not drop the car mid-climb. Only ever extends contact the car already
+    // had, which is why it does not make the car grounded in mid air.
+    float groundStickyProbe = 0.75f;
     float recoveryProbe = 1.30f;   // how far below the box the righting assist still works
     float uprightTorque = 6500.0f; // rolls the car back onto its wheels
     float tumbleDamping = 4.0f;    // bleeds off bump-induced pitch and roll, per second
     float driveUprightMin = 0.35f; // below this the car rights itself instead of driving
+    // Holds the car against a wall or the ceiling, in m/s^2 into the surface. It
+    // ramps in with the surface tilt and is exactly zero on level ground, so the
+    // handling tuned in Milestone 04 is untouched. Must beat gravity on the
+    // ceiling, where the full value applies.
+    float surfaceStick = 22.0f;
 
     bool grounded = false;
-    float uprightness = 1.0f; // 1 on its wheels, -1 on its roof
+    // Alignment with the surface the car is standing on: 1 sitting flat on it,
+    // -1 inverted relative to it. On the floor that is the world up, on a wall it
+    // is the wall's normal, which is what lets the same test work everywhere.
+    float uprightness = 1.0f;
+    // The surface that alignment is measured against: the normal under the car
+    // when grounded, world up otherwise. ChaseCamera offsets along it, so the
+    // view goes out from a wall instead of climbing it.
+    Vector3 surfaceNormal = { 0.0f, 1.0f, 0.0f };
 
     StaticModelAsset carModel;
     // Fitted in Initialize() so the model always matches the collision box.

@@ -28,6 +28,14 @@ namespace uistyle
     void DrawTextAt(const char *text, float x, float y, float baseSize, Color color);
     void DrawTextCentered(const char *text, float centerX, float y, float baseSize, Color color);
     void DrawDimmer(float alpha);
+    // Centred text drawn over the 3D scene rather than over a panel, where the
+    // background can be any brightness: it lays a dark copy down first.
+    void DrawShadowedText(const char *text, float centerX, float y, float baseSize, Color color);
+
+    // Standalone button, for the screens that are not a vertical list. Mouse
+    // only: where one is used, the keyboard is driving something else. `primary`
+    // marks the action the screen is really about.
+    bool Button(Rectangle bounds, const char *label, bool primary);
 
     // Vertical menu driven by both keyboard and mouse. Set itemCount, call
     // Update once, then draw the rows.

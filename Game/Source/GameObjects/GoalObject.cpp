@@ -37,6 +37,12 @@ void GoalObject::Initialize(Scene &owner)
                            { t * 0.5f, height * 0.5f, depth * 0.5f }, teamColor });
     }
 
+    // Floor of the recess. The arena floor slab ends at the goal line, so without
+    // this anything that follows the ball into the net drops out of the world -
+    // measured with the bot, which chased a rolling ball in and fell for good.
+    pieces.push_back({ { 0.0f, -floorThickness * 0.5f, midZ },
+                       { halfWidth + t, floorThickness * 0.5f, depth * 0.5f + t }, netColor });
+
     // Back of the net and its roof.
     pieces.push_back({ { 0.0f, height * 0.5f, lineZ + direction * (depth + t * 0.5f) },
                        { halfWidth + t, height * 0.5f, t * 0.5f }, netColor });

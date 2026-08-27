@@ -6,7 +6,7 @@
 class PlayerController final : public CarController
 {
 public:
-    virtual CarInput Poll() override;
+    virtual CarInput Poll(float deltaTime) override;
 };
 
 #endif

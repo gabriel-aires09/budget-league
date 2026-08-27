@@ -8,8 +8,8 @@ static const float ROW_HEIGHT = 32.0f;
 static const float ROW_GAP = 4.0f;
 static const float PADDING = 26.0f;
 static const float BOTTOM_PAD = 22.0f;
-static const int ROW_COUNT = 9;     // 8 values plus Back
-static const int SECTION_COUNT = 3; // Graphics, Gameplay, Audio
+static const int ROW_COUNT = 13;    // 12 values plus Back
+static const int SECTION_COUNT = 4; // Graphics, Gameplay, Controls, Audio
 
 static const int RESOLUTIONS[][2] = { { 0, 0 }, { 1280, 720 }, { 1600, 900 }, { 1920, 1080 } };
 static const int RESOLUTION_COUNT = 4;
@@ -42,9 +42,15 @@ float SettingsMenu::PreferredHeight()
 
 // Esc is deliberately not handled here: the scene that owns the panel closes it,
 // so the key is never consumed twice in one frame.
-bool SettingsMenu::Draw(GameSettings &settings, Rectangle area)
+bool SettingsMenu::Draw(GameSettings &settings, Rectangle area, SettingsBackground background)
 {
     const float scale = uistyle::Scale();
+
+    // Over the showcase the panel has to make itself the focal element, since
+    // nothing else on that screen dims. Light enough that the arena and the car
+    // still read behind it; the pause menu has already laid down its own.
+    if (background == SettingsBackground::Showcase)
+        uistyle::DrawDimmer(0.35f);
 
     uistyle::DrawPanel(area);
     uistyle::DrawTextAt("SETTINGS", area.x + PADDING * scale, area.y + 18.0f * scale, 26.0f, uistyle::Text);
@@ -105,6 +111,27 @@ bool SettingsMenu::Draw(GameSettings &settings, Rectangle area)
         settings.botEnabled = !settings.botEnabled;
     row.y += (ROW_HEIGHT + ROW_GAP) * scale;
 
+    uistyle::DrawTextAt("CONTROLS", row.x, row.y + 4.0f * scale, 16.0f, uistyle::Accent);
+    row.y += SECTION_GAP * scale;
+
+    delta = menu.ValueItem(row, "Gamepad", settings.gamepadEnabled ? "Enabled" : "Off", index++);
+    if (delta != 0)
+        settings.gamepadEnabled = !settings.gamepadEnabled;
+    row.y += (ROW_HEIGHT + ROW_GAP) * scale;
+
+    // Shown as a percentage because that is what a dead zone reads as, but held
+    // as the 0..1 fraction gamepad::Update wants.
+    delta = menu.ValueItem(row, "Stick dead zone",
+                           TextFormat("%i%%", (int)(settings.stickDeadZone * 100.0f + 0.5f)), index++);
+    if (delta != 0)
+        settings.stickDeadZone = Clamp((int)(settings.stickDeadZone * 100.0f + 0.5f) + delta * 5, 0, 40) / 100.0f;
+    row.y += (ROW_HEIGHT + ROW_GAP) * scale;
+
+    delta = menu.ValueItem(row, "Vibration", settings.vibrationEnabled ? "On" : "Off", index++);
+    if (delta != 0)
+        settings.vibrationEnabled = !settings.vibrationEnabled;
+    row.y += (ROW_HEIGHT + ROW_GAP) * scale;
+
     uistyle::DrawTextAt("AUDIO", row.x, row.y + 4.0f * scale, 16.0f, uistyle::Accent);
     row.y += SECTION_GAP * scale;
 
@@ -116,6 +143,11 @@ bool SettingsMenu::Draw(GameSettings &settings, Rectangle area)
     delta = menu.ValueItem(row, "SFX volume", TextFormat("%i%%", settings.sfxVolume), index++);
     if (delta != 0)
         settings.sfxVolume = Clamp(settings.sfxVolume + delta * 5, 0, 100);
+    row.y += (ROW_HEIGHT + ROW_GAP) * scale;
+
+    delta = menu.ValueItem(row, "Music volume", TextFormat("%i%%", settings.musicVolume), index++);
+    if (delta != 0)
+        settings.musicVolume = Clamp(settings.musicVolume + delta * 5, 0, 100);
     row.y += (ROW_HEIGHT + ROW_GAP + SECTION_GAP) * scale;
 
     bool back = menu.Item(row, "Back", index++);

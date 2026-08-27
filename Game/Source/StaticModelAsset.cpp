@@ -1,15 +1,11 @@
 #include "StaticModelAsset.h"
 
+#include "AssetPack.h"
 #include "Lighting.h"
 
 #include <raymath.h>
 
 #include <cstring>
-
-std::string assets::Path(const std::string &relative)
-{
-    return std::string(GetApplicationDirectory()) + "assets/" + relative;
-}
 
 namespace
 {
@@ -50,9 +46,9 @@ bool StaticModelAsset::Load(const std::string &name)
 {
     Unload();
 
-    std::string path = assets::Path("Models/" + name + ".evmodel");
+    std::string path = "Models/" + name + ".evmodel";
     int size = 0;
-    unsigned char *data = LoadFileData(path.c_str(), &size);
+    unsigned char *data = assets::LoadData(path, &size);
     if (data == nullptr)
     {
         TraceLog(LOG_WARNING, "MODEL: could not read %s", path.c_str());
@@ -66,7 +62,7 @@ bool StaticModelAsset::Load(const std::string &name)
     if (!reader.ok || memcmp(magic, MODEL_MAGIC, sizeof(magic)) != 0)
     {
         TraceLog(LOG_WARNING, "MODEL: %s is not an evmodel file", path.c_str());
-        UnloadFileData(data);
+        assets::UnloadData(data);
         return false;
     }
 
@@ -127,11 +123,11 @@ bool StaticModelAsset::Load(const std::string &name)
             MemFree(mesh.vertices);
             MemFree(mesh.normals);
         }
-        UnloadFileData(data);
+        assets::UnloadData(data);
         return false;
     }
 
-    UnloadFileData(data);
+    assets::UnloadData(data);
 
     model = {};
     model.transform = MatrixIdentity();
