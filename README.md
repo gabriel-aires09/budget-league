@@ -219,3 +219,29 @@ Build/Windows/…    the same, for a Windows build
 
 Car models from the Cars-Park low-poly pack (`Game/Assets/Cars-Park/License.txt`). Everything else —
 arena, ball, goals, boost pads, UI — is procedural.
+| Key | Action |
+|-----|--------|
+| `W` / `↑` | Accelerate |
+| `S` / `↓` | Reverse / brake |
+| `A` `D` / `←` `→` | Steer |
+| `Shift` | Boost |
+| `Space` | Jump (press again for a double jump / flip) |
+| `R` | Reset car |
+
+### In the air
+
+| Key | Action |
+|-----|--------|
+| `W` / `S` | Pitch (nose down / nose up) |
+| `A` / `D` | Yaw |
+| `Q` / `E` | Roll |
+
+### Menus
+
+| Key | Action |
+|-----|--------|
+| `Esc` / `P` | Pause and resume the match |
+| Mouse | Navigate the main menu, pause menu and settings |
+
+## Assets Used
+- [Cars Pack](https://quaternius.com/packs/cars.html)
