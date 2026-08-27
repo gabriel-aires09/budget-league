@@ -1187,15 +1187,50 @@ file in sync with `README.md` whenever the feature set moves.
   a turn** - the forward and backward ones stalled part way round and dropped the car on its roof.
   While `flipTimeRemaining` is running the angular velocity is re-set to `flipAxis * flipSpin` every
   step and air control is skipped entirely, so `flipSpin * flipDuration` is exactly the angle swept:
-  9.0 x 0.70 is one turn.
+  12.0 x 0.52 is one turn.
 - **The spin is cancelled when the flip ends, not released.** This is the sharp edge in it. Letting
-  the timer expire and simply falling through to air control hands 9 rad/s back to a car that has
+  the timer expire and simply falling through to air control hands 12 rad/s back to a car that has
   just come round to level, and it carries straight past upright: traced, the car ended a clean full
   rotation at uprightness +0.999 and was at -0.9 a third of a second later, landing inverted every
   time. Zeroing the angular velocity on the step the timer reaches zero is what makes the car come
   out of a flip flat and stay flat all the way down.
 - **Landing clears `flipTimeRemaining`**, so a flip that puts a wheel back on the ground early ends
   there rather than fighting the ground contact for the rest of its window.
+- **The flip's bonus on the ball is applied a step *after* contact, along the direction the ball was
+  just sent, and never on approach.** An impulse on approach is the obvious implementation and it is
+  wrong: it shoves the ball out of the car's way before the two ever meet. Measured, the same flip
+  left the ball at **8.5 m/s and 20 m** with a pre-contact impulse against **26.2 m/s and 52 m** with
+  no bonus at all — the bonus was worse than nothing. Reading the hit as a jump in the ball's speed
+  and adding to it is both correct and the idiom `MatchScene` already uses for the effects.
+- **The proximity test on that bonus is against the box, not a radius.** The body is 3.2 m long and
+  1.7 m wide, so a sphere big enough to reach past the nose claims hits a metre clear of the flank —
+  and with two cars on the pitch that test is also what says the hit was this car's.
+- **A flip is ballistic: the floor it rotates through may not add to its climb.** This is the whole of
+  the 2026-08-18 fix, and it is not a tuning value — it is the reason the flip worked at all. The body
+  is 3.2 m long and a flip fired straight after a jump starts about half a metre up, so as the car
+  comes over, its nose or tail sweeps well below the floor and Jolt answers the overlap by throwing
+  the car clear: measured, a forward flip left the ground climbing at 4.4 m/s and was climbing at
+  9.9 m/s a tenth of a second later, peaked **6 m** up and hung there for **2.2 s**. While the flip
+  runs, its vertical speed is therefore capped at what it had when it fired, falling away with gravity
+  — the climb can only decay, never be added to.
+- **Only the vertical is held; the speed along the ground is left alone.** Holding that as well was
+  tried and is much worse: forcing the dodge speed back every step drives the nose deeper into the
+  floor, and the car is thrown **7 m** up the moment the flip releases it. Same for dropping the
+  body friction to zero for the flip (**9 m**). So the scrape still costs a very early flip most of
+  its speed — that is unchanged from before the fix, and it is in the known-deviations list.
+- **`flipCapped` is decided when the flip fires, by a ray a car length straight down, and never
+  re-tested.** A flip high in the air has nothing to scrape and must keep every bit of the climb its
+  boost is giving it, so the cap has to be conditional — but testing the condition every step lets a
+  car that leaves probe range mid rotation and drops back into it slip a launch through the gap
+  (measured, 4.5 m and 1.8 s). `nearGround` is the wrong probe for this: it stops 1.65 m down, while
+  the body swings `halfExtents.z` below a centre of mass that is itself below the box centre, so a
+  flip at the very top of a jump read as a clean aerial and was launched like all the rest.
+- **The flip hold is tested before the grounded gate, and the flip takes `jumpLockout` like a jump
+  does.** Inside the gate, a flip fired a few hundredths of a second after the jump — a fast
+  Space, W, Space — was cancelled by the landing reset on the very step it fired, because the ground
+  probe reaches 0.7 m below a car that has only climbed 0.3 m. That left the raw 12 rad/s spin with no
+  cap on it, and the floor threw the car **4.4 m** up to tumble for **3.75 s**. The lockout is what
+  says the probe is not a landing yet.
 - **`CarObject::ResetTo` clears the car's transient state, not just its transform.** A reset that only
   teleports leaves a player who spent both jumps before a goal **kicking off unable to jump at all**,
   and carries a jump lockout or a half-finished flip through the countdown. `jumpHeldPrevious` is
@@ -1689,14 +1724,31 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   now keeps the last usable direction below `flatForwardMinimum` (0.25). The old guard was 0.001,
   which is far too small to catch this — by the time the vector is that short the direction has been
   meaningless for a long while.
+- **A car turning over has no usable flat forward either, and that one is not short — it is long and
+  pointing exactly backwards.** Half way through a forward flip the car is upside down and its nose
+  points back down the pitch, so `FollowDirection` handed the camera a direction reversed by 180
+  degrees and the view whipped round to the front of the car and back on every single flip (measured
+  on the identical flip, old camera against new: **180.0 deg off, 0.38 s in**). The length guard
+  cannot catch it, because the vector is full length the whole way. So the nose is also rejected when
+  the car has rolled away from the up the camera is framing against — `surfaceUp`, not the world's
+  up, which is why driving upside down on the ceiling is unaffected: there the car's up and the
+  ceiling's own up agree. Verified: boosting up the side wall to 20.4 m holds the car within 9.7 deg
+  of centre and never puts the eye behind a surface, identical to before the change.
+- **The velocity blend is tested against the direction the camera is using, not the car's own nose.**
+  It used to gate on `GetForwardSpeed() > 0`, which reads negative while the car is inverted, so a
+  flipping car stopped feeding the camera its travel direction exactly when the nose was also being
+  rejected and the view had nothing left to follow. Testing the velocity against the direction in
+  use keeps the camera live through a flip and still fails, as before, when the car is reversing.
 - **Ball cam rotates the side it sits on rather than interpolating its position, and that is the
   single biggest fix in 6.2.** The direction can genuinely reverse: the moment the car overtakes the
   ball, the ball is behind it and the view belongs on the other side. Smoothing the camera's
   *position* between those two sides draws a straight line, and that line runs through the car —
   measured, the view crossed at 3.07 m a frame and the car was off screen for 20 unbroken frames.
   Rotating the direction instead swings the camera round the car at its own distance and never
-  crosses it. It applies in ball cam only: chase mode's direction follows the car's heading, which
-  cannot reverse, so chase framing is left exactly as it was.
+  crosses it. It applies in ball cam only: chase mode's direction follows the car's heading, and
+  chase framing is left exactly as it was. (That was written as "which cannot reverse", and it was
+  wrong — a flip reverses it, which is the bug fixed on 2026-08-18 above. Rotation is still the right
+  answer for ball cam and still unnecessary for chase, because the heading no longer reverses at all.)
 - **`ballCamActive` seeds the rotation instead of smoothing it on the first frame in ball cam**, so
   pressing `C` never starts a swing from a direction the camera was never actually at.
 - **The near-range handover is a smoothstep, not the raw ratio.** A linear weight changes the follow
@@ -2046,8 +2098,122 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - The smoke test starts **directly in the match**, skipping both the menu and the car picker, because
   that is the scene that needs rendering validation. It therefore always drives the default car.
 
+## Flip physics, 2026-08-18 (branch `fix/jump-physic`)
+
+Reported: the somersault done with jump, W, jump turns over in slow motion and the car floats far too
+long before it lands. Both were true, and the float was a bug rather than a tuning value — the car was
+being launched by the floor it was rotating through (see the flip bullets under Decisions made).
+
+Two changes in `CarObject`, one tuning and one behavioural:
+
+- `flipSpin` 9.0 -> 12.0 rad/s and `flipDuration` 0.70 -> 0.52 s. The product is still one whole turn,
+  taken a third quicker. Both are still on the F1 tuning panel.
+- A flip is now ballistic while the floor is in reach, is held before the grounded gate rather than
+  inside it, and takes the jump lockout when it fires.
+
+Measured by a temporary harness that drove the real `MatchScene` with a scripted controller and
+stepped physics directly (removed afterwards). The car runs up to 14.9 m/s, jumps, and flips after
+the delay in the first column; a full turn is 360 deg.
+
+| Flip | Rotation, before -> after | Peak, before -> after | Airborne, before -> after | Speed 0.5 s after landing |
+|---|---|---|---|---|
+| Forward, 0.05 s after the jump | cancelled on the step it fired -> **308 deg in 0.52 s** | 6.69 m -> **1.91 m** | 2.78 s -> **1.11 s** | 1.1 -> 0.3 m/s |
+| Forward, 0.10 s | 351 deg in 0.70 s -> **320 deg in 0.52 s** | 5.93 m -> **1.83 m** | 2.16 s -> **1.02 s** | 0.2 -> 3.8 m/s |
+| Forward, 0.20 s | 353 -> **338 deg** | 5.03 m -> **1.60 m** | 1.97 s -> **0.88 s** | 3.9 -> 4.4 m/s |
+| Forward, 0.30 s | 355 -> **344 deg** | 3.22 m -> **1.39 m** | 1.52 s -> **0.77 s** | 6.0 -> 6.7 m/s |
+| Forward, 0.45 s (top of the jump) | 356 -> **338 deg** | 2.62 m -> **1.46 m** | 1.32 s -> **0.70 s** | 6.3 -> 6.3 m/s |
+| Side | 352 -> **346 deg** | 1.23 m -> **1.41 m** | 0.93 s -> **0.92 s** | 5.2 -> 5.4 m/s |
+| Backward | 348 -> **308 deg** | 5.10 m -> **1.76 m** | 2.00 s -> **1.02 s** | 0.0 -> 3.8 m/s |
+| Diagonal | 347 -> **302 deg** | 6.68 m -> **1.75 m** | 2.31 s -> **1.12 s** | 1.4 -> 0.0 m/s |
+
+Every flip lands upright, before and after. The side flip is the one that barely moves, and that is
+the tell: it rolls about the car's 1.7 m width rather than pitching about its 3.2 m length, so it was
+never scraping the floor and was never being launched.
+
+Nothing outside the flip moved:
+
+| Check | Result |
+|---|---|
+| Single jump | peaks 1.49 m, 1.09 s airborne — unchanged |
+| Double jump | peaks 3.85 m, 1.62 s airborne — unchanged |
+| Boosted aerial flip at 8.1 m, climbing 16.0 m/s | climbs to 18.3 m still gaining, 17.2 m/s against 12.5 m/s before — the cap does not touch it |
+| Debug / Development / Release | build with no game-code warnings |
+| `--smoke-test 60 --screenshot` in all three | exits 0, screenshot non-blank, no errors in the log |
+
+### A taller jump and the flip's hit on the ball, same day
+
+Asked for after the two fixes above: a slightly bigger jump, and a flip that really shifts the ball.
+
+- `jumpImpulse` 1000 -> 1100 N s. Nothing else moved; the double jump gets the extra height for free
+  because it stacks on the first.
+- `CarObject::ball`, set by `MatchScene`, plus `flipHitImpulse` (450 N s, on the F1 panel). A flip
+  that connects adds it to the ball on top of the collision.
+
+| Measurement | Before | After |
+|---|---|---|
+| Single jump | 1.49 m, 1.09 s airborne | **1.80 m, 1.20 s** |
+| Double jump | 3.85 m, 1.62 s | **4.40 m, 1.72 s** |
+| Forward flip at the top of a jump: speed 0.5 s after landing | 6.3 m/s | **8.2 m/s** — the extra height is extra clearance, so the nose scrapes less |
+| Every flip still lands upright, in 0.72-1.18 s | yes | yes |
+
+The hit, measured by driving at a resting ball and either going through it or flipping into it. "Ball
+leaves at" is the speed out of the contact, before `BallObject::maxSpeed` (55 m/s) clamps it on the
+next step:
+
+| Shot | Car at contact | Ball leaves at |
+|---|---|---|
+| Drive through, no flip | 29.9 m/s | 42.2 m/s |
+| Flip from 11 m out, bonus off | 13.3 m/s | 28.4 m/s |
+| Flip from 11 m out, bonus on | 13.3 m/s | **34.2 m/s** |
+| Flip from 6 m out, bonus off | 30.2 m/s | 57.1 m/s (clamped to 55) |
+| Flip from 6 m out, bonus on | 30.2 m/s | 64.9 m/s (clamped to 55) |
+
+So the bonus is worth about a fifth of the shot in the middle of the range, and nothing at all at the
+top of it, where the ball is already on its speed cap — which is the cap doing its job, not the bonus
+failing. The juice follows for free: `MatchScene` sizes the burst, the screen punch and the thump
+from the ball's speed jump, so a bigger jump is a bigger hit on screen and in the speakers with no
+extra code.
+
+### The camera followed the car round the flip
+
+Reported straight after: the camera swings from behind the car to the front during a flip. Same root
+cause, one step further on — `ChaseCamera::FollowDirection` takes the car's nose, flattens it to the
+pitch and sits opposite it, and half way through a flip the car is upside down with its nose pointing
+back down the field. The camera went there.
+
+Fixed in `ChaseCamera.cpp` only: the flattened nose is rejected while the car has rolled away from
+the up the camera frames against, exactly as it already was when the nose is too vertical to mean
+anything, and the velocity blend now tests against the direction in use rather than the car's own
+forward. Measured by a second temporary harness that ran the **real** `ChaseCamera` over scripted
+driving (removed afterwards). Because the fix touches no physics, the same flip could be replayed
+against both builds and the two camera tracks diffed directly.
+
+| Check | Old camera | New camera |
+|---|---|---|
+| Chase cam, forward flip: worst the camera sat off where the mode wants it | **180.0 deg**, 0.38 s in | **0.0 deg** |
+| Chase cam, forward flip: mean over the 1.5 s after the flip | 22.6 deg | **0.0 deg** |
+| Chase cam, side flip | 10.2 deg | 14.0 deg |
+| Ball cam, ball 4 m to the side: swing a flip adds over the same run without one | 14.7 deg | **5.3 deg** |
+| Ball cam, ball 9 m away | 8.3 deg | 8.9 deg |
+| Ball cam, ball 20 m away | 16.3 deg | 16.3 deg — the nose has no say past `ballCamNearRange` (7 m) |
+| Boosting up the side wall to 20.4 m | car within 9.7 deg of centre, eye never behind a surface | identical |
+
+The chase camera is the one that was broken outright; ball cam only leaks the nose in within
+`ballCamNearRange`, so it swung less, and what is left there after the fix is the **overtake
+handover**, not the flip: a car that flips past the ball genuinely puts the ball behind it, and ball
+cam is supposed to swing round to the other side. That swing is limited by `ballCamTurnRate` and
+takes about a second at 3 m — it is 6.2's design, not a bug, and it is worth knowing about before
+anyone tries to "fix" it a second time.
+
 ## Known deviations / things to be aware of
 
+- **A flip fired in the first tenth of a second after the jump scrubs the car's speed.** The body is
+  3.2 m long and rotates about a centre of mass 0.28 m below the box centre, so a pitch flip needs
+  about 1.9 m of clear air under the car and a jump only ever lifts it 1.84 m — a low forward flip
+  always drags its nose along the floor. Measured, a 25 m/s dodge lands at about 5 m/s. It is not new
+  (before the 2026-08-18 fix it landed at 0.2 m/s) and it is legible on screen, but if it ever needs
+  fixing, the fix is the car's proportions or the jump height, not another velocity rule: holding the
+  dodge speed, and dropping the flip's friction, were both tried and both ended in 7-9 m launches.
 - **Assets folder name.** CLAUDE.md says `Game/Assets/Cars-pack/`; on disk it is
   `Game/Assets/Cars-Park/`.
 - **The shadows are contact shadows, not cast shadows.** Each car and the ball drops a disc onto the

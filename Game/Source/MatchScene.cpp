@@ -38,6 +38,7 @@ void MatchScene::Initialize()
     playerCar.spawnPosition = Vector3{ 0.0f, playerCar.halfExtents.y, arena.length * 0.3f };
     playerCar.modelName = settings->playerCarModel; // picked in CarSelectScene
     playerCar.controller = &playerController;
+    playerCar.ball = &ball; // so a flip into it lands as the big hit
     playerCar.Initialize(*this);
 
     // With the bot switched off the scene is exactly what it was: solo practice
@@ -52,6 +53,7 @@ void MatchScene::Initialize()
         botCar.modelName = "SportsCar2";
         botCar.teamColor = uistyle::TeamOrange;
         botCar.controller = &botController;
+        botCar.ball = &ball;
         botCar.Initialize(*this);
 
         botController.car = &botCar;
