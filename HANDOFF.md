@@ -14,8 +14,8 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 08 — Car Selection**
 - [x] **Milestone 09 — Jumps, Flips and Air Control**
 - [x] **Milestone 10 — Camera Modes**
-- [ ] **Milestone 11 — HUD** — the next one; score, clock and boost meter exist as a placeholder in `MatchScene`
-- [ ] **Milestone 12 — Bot Opponent (or Solo Practice)**
+- [x] **Milestone 11 — HUD**
+- [ ] **Milestone 12 — Bot Opponent (or Solo Practice)** — the next one
 - [ ] **Milestone 13 — Tuning Panels (Debug/Development)**
 - [ ] **Milestone 14 — Visual Polish and Effects** — lighting is done, pulled forward; shadows, bloom and effects are not
 - [ ] **Milestone 15 — Audio**
@@ -36,7 +36,9 @@ from there opens a real match: an enclosed
 55 x 80 m arena with side walls, back walls, a ceiling and two coloured goals; a player car driven
 with WASD/arrows on a Jolt rigid body; a ball; a score, a match clock and a kickoff countdown; and
 a smooth third-person chase camera. A goal resets the field and counts down again, and the match
-ends at full time. The car draws a real low-poly model from the Cars-Park pack, cooked from FBX and
+ends on a full-time screen offering a rematch. Every readout now lives in `HUD.h/cpp`: a scoreboard
+with both team scores and the clock, a boost meter and a speed readout, the kickoff countdown and a
+goal band in the scoring team's colour. The car draws a real low-poly model from the Cars-Park pack, cooked from FBX and
 painted in the team colour, and the whole scene is flat-shaded by one directional light. Shift
 boosts, drawing on a 0-100 meter refilled by 18 boost pads spread across the field. Space jumps,
 a second press flips in whatever direction is held, and the car can be pitched, yawed and rolled in
@@ -276,6 +278,22 @@ document (removed afterwards) plus screenshots of the scene:
 | Scene teardown | all six models unloaded, lit shader unloaded exactly once, exit 0 |
 | Debug / Development / Release | build with no game-code warnings, smoke test exits 0, screenshot non-blank |
 
+Milestone 11 HUD, verified from screenshots taken by a temporary probe that forced the match into
+each state and resized the window from the environment (removed afterwards):
+
+| Check | Result |
+|---|---|
+| Scoreboard | both scores in their team colours either side of the clock, 3 - 1 read correctly |
+| Clock | counts down, and turns `uistyle::Warning` red for the last 30 s — checked at 0:12 |
+| Boost meter | fills and empties, quarter ticks visible, number matches the bar at 18 / 25 / 33 / 60 / 100 |
+| Speed | reads in km/h bottom left, replacing the old debug line |
+| Kickoff countdown | KICKOFF plus the digit, shadowed so it stays readable over the far goal |
+| Goal banner | full-width band in the scoring team's colour, GOAL! and BLUE SCORES, wipes open and shut |
+| Full time | FULL TIME, 3 - 1 in team colours, BLUE WINS, REMATCH and MAIN MENU buttons |
+| 1280 x 720 / 1920 x 1080 / 960 x 540 | every element scales and stays inside the window |
+| Release build | no GROUNDED / CHASE CAM readouts — they are behind `GAME_DEV_TOOLS` |
+| Debug / Development / Release | build with no game-code warnings, smoke test exits 0, no errors in the log |
+
 ## Layout
 
 ```
@@ -285,7 +303,8 @@ Game/Source/
   MainMenuScene.h/cpp          title, Play / How to play / Settings / Exit, credits and build string
   HowToPlayScene.h/cpp         the how-to-play screen: six panels of rules and controls
   CarSelectScene.h/cpp         the car picker: six cooked cars on a 2 x 3 grid of pedestals
-  MatchScene.h/cpp             the gameplay scene, pause overlay, score/clock readout
+  MatchScene.h/cpp             the gameplay scene and the pause overlay
+  HUD.h/cpp                    namespace hud: every in-match readout, plus the full time screen
   Match.h/cpp                  score, clock, kickoff/goal/full time state machine
   GameSettings.h               the settings struct App owns
   MenuAction.h                 what a scene asks App to do next
@@ -792,6 +811,35 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   and applied after the buttons are drawn. It cannot be handled inside the loop, because `selected`
   is what the start path reads and the buttons have not been drawn yet at that point.
 
+### HUD
+- **`hud` is a namespace, not a class, because the HUD owns no state at all.** Everything it shows is
+  read from the `Match` and the car on the frame it draws, including both animations: the kickoff
+  digit swells from `match.stateTimer`'s fraction and the goal band wipes open and shut from the same
+  timer against `match.celebrationTime`. Adding a timer of its own would be a second clock to keep in
+  step with the one the match already runs.
+- **`Draw` and `DrawFullTime` are separate because only one of them takes input.** `MatchScene` skips
+  the full time screen while the pause menu is up, so its buttons never draw hover states underneath
+  the dimmer. That is also why `DrawFullTime` returns a `MenuAction` rather than setting
+  `pendingAction` itself — scenes own that field, as everywhere else.
+- **A rematch is `MenuAction::StartMatch` from inside the match**, which makes `App` tear the scene
+  down and build a fresh one. No reset path was added; `Match::Begin` already does everything a new
+  match needs and the scene has nothing worth keeping.
+- **There is no boost-pad hint, and that is deliberate.** A marker pointing at the nearest ready pad
+  was built, measured and then **removed on request**. If it is ever wanted again, three things it
+  took to work are worth knowing: a pad behind the camera projects *mirrored through the screen
+  centre*, so it has to be flipped back before being clamped to a screen edge or it points exactly
+  the wrong way (`GetWorldToScreen` gives no sign of this — the test is the dot product of
+  camera-to-pad against camera forward); the marker has to be outlined, because it is the same yellow
+  as the pads it points at and vanished into them; and it has to be suppressed under about 8 m, or it
+  sits on top of the car pointing at a pad already filling the screen.
+- **`DrawShadowedText` exists because HUD text over the field has no controlled background.** It
+  draws a dark copy offset by two scaled pixels first. The kickoff countdown needs it — the digit
+  lands over the far goal, the one bright thing at the centre of the screen. Anything else drawn onto
+  the field rather than onto a panel should use it too.
+- **Speed graduated from debug text to a HUD element; GROUNDED/AIRBORNE and the camera mode did not.**
+  Those two stay in `MatchScene::Draw` behind `GAME_DEV_TOOLS`, so Release draws neither — verified on
+  a Release screenshot.
+
 ### Menus
 - **`uistyle::Button` is the shared standalone button** used by the car picker and the how-to-play
   screen. It was a file-static in `CarSelectScene.cpp` until the second screen needed one. It is
@@ -829,9 +877,9 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   now that the arena is closed the ball cannot be lost, so that was dropped again.
 - **`GameSettings::matchDurationMinutes` is now read** (at `MatchScene::Initialize`), so changing it
   mid-match has no effect until the next match. That is the intended behaviour, not a bug.
-- **Full time just stops.** The match freezes and shows FULL TIME with the result; there is no
-  post-match screen or rematch flow. Esc still opens the pause menu to leave. Worth revisiting when
-  the HUD lands in Milestone 11.
+- **Full time offers a rematch and the main menu, and nothing else.** There are no post-match stats.
+  While the pause menu is open the full time screen is not drawn at all, so the way out of a finished
+  match is either its own two buttons or the pause menu, never both at once.
 - **The Release build prints GCC `-O3` warnings from inside Jolt.** Known third-party false
   positives, not project errors.
 - **Air roll is on Q/E, which CLAUDE.md section 8 does not list.** That section says WASD maps to
@@ -843,6 +891,9 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
   alone. Both are verified.
 - `CarInput` carries `throttle`, `steer`, `boost`, `jump`, `airPitch`, `airYaw`, `airRoll` and
   `reset` — everything the bot in Milestone 12 needs.
+- **CLAUDE.md 2.3 lists "boost pad hints" as a HUD element and there are none.** The pads communicate
+  their own state by glowing in the world; the screen-space hint was removed on request. See the HUD
+  decisions above before adding one back.
 - **There is no boost flame or trail yet.** `CarObject::boosting` is set every step and the meter
   brightens while held, but the visual effect belongs to Milestone 14's `Effects.h/cpp`.
 - `.venv` does not exist yet; the Makefile falls back to `python3`, which is fine while the cooker
@@ -873,21 +924,21 @@ the ball and floor were bare silhouettes. Milestone 14 still owns shadows, bloom
 - **All six previews are painted blue,** because the player is always on the blue team. If teams ever
   become selectable, `SetPaintColor` in `CarSelectScene::Initialize` is the one place to change.
 
-## Next steps — Milestone 11 (HUD)
+## Next steps — Milestone 12 (Bot opponent, or solo practice)
 
-1. Move the score, the clock, the boost meter and the state banners out of `MatchScene` into
-   `HUD.h/cpp`. They are currently drawn by `DrawMatchStatus` and `DrawBoostMeter`, which were always
-   meant as placeholders — everything they draw already scales through `uistyle::Scale()`, so the move
-   is mostly relocation plus the pieces that are missing.
-2. What is missing: boost-pad state hints, a real goal celebration banner (there is a plain "GOAL!"
-   today) and a kickoff countdown treatment beyond the current number.
-3. The debug readouts in `MatchScene::Draw` — speed, GROUNDED/AIRBORNE, the camera mode and the
-   controls line — should either become part of the HUD or move behind `GAME_DEV_TOOLS`. They are not
-   shipping UI.
-4. Full time still just freezes the field with a FULL TIME banner and no rematch flow; the HUD is the
-   natural place to give it a proper end-of-match screen.
+1. `BotController` implements `CarController`, the same interface `PlayerController` already does, so
+   it plugs into a second `CarObject` with no changes to `CarObject` itself. `CarInput` already
+   carries throttle, steer, boost, jump, the three air axes and reset.
+2. `GameSettings` already has the bot-enabled flag, and it is already a row in the settings panel —
+   it is simply not read yet. `MatchScene::Initialize` is where it has to be consulted, and the
+   fallback when it is off is solo practice, which is exactly what the scene does today.
+3. The HUD needs nothing new for a second car: the scoreboard is already per team and
+   `Match::AddCar` puts any car into the kickoff reset. Give the bot its own `spawnPosition` at the
+   orange end and a `spawnYawDegrees` facing the middle.
+4. `MatchScene::boostPads` currently pushes only `&playerCar` into each pad's `cars` list; the bot has
+   to be added there too or it will drive over pads and collect nothing.
 
-The opponent car (Milestone 12) needs no new asset work: give the second `CarObject` a different
+The opponent car needs no new asset work: give the second `CarObject` a different
 `modelName` and the orange `teamColor` before `Initialize()` and it cooks, fits and paints itself.
 It should not be given `settings->playerCarModel` — that field is the player's car; pick the bot's
 from the same `CARS` table in `CarSelectScene.cpp`, or simply leave it on the `SportsCar` default.

@@ -1,7 +1,5 @@
 #include "MatchScene.h"
 
-#include <cmath>
-
 void MatchScene::Initialize()
 {
     InitializePhysics();
@@ -126,64 +124,6 @@ void MatchScene::Update(float deltaTime)
     chaseCamera.Update(camera, playerCar, ball.GetBodyPosition(), deltaTime);
 }
 
-// Score, clock and the state banners. This is deliberately minimal: the real HUD
-// (boost meter, pad hints, celebration art) is Milestone 10.
-void MatchScene::DrawMatchStatus()
-{
-    const float scale = uistyle::Scale();
-    const float centerX = GetScreenWidth() * 0.5f;
-
-    int seconds = (int)ceilf(match.timeRemaining);
-    uistyle::DrawTextCentered(TextFormat("%d : %02d", seconds / 60, seconds % 60),
-                              centerX, 16.0f * scale, 30.0f, uistyle::Text);
-    uistyle::DrawTextCentered(TextFormat("%d", match.scoreBlue), centerX - 90.0f * scale,
-                              14.0f * scale, 40.0f, uistyle::TeamBlue);
-    uistyle::DrawTextCentered(TextFormat("%d", match.scoreOrange), centerX + 90.0f * scale,
-                              14.0f * scale, 40.0f, uistyle::TeamOrange);
-
-    if (match.state == MatchState::Kickoff)
-    {
-        // Counts 3, 2, 1 and then GO for the last moment before the field unfreezes.
-        int count = (int)ceilf(match.stateTimer);
-        uistyle::DrawTitle(count > 0 ? TextFormat("%d", count) : "GO", centerX, 200.0f * scale, 72.0f);
-    }
-    else if (match.state == MatchState::Celebration)
-    {
-        Color color = match.lastScoringTeam == 0 ? uistyle::TeamBlue : uistyle::TeamOrange;
-        uistyle::DrawTextCentered("GOAL!", centerX, 190.0f * scale, 76.0f, color);
-        uistyle::DrawTextCentered(match.lastScoringTeam == 0 ? "BLUE SCORES" : "ORANGE SCORES",
-                                  centerX, 270.0f * scale, 26.0f, uistyle::Text);
-    }
-    else if (match.state == MatchState::Finished)
-    {
-        uistyle::DrawTitle("FULL TIME", centerX, 190.0f * scale, 60.0f);
-        const char *result = match.scoreBlue == match.scoreOrange ? "DRAW"
-                           : (match.scoreBlue > match.scoreOrange ? "BLUE WINS" : "ORANGE WINS");
-        Color color = match.scoreBlue == match.scoreOrange ? uistyle::Text
-                    : (match.scoreBlue > match.scoreOrange ? uistyle::TeamBlue : uistyle::TeamOrange);
-        uistyle::DrawTextCentered(result, centerX, 260.0f * scale, 32.0f, color);
-    }
-}
-
-// The 0-100 meter. Milestone 10 replaces this with the real HUD widget.
-void MatchScene::DrawBoostMeter()
-{
-    const float scale = uistyle::Scale();
-    const float barWidth = 210.0f * scale;
-    const float barHeight = 20.0f * scale;
-    Rectangle bar = { GetScreenWidth() - barWidth - 28.0f * scale,
-                      GetScreenHeight() - barHeight - 46.0f * scale, barWidth, barHeight };
-
-    float fraction = playerCar.boostCapacity > 0.0f ? playerCar.boostAmount / playerCar.boostCapacity : 0.0f;
-    DrawRectangleRec(bar, uistyle::Panel);
-    DrawRectangleRec(Rectangle{ bar.x, bar.y, bar.width * fraction, bar.height },
-                     playerCar.boosting ? Color{ 255, 232, 150, 255 } : uistyle::Boost);
-    DrawRectangleLinesEx(bar, 2.0f, uistyle::Border);
-
-    uistyle::DrawTextAt(TextFormat("BOOST %3.0f", playerCar.boostAmount),
-                        bar.x, bar.y - 24.0f * scale, 18.0f, uistyle::TextDim);
-}
-
 void MatchScene::Draw()
 {
     BeginMode3D(camera);
@@ -193,19 +133,26 @@ void MatchScene::Draw()
     arena.DrawGlassWalls();
     EndMode3D();
 
-    DrawMatchStatus();
-    DrawBoostMeter();
+    hud::Draw(match, playerCar);
 
-    uistyle::DrawTextAt(TextFormat("SPEED %3.0f km/h", fabsf(playerCar.GetForwardSpeed()) * 3.6f),
-                        20.0f, 20.0f, 24.0f, uistyle::Text);
-    // Nothing has been simulated yet during the kickoff freeze, so the grounded
-    // flag would read stale for the first three seconds of every match.
+#ifdef GAME_DEV_TOOLS
+    // Development readouts, not shipping UI. Nothing has been simulated yet
+    // during the kickoff freeze, so the grounded flag would read stale for the
+    // first three seconds of every match.
     if (!match.IsFrozen())
-        uistyle::DrawTextAt(playerCar.grounded ? "GROUNDED" : "AIRBORNE", 20.0f, 52.0f, 18.0f, uistyle::TextDim);
-    uistyle::DrawTextAt(chaseCamera.ballCam ? "BALL CAM" : "CHASE CAM", 20.0f, 76.0f, 18.0f, uistyle::TextDim);
-    // uistyle::DrawTextAt("WASD drive / air pitch+yaw - Space jump - Shift boost - Q/E air roll - C camera - R reset - Esc pause",
-    //                     20.0f, GetScreenHeight() - 32.0f, 18.0f, uistyle::TextDim);
-    //
+        uistyle::DrawTextAt(playerCar.grounded ? "GROUNDED" : "AIRBORNE", 20.0f, 20.0f, 18.0f, uistyle::TextDim);
+    uistyle::DrawTextAt(chaseCamera.ballCam ? "BALL CAM" : "CHASE CAM", 20.0f, 44.0f, 18.0f, uistyle::TextDim);
+#endif
+
+    // The end-of-match screen takes input, so it is skipped while the pause menu
+    // is up rather than left to draw hover states under the dimmer.
+    if (!paused && match.state == MatchState::Finished)
+    {
+        MenuAction action = hud::DrawFullTime(match);
+        if (action != MenuAction::None)
+            pendingAction = action;
+    }
+
     if (!paused)
         return;
 

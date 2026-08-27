@@ -3,6 +3,7 @@
 
 #include "Scene.h"
 #include "ChaseCamera.h"
+#include "HUD.h"
 #include "Match.h"
 #include "PlayerController.h"
 #include "SettingsMenu.h"
@@ -17,7 +18,7 @@
 
 // The gameplay scene. Milestone 02: arena floor, player car and chase camera.
 // Milestone 03: pause menu. Milestone 05: the ball. Milestone 06: the enclosed
-// arena, goals, score and clock. The full HUD arrives in Milestone 10.
+// arena, goals, score and clock. Milestone 11 moved every readout into HUD.h.
 class MatchScene final : public Scene
 {
 public:
@@ -27,8 +28,6 @@ public:
     virtual void Shutdown() override;
 
     void BuildBoostPads();
-    void DrawMatchStatus();
-    void DrawBoostMeter();
 
     ArenaObject arena;
     BallObject ball;
