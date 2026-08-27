@@ -71,6 +71,16 @@ jobs:
           git clone --depth 1 --branch "$GLM_TAG" https://github.com/g-truc/glm.git Game/ThirdParty/glm
           git clone --depth 1 --branch "$IMGUI_TAG" https://github.com/ocornut/imgui.git Game/ThirdParty/imgui
 
+      - name: Patch raylib to use the static CRT (/MT)
+        # raylib's bundled VS2022 project builds Release against the dynamic CRT
+        # (MultiThreadedDLL / MSVCRT.lib). Game.vcxproj links every configuration
+        # against the static CRT (/MT) against one shared raylib.lib, so the two
+        # must match or the link fails with unresolved __imp_* symbols.
+        run: |
+          Get-ChildItem -Path Game/ThirdParty/raylib/projects/VS2022 -Filter *.vcxproj -Recurse | ForEach-Object {
+            (Get-Content $_.FullName -Raw) -replace 'MultiThreadedDLL', 'MultiThreaded' | Set-Content $_.FullName -NoNewline
+          }
+
       - name: Build raylib.lib (static, /MT, x64)
         run: msbuild Game/ThirdParty/raylib/projects/VS2022/raylib.sln /p:Configuration=Release /p:Platform=x64
 
