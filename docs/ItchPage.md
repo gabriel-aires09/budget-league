@@ -81,13 +81,13 @@ Menus take the arrow keys or WASD, Enter or Space to confirm, Esc to go back —
 **Linux** — unzip, then run the executable. Keep the `assets` folder next to it.
 
 ```sh
-chmod +x ArcadeCarSoccer
-./ArcadeCarSoccer
+chmod +x BudgetLeague
+./BudgetLeague
 ```
 
 Needs a working OpenGL driver and X11 — nothing else is installed.
 
-**Windows** — unzip and run `ArcadeCarSoccer.exe`, with its `assets` folder beside it. No runtime to
+**Windows** — unzip and run `BudgetLeague.exe`, with its `assets` folder beside it. No runtime to
 install; everything is linked statically.
 
 The game opens fullscreen at your monitor's own resolution. Settings turns it back into a 1280×720

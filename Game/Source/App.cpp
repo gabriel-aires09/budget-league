@@ -8,6 +8,7 @@
 #include "ImGuiRaylib.h"
 #include "MainMenuScene.h"
 #include "PostProcess.h"
+#include "TextureAsset.h"
 #include "MatchScene.h"
 #include "TitleScene.h"
 #include "UserInterface.h"
@@ -42,6 +43,23 @@ bool App::Initialize(int argc, char **argv)
     InitWindow(windowWidth, windowHeight, "Budget League");
     if (!IsWindowReady())
         return false;
+
+    // The window icon: the same cooked logo the title screen draws, decoded to
+    // pixels and handed over at three sizes, which is what a desktop wants —
+    // one for the title bar, one for the task bar and one for the switcher.
+    // Missing cooked assets are not fatal anywhere else in the game and are not
+    // here either: the window simply keeps the default icon.
+    Image icon = {};
+    if (LoadCookedImage("budget-league-logo", icon))
+    {
+        Image sizes[3] = { ImageCopy(icon), ImageCopy(icon), icon };
+        ImageResize(&sizes[0], 16, 16);
+        ImageResize(&sizes[1], 32, 32);
+        ImageResize(&sizes[2], 64, 64);
+        SetWindowIcons(sizes, 3);
+        for (Image &image : sizes)
+            UnloadImage(image);
+    }
 
     // Open fullscreen, at whatever the monitor actually is. The window has to be
     // resized to the monitor first: ToggleFullscreen keeps the current size as

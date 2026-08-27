@@ -77,7 +77,7 @@ command line; everything below keys off it and off `ARCH`.
 |---|---|---|---|---|
 | 1 | 33 | `SIMD_FLAGS := -msse4.2 -mpopcnt` | empty when `ARCH` is `arm64`/`aarch64` | **These are x86-only and will not compile on Apple Silicon.** Jolt autodetects ARM NEON. The Makefile's own comment already warns this value must be identical for Jolt and every file including it, so it must stay a single variable. |
 | 2 | 59 | `LDLIBS := $(RAYLIB_LIB) -lGL -lm -lpthread -ldl -lrt -lX11` | per platform, see below | `-lGL`, `-lrt` and `-lX11` do not exist on Windows or macOS. |
-| 3 | 19 | `TARGET := $(BUILD_DIR)/ArcadeCarSoccer` | append `.exe` on Windows | Windows will not run an extensionless binary. |
+| 3 | 19 | `TARGET := $(BUILD_DIR)/ArcadeCarSoccer` | append `.exe` on Windows | Windows will not run an extensionless binary. (The executable was renamed to `BudgetLeague` afterwards; the line quoted here is the one Milestone 21 changed.) |
 | 4 | 116 | `@cd $(BUILD_DIR) && ./ArcadeCarSoccer` | append `.exe` on Windows | Same, for `make run`. |
 | 5 | 28 | `$(ROOT)/.venv/bin/python` | `$(ROOT)/.venv/Scripts/python.exe` on Windows | Python venvs use `Scripts/` on Windows. Affects the `cook` build event only. |
 | 6 | 46 | `LDFLAGS_MODE := -s` (Release) | drop it on macOS, use `-Wl,-x` or a separate `strip` | Apple's linker rejects `-s`. |
@@ -196,9 +196,10 @@ platform-independent, and `Build/Windows/<Config>/assets/` is written by the sam
 | Check | Result |
 |---|---|
 | `make release TARGET_OS=Windows …` | exit 0, no warnings from `Game/Source` |
-| `file ArcadeCarSoccer.exe` | `PE32+ executable for MS Windows, x86-64` |
+| `file BudgetLeague.exe` | `PE32+ executable for MS Windows, x86-64` |
 | `objdump -p` imports | system DLLs only — no MinGW runtime to ship |
-| `wine ./ArcadeCarSoccer.exe --smoke-test 60 --screenshot SmokeTest.png` | exit 0, non-blank screenshot of the arena at kickoff |
+| PE subsystem, Release | 2 (GUI): `-mwindows`, so no terminal opens beside the game. Development stays 3 (console) |
+| `wine ./BudgetLeague.exe --smoke-test 60 --screenshot SmokeTest.png` | exit 0, non-blank screenshot of the arena at kickoff |
 | Linux `make all` after the change | unchanged, smoke test still exit 0 |
 
 Wine is a proxy for Windows, not Windows. It exercises the executable, the cooked assets, the
@@ -230,7 +231,7 @@ The existing smoke test is the cross-platform check and needs no display-server 
 Windows or macOS:
 
 ```sh
-./ArcadeCarSoccer --smoke-test 60 --screenshot SmokeTest.png
+./BudgetLeague --smoke-test 60 --screenshot SmokeTest.png
 ```
 
 It should exit 0 and write a non-blank screenshot.

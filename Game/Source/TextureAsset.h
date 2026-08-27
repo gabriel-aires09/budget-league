@@ -17,4 +17,9 @@ struct TextureAsset
     bool loaded = false;
 };
 
+// The same cooked file decoded to pixels instead of to a texture, for the one
+// caller that needs them on the CPU: the window icon, which raylib takes as an
+// Image. The caller owns what comes back and must UnloadImage it.
+bool LoadCookedImage(const std::string &name, Image &image);
+
 #endif
