@@ -294,33 +294,39 @@ Build the enclosed **ArenaObject** (side walls, back walls, ceiling/high bound) 
 Implement boost: a **0–100 meter**, **hold Shift** to accelerate with a flame/trail effect, boost **drains** while active, and **BoostPadObjects** around the arena that **refill** boost on overlap (then cooldown/glow).
 → verify: holding Shift consumes boost and visibly accelerates the car; boost empties and refills; driving over a ready pad refills boost and the pad goes on cooldown.
 
-## Milestone 08 — Jumps, Flips, and Air Control
+## Milestone 08 - Car selection
+Create a new menu for the player can choose a different car before the match. The menu can be displayed after the player select to the start the game. Use the car assets from `Assets/Cars-Park`. Use `Cop.fbx`, `NormalCar1.fbx`, `SUV.fbx`, etc. Because we have seven assets, only use 6. The menu will have two lines and each line will have tree cars for the player to choose. About the assets, you don't need to use `SportsCars2.fbx`.
+
+## Milestone 09 — Jumps, Flips, and Air Control
 Implement the **jump** (Space) with an optional **second jump / flip**, and **air control** (pitch, yaw, roll) while airborne.
 → verify: single and double jump/flip work; the car can be rotated in the air along all three axes and lands recoverably; aerial ball touches are possible.
 
-## Milestone 09 — Camera Modes
+## Milestone 10 — Camera Modes
 Polish the **ChaseCamera**: smooth follow of the car's rotation and velocity, and a **ball-cam** toggle (**C**) that keeps the ball in view. The camera must not clip badly or lose the car.
 → verify: toggling `C` switches between car-facing and ball-cam; neither mode clips through walls or loses the car; motion stays smooth.
 
-## Milestone 10 — HUD
+## Milestone 11 — HUD
 Implement the in-match **HUD**: team scores, match timer, boost meter, kickoff countdown, boost-pad state hints, and a **goal celebration** banner/text. Readable on common laptop screens; resizes correctly.
 → verify: every element updates live and stays legible at different window sizes; the goal banner appears on each score.
 
-## Milestone 11 — Bot Opponent (or Solo Practice)
+## Milestone 12 — Bot Opponent (or Solo Practice)
 Add a simple **BotController**: drives toward the ball, aims its hits roughly toward the player's goal, and boosts occasionally. It must be **beatable**. If the bot is too unstable to be fun, fall back to **solo practice mode** (two goals, working scoreboard, no opponent).
 → verify: a full match can be played against the bot and won by a competent player; the bot never gets stuck against a wall for long. (Fallback: solo practice keeps score across both goals.)
 
-## Milestone 12 — Tuning Panels (Debug/Development)
+## Milestone 13 — Tuning Panels (Debug/Development)
 Add Dear ImGui **tuning panels** (Debug/Development only) to adjust, live: gravity, ball restitution/friction/angular damping, car acceleration/top speed/steering/grip, jump and flip impulses, air-control strength, boost drain/refill rates, and camera smoothing. Include a button to save the current values back to a config the game loads on startup.
 → verify: changing a slider immediately changes gameplay feel; saved values persist across restarts; Release builds contain no tuning UI.
 
-## Milestone 13 — Visual Polish and Effects
+## Milestone 14 — Visual Polish and Effects
 Bring the arena to life: futuristic indoor stadium, arena trim, colored goals, boost-pad glow, clear team colors, a boost flame/trail, a ball highlight, goal-explosion particles, lighting, and shadows. Add **bloom / subtle post-processing** only if performance allows (toggleable).
 → verify: the game reads as an energetic arcade sports game; effects fire on the right events (boost, jump, ball hit, goal); frame rate stays smooth on a common laptop.
 
-## Milestone 14 — Audio
+## Milestone 15 — Audio
 Implement a simple, efficient **procedural sound** system for at least: boost (loop while active), jump/flip, car–ball impact, wall/car impact, boost-pad pickup, kickoff countdown ticks, goal celebration, match end, and UI click/hover.
 → verify: each cue fires on its event, respects the audio volume settings, and doesn't stutter under normal play.
+
+## Milestone 16 - UI Polish
+Improve the actual UI/UX of the game using [raygui](https://github.com/raysan5/raygui). You can use the cyber style from `raygui/styles`. Adapt the menu, Hud, settings, etc for the new design. Don't remove any feature - just organize and improve the UI/UX. 
 
 ---
 

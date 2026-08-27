@@ -54,6 +54,10 @@ void MatchScene::Initialize()
 
 // Four full pads out wide plus a scatter of small ones, so crossing the field
 // the long way is always a choice between the quick route and the fed route.
+//
+// Every pad has to sit inside the flat part of the floor: a pad is a flat disc
+// with no body, so one hanging over a ramp would clip into it and read as broken.
+// arena.FlatHalfWidth/FlatHalfLength are the limits, minus the pad's own radius.
 void MatchScene::BuildBoostPads()
 {
     const float smallRows[] = { -28.0f, -14.0f, 14.0f, 28.0f };
@@ -67,7 +71,7 @@ void MatchScene::BuildBoostPads()
         for (float sideZ = -1.0f; sideZ <= 1.0f; sideZ += 2.0f)
         {
             BoostPadObject pad;
-            pad.position = Vector3{ sideX * 20.0f, 0.0f, sideZ * 32.0f };
+            pad.position = Vector3{ sideX * 19.0f, 0.0f, sideZ * 31.0f };
             pad.radius = 3.0f;
             pad.refillAmount = 100.0f;
             pad.cooldownTime = 10.0f;
@@ -88,7 +92,7 @@ void MatchScene::BuildBoostPads()
     for (float sideX = -1.0f; sideX <= 1.0f; sideX += 2.0f)
     {
         BoostPadObject pad;
-        pad.position = Vector3{ sideX * 23.0f, 0.0f, 0.0f };
+        pad.position = Vector3{ sideX * 20.0f, 0.0f, 0.0f };
         boostPads.push_back(pad);
     }
 }
