@@ -1,9 +1,17 @@
 #ifndef GAMESETTINGS_H
 #define GAMESETTINGS_H
 
+#include <string>
+
 // Shared by the main menu and the pause menu; App owns the single instance.
 struct GameSettings
 {
+    // Picked in CarSelectScene rather than in the settings panel, but it lives
+    // here for the same reason everything else does: it is the one struct every
+    // scene can see, so the choice survives from the picker to the match and
+    // back to the menu.
+    std::string playerCarModel = "SportsCar";
+
     // Graphics
     bool fullscreen = false;
     int resolutionIndex = 0; // 0 = custom, meaning whatever size the window has

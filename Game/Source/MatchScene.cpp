@@ -28,6 +28,7 @@ void MatchScene::Initialize()
     }
 
     playerCar.spawnPosition = Vector3{ 0.0f, 0.36f, arena.length * 0.3f };
+    playerCar.modelName = settings->playerCarModel; // picked in CarSelectScene
     playerCar.controller = &playerController;
     playerCar.Initialize(*this);
 

@@ -1,5 +1,6 @@
 #include "App.h"
 
+#include "CarSelectScene.h"
 #include "Lighting.h"
 #include "MainMenuScene.h"
 #include "MatchScene.h"
@@ -95,6 +96,7 @@ void App::Run()
         activeScene->pendingAction = MenuAction::None;
         switch (action)
         {
+        case MenuAction::SelectCar:  SetScene(new CarSelectScene()); break;
         case MenuAction::StartMatch: SetScene(new MatchScene()); break;
         case MenuAction::MainMenu:   SetScene(new MainMenuScene()); break;
         case MenuAction::ExitGame:   running = false; break;

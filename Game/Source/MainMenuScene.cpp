@@ -48,8 +48,9 @@ void MainMenuScene::Draw()
         menu.itemCount = 3;
         menu.Update();
 
+        // Play goes to the car picker, which is what starts the match.
         if (menu.Item(row, "Play", 0))
-            pendingAction = MenuAction::StartMatch;
+            pendingAction = MenuAction::SelectCar;
         row.y += rowHeight + rowGap;
 
         if (menu.Item(row, "Settings", 1))
