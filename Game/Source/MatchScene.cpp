@@ -79,6 +79,12 @@ void MatchScene::Initialize()
     if (botActive)
         match.AddCar(botCar);
     match.Begin(ball, blueGoal, orangeGoal, (float)settings->matchDurationMinutes);
+
+#ifdef GAME_DEV_TOOLS
+    // Last, so the saved config lands on objects that already exist and the
+    // panel's sliders point at the real fields.
+    tuningPanel.Initialize(*this);
+#endif
 }
 
 // Four full pads out wide plus a scatter of small ones, so crossing the field
@@ -104,6 +110,7 @@ void MatchScene::BuildBoostPads()
             pad.radius = 3.0f;
             pad.refillAmount = 100.0f;
             pad.cooldownTime = 10.0f;
+            pad.fullRefill = true;
             boostPads.push_back(pad);
         }
     }
@@ -128,6 +135,15 @@ void MatchScene::BuildBoostPads()
 
 void MatchScene::Update(float deltaTime)
 {
+#ifdef GAME_DEV_TOOLS
+    if (IsKeyPressed(KEY_F1))
+        tuningPanel.open = !tuningPanel.open;
+    // Frozen while the panel is up, so nothing below runs - not the pause key
+    // either, which ImGui may be using for a text field.
+    if (tuningPanel.open)
+        return;
+#endif
+
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P))
     {
         if (settingsOpen)
@@ -163,6 +179,8 @@ void MatchScene::Draw()
     hud::Draw(match, playerCar);
 
 #ifdef GAME_DEV_TOOLS
+    tuningPanel.Draw(*this);
+
     // Development readouts, not shipping UI. Nothing has been simulated yet
     // during the kickoff freeze, so the grounded flag would read stale for the
     // first three seconds of every match.

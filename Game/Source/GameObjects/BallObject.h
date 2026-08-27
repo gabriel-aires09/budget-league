@@ -6,8 +6,9 @@
 // The soccer ball: one dynamic sphere, heavy enough to feel like it has mass but
 // light enough that a full speed hit sends it flying.
 //
-// Every field below is a tunable; Milestone 12 binds them to the ImGui panel.
-// Call ApplyTuning() after changing them at runtime.
+// Every field below is a tunable, and most are on the F1 tuning panel
+// (TuningPanel.cpp) in Debug and Development. Call ApplyTuning() after changing
+// them at runtime.
 class BallObject final : public GameObject
 {
 public:

@@ -27,6 +27,10 @@ public:
     float radius = 2.0f;     // pickup radius, measured in the XZ plane
     float refillAmount = 12.0f;
     float cooldownTime = 4.0f;
+    // A full-refill pad, as opposed to one of the small ones. It is what the two
+    // kinds are, and it is also how the tuning panel knows which pads a refill
+    // slider applies to once the amounts have been edited away from the defaults.
+    bool fullRefill = false;
     // A car has to be near the floor to collect: flying over a pad must not take it.
     float pickupHeight = 2.0f;
 

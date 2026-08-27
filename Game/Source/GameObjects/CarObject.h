@@ -10,8 +10,9 @@
 // Rocket car: a single dynamic box driven by arcade forces plus a ground probe.
 // Deliberately not a Jolt VehicleConstraint (see CLAUDE.md 2.5).
 //
-// Every field below is a handling tunable; Milestone 12 binds them to the ImGui
-// panel. Call ApplyTuning() after changing the body ones at runtime.
+// Every field below is a handling tunable, and most are on the F1 tuning panel
+// (TuningPanel.cpp) in Debug and Development. Call ApplyTuning() after changing
+// the body ones at runtime.
 class CarObject final : public GameObject
 {
 public:
