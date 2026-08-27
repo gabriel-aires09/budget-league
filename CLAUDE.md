@@ -445,6 +445,40 @@ SettingsMenu (section 2.3), separate from master and SFX, felt live as it moves.
   slider changes the music without touching the sound effects; with `assets/Music`
   missing the game logs a warning and runs silent instead of failing.
 
+## Milestone 21 — Cross-Platform Builds (Windows and macOS)
+Produce a separate runnable executable for **Windows** and **macOS** alongside the Linux
+one. The project header above and section 1.1 still name **Linux** as the platform, and
+they stay that way: this milestone is the explicit, scoped exception to them, and Linux
+remains what the game is developed and verified on.
+
+**No game code changes.** `Game/Source/` contains no platform `#ifdef`s, no POSIX headers
+and no shell calls, and every filesystem touch already goes through raylib. This is a
+build-system change only. The annotated diff lives in `docs/CrossPlatformBuild.md`.
+
+**What changes, all in `Makefile`:**
+- Platform detection from `uname -s` / `uname -m`, or `OS=Windows_NT`.
+- `SIMD_FLAGS` empty on ARM — `-msse4.2 -mpopcnt` will not compile on Apple Silicon, and
+  Jolt autodetects NEON there.
+- `LDLIBS` per platform, taking raylib's own values: `-lopengl32 -lgdi32 -lwinmm` on
+  Windows, the OpenGL/Cocoa/IOKit/CoreAudio/CoreVideo frameworks on macOS.
+- `TARGET` and the `run:` recipe gain `.exe` on Windows.
+- `PYTHON` uses `.venv/Scripts/python.exe` on Windows.
+- Release `LDFLAGS_MODE` drops `-s` on macOS, where Apple's linker rejects it.
+
+**Two supported paths:** native builds on each OS (the main one — Windows needs MSYS2 or
+Git Bash, not `cmd.exe`, because the Makefile uses `find` and `rm -rf`), and
+cross-compiling the Windows executable from Linux with `x86_64-w64-mingw32`. macOS is
+**native-only**: cross-compiling it needs Apple's SDK. `libraylib.a` is not portable
+between platforms and must be rebuilt on each.
+
+**Not in scope:** installers, code signing, notarisation, `.app` bundles, or any change to
+how the game behaves on Linux.
+
+→ verify: each platform builds all three configurations with no game-code warnings;
+  `./ArcadeCarSoccer --smoke-test 60 --screenshot SmokeTest.png` exits 0 and writes a
+  non-blank screenshot on each; the cooked `assets/` folder sits beside every executable
+  produced; the Linux build is unchanged in behaviour.
+
 ---
 
 # 6. Final Milestone — Polish (individual prompts)

@@ -24,6 +24,7 @@ Project state for whoever continues the work. Update this file whenever the proj
 - [x] **Milestone 18 — Main Menu Showcase**
 - [x] **Milestone 19 — Settings Screen (main-menu layout)**
 - [x] **Milestone 20 — Soundtrack (OST playlist)**
+- [x] **Milestone 21 — Cross-Platform Builds** (Windows done and verified by cross-compile; macOS written but unbuilt — no Mac here)
 
 Final milestone (CLAUDE.md section 6), a subsection at a time:
 
@@ -1050,6 +1051,28 @@ or **Space** starts the match, **Esc** goes back to the main menu, right click p
 The first build takes a few minutes (raylib + 153 Jolt translation units per config); after that it
 is incremental.
 
+To cross-compile the Windows executable from Linux (Milestone 21; full notes in
+[docs/CrossPlatformBuild.md](docs/CrossPlatformBuild.md)):
+
+```sh
+make -C Game/ThirdParty/raylib/src clean      # only when switching toolchains
+make release TARGET_OS=Windows \
+     CXX=x86_64-w64-mingw32-g++ CC=x86_64-w64-mingw32-gcc AR=x86_64-w64-mingw32-ar
+# -> Build/Windows/Release/ArcadeCarSoccer.exe + assets/
+```
+
+Use the `release`/`development`/`debug` goal, not a bare `CONFIG=Release` — the default goal
+re-invokes make with `CONFIG=Development` and discards it.
+
+## Publishing
+
+[docs/ItchPage.md](docs/ItchPage.md) holds the itch.io store page copy — metadata (tagline, tags,
+platforms) and the page body, written from the README and this document. Two things about it that
+are not obvious: the page claims **Linux and Windows only**, because macOS is written into the
+`Makefile` but has never been built here, and every upload must zip the executable **with its
+`assets/` folder**, since without it the game falls back to box stand-ins and runs silent. Keep the
+file in sync with `README.md` whenever the feature set moves.
+
 ## Decisions made
 
 ### Build
@@ -1063,6 +1086,21 @@ is incremental.
 - Third-party include paths use **`-isystem`**, so `-Wall -Wextra` only reports game code.
 - Mode defines: `GAME_DEBUG` / `GAME_DEVELOPMENT` / `GAME_RELEASE`, plus `GAME_DEV_TOOLS` in Debug
   and Development only — gate all ImGui tuning UI behind it (Milestone 13).
+- **Cross-platform support is `Makefile`-only.** `Game/Source/` has no platform `#ifdef`, no POSIX
+  header and no shell call — every filesystem touch already goes through raylib — so Milestone 21
+  changed no game code at all. `TARGET_OS` (`?=`, so it can be overridden on the command line)
+  selects the link line, the `.exe` suffix and raylib's `PLATFORM_OS`; `ARCH` drops `SIMD_FLAGS` on
+  ARM, where `-msse4.2` would not compile and Jolt uses NEON anyway.
+- **Non-Linux targets nest under `Build/<TargetOS>/`.** Linux keeps the flat `Build/<Config>/` it
+  always had, so every path in the docs stays right; without the nesting a native `.o` and a
+  cross-compiled `.o` would share a filename and silently poison each other.
+- **`CC` must be passed alongside `CXX` when cross-compiling** — raylib is C, and `CC`/`AR` are what
+  get forwarded to its Makefile. And raylib leaves its `.o` files in its own source tree, so switching
+  toolchains needs `make -C Game/ThirdParty/raylib/src clean` first even though the archives are
+  per-target.
+- **The Windows link is fully static** (`-static -static-libgcc -static-libstdc++`). raylib's own
+  list has none of these because raylib is C; without them the C++ executable would need three MinGW
+  runtime DLLs shipped beside it.
 
 ### Gameplay and physics
 - **The car is a single dynamic box** with a downward ground-probe ray and custom arcade forces, not
