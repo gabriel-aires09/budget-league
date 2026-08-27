@@ -329,10 +329,7 @@ Bring the arena to life: futuristic indoor stadium, arena trim, colored goals, b
 Implement a simple, efficient **procedural sound** system for at least: boost (loop while active), jump/flip, car–ball impact, wall/car impact, boost-pad pickup, kickoff countdown ticks, goal celebration, match end, and UI click/hover.
 → verify: each cue fires on its event, respects the audio volume settings, and doesn't stutter under normal play.
 
-## Milestone 16 - UI Polish
-Improve the actual UI/UX of the game using [raygui](https://github.com/raysan5/raygui). You can use the cyber style from `raygui/styles`. Adapt the menu, Hud, settings, etc for the new design. Don't remove any feature - just organize and improve the UI/UX. 
-
-## Milestone 17 - Arena field dimensions
+## Milestone 16- Arena field dimensions
 Improve the current arena field dimensions. I want a arena simulation from rocket league. That measures for reference creation. There is two type of measures: real life measure using meters and engine units (Unreal Engine units)
 
 **Field Dimensions**
@@ -340,7 +337,7 @@ Improve the current arena field dimensions. I want a arena simulation from rocke
 - Sideline to sideline: 7,680 Unreal Units, equivalent to approximately **76.81 meters**
 - Floor to ceiling: 2,048 Unreal Units, equivalent to approximately **20.73 meters**
 
-## Milestone 18 - Car and ball dimensions 
+## Milestone 17 - Car and ball dimensions 
 Change the actual size of ball and cars simulating the rocket league game objects sizes1
 - Ball height: approximately 182 Unreal Units, equivalent to roughly **1.83 meters**
 - Cars size: lenght 118.01 Unreal units, width 84.20 Unreal Units and height 36.16 Unreal units 
