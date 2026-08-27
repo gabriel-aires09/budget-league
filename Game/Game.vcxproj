@@ -151,7 +151,7 @@
        .venv interpreter if one exists, otherwise uses `python` from PATH. -->
   <ItemDefinitionGroup>
     <PostBuildEvent>
-      <Command>if exist "$(SolutionDir).venv\Scripts\python.exe" ("$(SolutionDir).venv\Scripts\python.exe" "$(SolutionDir)Tools\AssetCooker.py" --assets "$(SolutionDir)Game\Assets" --cache "$(SolutionDir)Build\Intermediate\Cooked" --output "$(OutDir)assets.pak") else (python "$(SolutionDir)Tools\AssetCooker.py" --assets "$(SolutionDir)Game\Assets" --cache "$(SolutionDir)Build\Intermediate\Cooked" --output "$(OutDir)assets.pak")</Command>
+      <Command>if exist "$(SolutionDir).venv\Scripts\python.exe" ("$(SolutionDir).venv\Scripts\python.exe" "$(SolutionDir)Tools\AssetCooker.py" --assets "$(SolutionDir)Game\Assets" --output "$(SolutionDir)Build\Intermediate\Cooked" --pak "$(OutDir)assets.pak") else (python "$(SolutionDir)Tools\AssetCooker.py" --assets "$(SolutionDir)Game\Assets" --output "$(SolutionDir)Build\Intermediate\Cooked" --pak "$(OutDir)assets.pak")</Command>
       <Message>[cook] Game/Assets -&gt; $(OutDir)assets.pak</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
