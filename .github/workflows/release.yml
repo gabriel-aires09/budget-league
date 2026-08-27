@@ -73,13 +73,24 @@ jobs:
 
       - name: Patch raylib to use the static CRT (/MT)
         # raylib's bundled VS2022 project builds Release against the dynamic CRT
-        # (MultiThreadedDLL / MSVCRT.lib). Game.vcxproj links every configuration
-        # against the static CRT (/MT) against one shared raylib.lib, so the two
-        # must match or the link fails with unresolved __imp_* symbols.
+        # (MultiThreadedDLL / MSVCRT.lib), or leaves RuntimeLibrary unset and picks
+        # up the toolset's own /MD default. Game.vcxproj links every configuration
+        # against the static CRT (/MT) against one shared raylib.lib, so raylib
+        # must be forced onto /MT too or the link fails with unresolved __imp_*
+        # symbols (dynamic-CRT case) or no CRT at all (unset case).
         run: |
-          Get-ChildItem -Path Game/ThirdParty/raylib/projects/VS2022 -Filter *.vcxproj -Recurse | ForEach-Object {
+          Get-ChildItem -Path Game/ThirdParty/raylib -Recurse -Include *.vcxproj,*.props,*.targets | ForEach-Object {
             (Get-Content $_.FullName -Raw) -replace 'MultiThreadedDLL', 'MultiThreaded' | Set-Content $_.FullName -NoNewline
           }
+          Set-Content -Path Game/ThirdParty/raylib/projects/VS2022/Directory.Build.props -NoNewline -Value @'
+          <Project>
+            <ItemDefinitionGroup>
+              <ClCompile>
+                <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+              </ClCompile>
+            </ItemDefinitionGroup>
+          </Project>
+          '@
 
       - name: Build raylib.lib (static, /MT, x64)
         run: msbuild Game/ThirdParty/raylib/projects/VS2022/raylib.sln /p:Configuration=Release /p:Platform=x64
