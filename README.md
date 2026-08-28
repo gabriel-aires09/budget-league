@@ -9,6 +9,8 @@ A Rocket League-like game with low-poly graphics. The main idea behind the proje
 
 If everything goes well, I want to implement a split screen two-player mode  (2v2 - 1v1) and online multiplayer as a proof of concept. The arena, ball, goals, boost pads, UI and every sound effect are procedural — the sound cues are synthesised at startup from a table. The only imported art is the Quartenius Cars Pack
 
+https://github.com/user-attachments/assets/3d9dde85-ef74-4928-b805-6736bfb42901
+
 ## Stack
 
 - **Platform:** Linux and Windows
