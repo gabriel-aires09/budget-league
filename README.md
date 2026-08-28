@@ -11,7 +11,7 @@ If everything goes well, I want to implement a split screen two-player mode  (2v
 
 ## Stack
 
-- **Platform:** Linux
+- **Platform:** Linux and Windows
 - **Language:** C++ (GCC / Makefile), with Python for the build tools
 - **Graphics:** [raylib](https://github.com/raysan5/raylib)
 - **Physics:** [Jolt](https://github.com/jrouwe/JoltPhysics)
