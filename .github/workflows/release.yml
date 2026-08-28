@@ -1,0 +1,149 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  
+env:
+  RAYLIB_TAG: "6.0"
+  JOLT_TAG: "v5.6.0"
+  GLM_TAG: "1.0.3"
+  IMGUI_TAG: "v1.92.9b-docking"
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libgl1-mesa-dev libx11-dev libxrandr-dev \
+            libxinerama-dev libxcursor-dev libxi-dev libasound2-dev \
+            python3 python3-venv python3-pip
+
+      - name: Clone ThirdParty dependencies
+        run: |
+          git clone --depth 1 --branch "$RAYLIB_TAG" https://github.com/raysan5/raylib.git Game/ThirdParty/raylib
+          git clone --depth 1 --branch "$JOLT_TAG" https://github.com/jrouwe/JoltPhysics.git Game/ThirdParty/Jolt
+          git clone --depth 1 --branch "$GLM_TAG" https://github.com/g-truc/glm.git Game/ThirdParty/glm
+          git clone --depth 1 --branch "$IMGUI_TAG" https://github.com/ocornut/imgui.git Game/ThirdParty/imgui
+
+      - name: Set up Python tools
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -r Tools/requirements.txt
+
+      - name: Build Release
+        run: make release
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp -r Build/Release BudgetLeague-Linux-x64
+          zip -r dist/BudgetLeague-Linux-x64.zip BudgetLeague-Linux-x64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BudgetLeague-Linux-x64
+          path: dist/BudgetLeague-Linux-x64.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Clone ThirdParty dependencies
+        shell: bash
+        run: |
+          git clone --depth 1 --branch "$RAYLIB_TAG" https://github.com/raysan5/raylib.git Game/ThirdParty/raylib
+          git clone --depth 1 --branch "$JOLT_TAG" https://github.com/jrouwe/JoltPhysics.git Game/ThirdParty/Jolt
+          git clone --depth 1 --branch "$GLM_TAG" https://github.com/g-truc/glm.git Game/ThirdParty/glm
+          git clone --depth 1 --branch "$IMGUI_TAG" https://github.com/ocornut/imgui.git Game/ThirdParty/imgui
+
+      - name: Patch raylib to use the static CRT (/MT)
+        # raylib's bundled VS2022 project builds Release against the dynamic CRT
+        # (MultiThreadedDLL / MSVCRT.lib), or leaves RuntimeLibrary unset and picks
+        # up the toolset's own /MD default. Game.vcxproj links every configuration
+        # against the static CRT (/MT) against one shared raylib.lib, so raylib
+        # must be forced onto /MT too or the link fails with unresolved __imp_*
+        # symbols (dynamic-CRT case) or no CRT at all (unset case).
+        run: |
+          Get-ChildItem -Path Game/ThirdParty/raylib -Recurse -Include *.vcxproj,*.props,*.targets | ForEach-Object {
+            (Get-Content $_.FullName -Raw) -replace 'MultiThreadedDLL', 'MultiThreaded' | Set-Content $_.FullName -NoNewline
+          }
+          Set-Content -Path Game/ThirdParty/raylib/projects/VS2022/Directory.Build.props -NoNewline -Value @'
+          <Project>
+            <ItemDefinitionGroup>
+              <ClCompile>
+                <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+              </ClCompile>
+            </ItemDefinitionGroup>
+          </Project>
+          '@
+
+      - name: Build raylib.lib (static, /MT, x64)
+        run: msbuild Game/ThirdParty/raylib/projects/VS2022/raylib.sln /p:Configuration=Release /p:Platform=x64
+
+      - name: Locate raylib.lib
+        shell: bash
+        run: |
+          LIB_PATH=$(find Game/ThirdParty/raylib -iname "raylib.lib" | head -n 1)
+          if [ -z "$LIB_PATH" ]; then
+            echo "raylib.lib not found after building raylib's VS2022 solution" >&2
+            exit 1
+          fi
+          cp "$LIB_PATH" Game/ThirdParty/raylib/src/raylib.lib
+
+      - name: Set up Python tools
+        run: |
+          python -m venv .venv
+          .venv\Scripts\pip.exe install -r Tools\requirements.txt
+
+      - name: Build Release
+        run: msbuild Game.sln /p:Configuration=Release /p:Platform=x64
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist BudgetLeague-Windows-x64
+          cp Build/Windows/Release/BudgetLeague.exe BudgetLeague-Windows-x64/
+          cp Build/Windows/Release/assets.pak BudgetLeague-Windows-x64/
+          7z a dist/BudgetLeague-Windows-x64.zip BudgetLeague-Windows-x64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BudgetLeague-Windows-x64
+          path: dist/BudgetLeague-Windows-x64.zip
+
+  publish-release:
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/BudgetLeague-Linux-x64/BudgetLeague-Linux-x64.zip
+            dist/BudgetLeague-Windows-x64/BudgetLeague-Windows-x64.zip
